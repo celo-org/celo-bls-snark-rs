@@ -1,0 +1,3 @@
+[submodule "zexe"]
+	path = zexe
+	url = https://github.com/scipr-lab/zexe

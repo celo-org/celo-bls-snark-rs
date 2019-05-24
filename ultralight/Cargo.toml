@@ -1,0 +1,13 @@
+[package]
+name = "bls"
+version = "0.1.0"
+authors = ["Kobi Gurkan <kobigurk@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+snark-gadgets = { path = "../zexe/snark-gadgets" }
+snark = { path = "../zexe/snark" }
+algebra = { path = "../zexe/algebra" }
+
+[dev-dependencies]
+rand = { version = "0.4" }
