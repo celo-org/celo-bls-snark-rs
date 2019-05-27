@@ -1,3 +1,5 @@
+use crate::hash::PRF;
+
 use failure::Error;
 use dpc::crypto_primitives::crh::{
     FixedLengthCRH,
@@ -34,17 +36,14 @@ impl PedersenWindow for Window {
 
 
 
-pub struct Hasher {
+pub struct CompositeHasher {
     parameters: CRHParameters,
-    output_size_in_bits: usize,
 }
 
-impl Hasher {
-
-    pub fn new(output_size_in_bits: usize) -> Result<Hasher, Error> {
-        Ok(Hasher {
-            parameters: Hasher::setup_crh()?,
-            output_size_in_bits: output_size_in_bits,
+impl CompositeHasher {
+    pub fn new() -> Result<CompositeHasher, Error> {
+        Ok(CompositeHasher {
+            parameters: CompositeHasher::setup_crh()?,
         })
     }
 
@@ -63,10 +62,14 @@ impl Hasher {
 
 
     fn setup_crh() -> Result<CRHParameters, Error> {
-        let mut rng = Hasher::prng()?;
+        let mut rng = CompositeHasher::prng()?;
         CRH::setup::<_>(&mut rng)
     }
 
+
+}
+
+impl PRF for CompositeHasher {
     fn crh(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
@@ -74,8 +77,7 @@ impl Hasher {
         Ok(res)
     }
 
-    fn prf(&self, hashed_message: &[u8]) -> Result<Vec<u8>, Error> {
-        let output_size_in_bits = self.output_size_in_bits;
+    fn prf(&self, hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
         let num_hashes = (output_size_in_bits + 256 - 1)/256;
         let last_bits_to_keep = match output_size_in_bits % 256 {
             0 => 256,
@@ -93,13 +95,13 @@ impl Hasher {
             hasher.input(&counter);
             hasher.input(hashed_message);
             let mut hash_result = hasher.result().to_vec();
-            if (i == num_hashes - 1) {
+            if i == num_hashes - 1 {
                 let mut current_index = 0;
                 for j in hash_result.iter_mut() {
-                    if (current_index == last_byte_position) {
+                    if current_index == last_byte_position {
                         //println!("last byte: {}", *j);
                         *j = *j & last_byte_mask;
-                    } else if (current_index > last_byte_position) {
+                    } else if current_index > last_byte_position {
                         *j = 0;
                     }
                     current_index+=1;
@@ -110,29 +112,29 @@ impl Hasher {
 
         Ok(result)
     }
-
-    fn hash(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    fn hash(&self, message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
         let hashed_message = self.crh(message)?;
-        self.prf(&hashed_message)
+        self.prf(&hashed_message, output_size_in_bits)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Hasher};
+    use crate::hash::PRF;
+    use super::{CompositeHasher as Hasher};
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
-        let hasher = Hasher::new(256).unwrap();
+        let hasher = Hasher::new().unwrap();
         let result = hasher.crh(&msg).unwrap();
         //println!("crh result: {:x?}", &result);
     }
 
     #[test]
     fn test_crh_random() {
-        let hasher = Hasher::new(256).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
@@ -144,66 +146,65 @@ mod test {
 
     #[test]
     fn test_prf_random_768() {
-        let hasher = Hasher::new(768).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result).unwrap();
+        let prf_result = hasher.prf(&result, 768).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
     #[test]
     fn test_prf_random_769() {
-        let hasher = Hasher::new(769).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x0dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result).unwrap();
+        let prf_result = hasher.prf(&result, 769).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
     #[test]
     fn test_prf_random_760() {
-        let hasher = Hasher::new(760).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result).unwrap();
+        let prf_result = hasher.prf(&result, 760).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
     #[test]
     fn test_hash_random() {
-        let hasher = Hasher::new(760).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 9820*4/8];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.hash(&msg).unwrap();
+        let result = hasher.hash(&msg, 760).unwrap();
         //println!("hash result: {:?}", &result);
     }
 
     #[test]
     #[should_panic]
     fn test_invalid_message() {
-        let hasher = Hasher::new(760).unwrap();
+        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 9820*4/8 + 1];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.hash(&msg).unwrap();
+        let result = hasher.hash(&msg, 760).unwrap();
         //println!("hash result: {:?}", &result);
     }
-
 }
