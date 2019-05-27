@@ -33,6 +33,6 @@ use algebra::{
     PairingEngine,
 };
 
-pub trait HashToG2<P: Bls12Parameters> {
-    fn hash(&self, message: &[u8]) -> Result<G2Projective::<P>, Error>;
+pub trait HashToG2 {
+    fn hash<P: Bls12Parameters>(&self, message: &[u8]) -> Result<G2Projective<P>, Error>;
 }
