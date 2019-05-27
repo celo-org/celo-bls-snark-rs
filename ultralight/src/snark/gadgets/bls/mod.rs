@@ -77,6 +77,7 @@ mod test {
         fields::bls12_377::Fr as Bls12_377Fr,
         BitIterator, PrimeField,
     };
+    use rand::{Rng, SeedableRng, XorShiftRng};
 
     use super::BlsVerifyGadget;
 
