@@ -2,7 +2,8 @@ use failure::Error;
 use crate::{
     hash::PRF,
     curve::{
-        hash::HashToG2
+        hash::HashToG2,
+        cofactor,
     },
 };
 use byteorder::{
@@ -81,7 +82,7 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
             let possible_x: Fp2::<P::Fp2Params> = FromBytes::read(hash.as_slice())?;
             match get_point_from_x::<P>(possible_x, true) {
                 None => continue,
-                Some(x) => return Ok(x.into_projective()),
+                Some(x) => return Ok(cofactor::scale_by_cofactor_fuentes::<P>(&x.into_projective())),
             }
         }
         Err(HashToCurveError::CannotFindPoint)?
