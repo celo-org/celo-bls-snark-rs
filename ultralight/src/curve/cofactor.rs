@@ -1,5 +1,5 @@
 use std::{
-    ops::{Mul, Neg, Add, Div},
+    ops::{Mul, Neg, Div},
 };
 
 use algebra::{
@@ -180,7 +180,7 @@ mod test {
     fn test_scale_by_cofactor_scott() {
         let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-        for i in 0..5 {
+        for _i in 0..5 {
             let p: G2Projective = rng.gen();
             let scott_cofactor = scale_by_cofactor_scott::<Bls12_377Parameters>(&p);
 
@@ -197,7 +197,7 @@ mod test {
         let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let X = curve_X::<Bls12_377Parameters>();
 
-        for i in 0..5 {
+        for _i in 0..5 {
             let p: G2Projective = rng.gen();
             let fuentes_cofactor = scale_by_cofactor_fuentes::<Bls12_377Parameters>(&p);
 

@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::{Criterion, Fun, ParameterizedBenchmark};
-use criterion::black_box;
+use criterion::{Criterion, ParameterizedBenchmark};
+
 
 use algebra::curves::{
     ProjectiveCurve,
@@ -19,7 +19,7 @@ fn bench_scale_by_cofactor(c: &mut Criterion) {
     let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let mut points: Vec<G2Projective> = vec![];
     const SAMPLES: usize =  3;
-    for i in 0..SAMPLES {
+    for _i in 0..SAMPLES {
         points.push(rng.gen());
     }
     /*

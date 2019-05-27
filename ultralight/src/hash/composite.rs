@@ -128,7 +128,7 @@ mod test {
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
         let hasher = Hasher::new().unwrap();
-        let result = hasher.crh(&msg).unwrap();
+        let _result = hasher.crh(&msg).unwrap();
         //println!("crh result: {:x?}", &result);
     }
 
@@ -140,7 +140,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.crh(&msg).unwrap();
+        let _result = hasher.crh(&msg).unwrap();
         //println!("crh result: {:x?}", &result);
     }
 
@@ -153,7 +153,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result, 768).unwrap();
+        let _prf_result = hasher.prf(&result, 768).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
@@ -166,7 +166,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result, 769).unwrap();
+        let _prf_result = hasher.prf(&result, 769).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
@@ -179,7 +179,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let prf_result = hasher.prf(&result, 760).unwrap();
+        let _prf_result = hasher.prf(&result, 760).unwrap();
         //println!("prf result: {:?}", &prf_result);
     }
 
@@ -191,7 +191,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.hash(&msg, 760).unwrap();
+        let _result = hasher.hash(&msg, 760).unwrap();
         //println!("hash result: {:?}", &result);
     }
 
@@ -204,7 +204,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.hash(&msg, 760).unwrap();
+        let _result = hasher.hash(&msg, 760).unwrap();
         //println!("hash result: {:?}", &result);
     }
 }

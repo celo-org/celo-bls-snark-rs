@@ -2,7 +2,6 @@ use failure::Error;
 use crate::{
     hash::PRF,
     curve::{
-        self,
         hash::HashToG2
     },
 };
@@ -108,9 +107,6 @@ mod test {
     };
 
     use algebra::curves::{
-        models::bls12::{
-            Bls12Parameters,
-        },
         bls12_377::{
             Bls12_377Parameters,
             G2Projective,
@@ -121,6 +117,6 @@ mod test {
     fn test_hash_to_curve() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>(&[]).unwrap();
+        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>(&[]).unwrap();
     }
 }

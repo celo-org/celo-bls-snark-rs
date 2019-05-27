@@ -6,7 +6,7 @@ use snark_gadgets::{
     utils::{AllocGadget, EqGadget},
 };
 use algebra::{
-    utils::ToEngineFr, AffineCurve, PairingEngine, ProjectiveCurve,
+    AffineCurve, PairingEngine, ProjectiveCurve,
 };
 pub struct BlsVerifyGadget<
     PairingE: PairingEngine,
@@ -53,7 +53,6 @@ mod test {
 
     use snark::ConstraintSystem;
     use snark_gadgets::{
-        pairing::PairingGadget,
         test_constraint_system::TestConstraintSystem,
         pairing::bls12_377::{
             PairingGadget as Bls12_377PairingGadget,
@@ -75,9 +74,8 @@ mod test {
             ProjectiveCurve,
         },
         fields::bls12_377::Fr as Bls12_377Fr,
-        BitIterator, PrimeField,
     };
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    
 
     use super::BlsVerifyGadget;
 
