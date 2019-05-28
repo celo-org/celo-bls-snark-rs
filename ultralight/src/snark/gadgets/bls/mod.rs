@@ -1,12 +1,10 @@
+use algebra::{PairingEngine, ProjectiveCurve};
 use snark::{ConstraintSystem, SynthesisError};
 use snark_gadgets::{
-    groups::GroupGadget,
     fields::FieldGadget,
+    groups::GroupGadget,
     pairing::PairingGadget,
     utils::{AllocGadget, EqGadget},
-};
-use algebra::{
-    AffineCurve, PairingEngine, ProjectiveCurve,
 };
 pub struct BlsVerifyGadget<
     PairingE: PairingEngine,
@@ -18,9 +16,11 @@ pub struct BlsVerifyGadget<
     pub signature: P::G2Gadget,
 }
 
-impl<PairingE: PairingEngine,
-    ConstraintE: PairingEngine,
-    P: PairingGadget<PairingE, ConstraintE>> BlsVerifyGadget<PairingE, ConstraintE, P>
+impl<
+        PairingE: PairingEngine,
+        ConstraintE: PairingEngine,
+        P: PairingGadget<PairingE, ConstraintE>,
+    > BlsVerifyGadget<PairingE, ConstraintE, P>
 {
     pub fn alloc<CS: ConstraintSystem<ConstraintE>>(
         &self,
@@ -30,11 +30,17 @@ impl<PairingE: PairingEngine,
         for (i, pk) in self.pub_keys.iter().enumerate() {
             aggregated_pk = aggregated_pk.add(cs.ns(|| format!("add pk {}", i)), pk)?;
         }
-        let prepared_aggregated_pk = P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
-        let prepared_message_hash = P::prepare_g2(cs.ns(|| "prepared message hash"), &self.message_hash)?;
+        let prepared_aggregated_pk =
+            P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
+        let prepared_message_hash =
+            P::prepare_g2(cs.ns(|| "prepared message hash"), &self.message_hash)?;
         let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &self.signature)?;
-        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || Ok(PairingE::G1Projective::prime_subgroup_generator()))?.negate(cs.ns(|| "negate g1 generator"))?;
-        let prepared_g1_neg_generator = P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
+        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
+            Ok(PairingE::G1Projective::prime_subgroup_generator())
+        })?
+        .negate(cs.ns(|| "negate g1 generator"))?;
+        let prepared_g1_neg_generator =
+            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
         let bls_equation = P::product_of_pairings(
             cs.ns(|| "verify BLS signature"),
             &[prepared_g1_neg_generator, prepared_aggregated_pk],
@@ -46,28 +52,14 @@ impl<PairingE: PairingEngine,
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use rand;
 
-    use snark::ConstraintSystem;
-    use snark_gadgets::{
-        test_constraint_system::TestConstraintSystem,
-        pairing::bls12_377::{
-            PairingGadget as Bls12_377PairingGadget,
-        },
-        groups::bls12::bls12_377::{
-            G1Gadget as Bls12_377G1Gadget,
-            G2Gadget as Bls12_377G2Gadget,
-        },
-        utils::AllocGadget,
-    };
     use algebra::{
         curves::{
             bls12_377::{
-                Bls12_377,
-                G1Projective as Bls12_377G1Projective,
+                Bls12_377, G1Projective as Bls12_377G1Projective,
                 G2Projective as Bls12_377G2Projective,
             },
             sw6::SW6,
@@ -75,7 +67,13 @@ mod test {
         },
         fields::bls12_377::Fr as Bls12_377Fr,
     };
-    
+    use snark::ConstraintSystem;
+    use snark_gadgets::{
+        groups::bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget, G2Gadget as Bls12_377G2Gadget},
+        pairing::bls12_377::PairingGadget as Bls12_377PairingGadget,
+        test_constraint_system::TestConstraintSystem,
+        utils::AllocGadget,
+    };
 
     use super::BlsVerifyGadget;
 
@@ -86,14 +84,17 @@ mod test {
 
         let generator = Bls12_377G1Projective::prime_subgroup_generator();
         let pub_key = generator * &secret_key;
-        let signature = message_hash* &secret_key;
+        let signature = message_hash * &secret_key;
         let fake_signature: Bls12_377G2Projective = rand::random();
 
         {
             let mut cs = TestConstraintSystem::<SW6>::new();
-            let message_hash_var = Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
-            let pub_key_var = Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
-            let signature_var = Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget> {
                 pub_keys: [pub_key_var].to_vec(),
@@ -107,9 +108,12 @@ mod test {
         }
         {
             let mut cs = TestConstraintSystem::<SW6>::new();
-            let message_hash_var = Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
-            let pub_key_var = Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
-            let signature_var = Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
             let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget> {
                 pub_keys: [pub_key_var].to_vec(),

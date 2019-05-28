@@ -1,45 +1,19 @@
-use std::ops::{Mul, Neg};
-use rand::{thread_rng, Rng};
-use failure::Error;
-use crate::{
-    hash::composite::CompositeHasher,
-    curve::hash::HashToG2,
-};
+use crate::curve::hash::HashToG2;
 use algebra::{
-    bytes::{ToBytes, FromBytes},
-    biginteger::BigInteger,
-    fields::{
-        Field, Fp2,
-        SquareRootField,
-        fp6_3over2::Fp6,
-        fp12_2over3over2::Fp12,
-        BitIterator,
-        PrimeField,
-        FpParameters,
-        bls12_377::{Fr, Fq12},
-    },
     curves::{
-        AffineCurve,
-        ProjectiveCurve,
-        PairingCurve,
-        bls12_377::{
-            Bls12_377,
-            Bls12_377Parameters,
-            G1Affine,
-            G1Projective,
-            G2Affine,
-            G2Projective
-        },
-        models::{
-            ModelParameters,
-            SWModelParameters,
-            bls12::{
-                Bls12Parameters,
-            }
-        },
-        PairingEngine,
+        bls12_377::{Bls12_377, Bls12_377Parameters, G1Affine, G1Projective, G2Projective},
+        AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve,
+    },
+    fields::{
+        bls12_377::{Fq12, Fr},
+        Field,
     },
 };
+use failure::Error;
+use rand::Rng;
+
+/// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
+use std::ops::{Mul, Neg};
 
 pub struct PrivateKey {
     sk: Fr,
@@ -47,23 +21,23 @@ pub struct PrivateKey {
 
 impl PrivateKey {
     pub fn generate<R: Rng>(rng: &mut R) -> PrivateKey {
-        PrivateKey {
-            sk: rng.gen(),
-        }
+        PrivateKey { sk: rng.gen() }
     }
 
     pub fn from_sk(sk: &Fr) -> PrivateKey {
-        PrivateKey {
-            sk: sk.clone(),
-        }
+        PrivateKey { sk: sk.clone() }
     }
 
     pub fn get_sk(&self) -> Fr {
-        self.sk
+        self.sk.clone()
     }
 
     pub fn sign<H: HashToG2>(&self, message: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
-        Ok(Signature::from_sig(&hash_to_g2.hash::<Bls12_377Parameters>(message)?.mul(&self.sk)))
+        Ok(Signature::from_sig(
+            &hash_to_g2
+                .hash::<Bls12_377Parameters>(message)?
+                .mul(&self.sk),
+        ))
     }
 
     pub fn to_public(&self) -> PublicKey {
@@ -83,13 +57,11 @@ pub struct PublicKey {
 
 impl PublicKey {
     pub fn from_pk(pk: &G1Projective) -> PublicKey {
-        PublicKey {
-            pk: pk.clone(),
-        }
+        PublicKey { pk: pk.clone() }
     }
 
     pub fn get_pk(&self) -> G1Projective {
-        self.pk
+        self.pk.clone()
     }
 
     pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
@@ -98,15 +70,27 @@ impl PublicKey {
             apk = apk + &(*i).pk;
         }
 
-        PublicKey {
-            pk: apk,
-        }
+        PublicKey { pk: apk }
     }
 
-    pub fn verify<H: HashToG2>(&self, message: &[u8], signature: &Signature, hash_to_g2: &H) -> Result<(), Error> {
+    pub fn verify<H: HashToG2>(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        hash_to_g2: &H,
+    ) -> Result<(), Error> {
         let pairing = Bls12_377::product_of_pairings(&vec![
-            (&G1Affine::prime_subgroup_generator().neg().prepare(), &signature.get_sig().into_affine().prepare()),
-            (&self.pk.into_affine().prepare(), &hash_to_g2.hash::<Bls12_377Parameters>(message)?.into_affine().prepare()),
+            (
+                &G1Affine::prime_subgroup_generator().neg().prepare(),
+                &signature.get_sig().into_affine().prepare(),
+            ),
+            (
+                &self.pk.into_affine().prepare(),
+                &hash_to_g2
+                    .hash::<Bls12_377Parameters>(message)?
+                    .into_affine()
+                    .prepare(),
+            ),
         ]);
         if pairing == Fq12::one() {
             Ok(())
@@ -117,18 +101,16 @@ impl PublicKey {
 }
 
 pub struct Signature {
-    sig: G2Projective
+    sig: G2Projective,
 }
 
 impl Signature {
     pub fn from_sig(sig: &G2Projective) -> Signature {
-        Signature {
-            sig: sig.clone(),
-        }
+        Signature { sig: sig.clone() }
     }
 
     pub fn get_sig(&self) -> G2Projective {
-        self.sig
+        self.sig.clone()
     }
 
     pub fn aggregate(signatures: &[&Signature]) -> Signature {
@@ -137,32 +119,17 @@ impl Signature {
             asig = asig + &(*i).sig;
         }
 
-        Signature {
-            sig: asig,
-        }
+        Signature { sig: asig }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use rand::{thread_rng, Rng};
     use super::*;
     use crate::{
-        hash::{
-            PRF,
-            composite::CompositeHasher,
-        },
-        curve::{
-            hash::{
-                HashToG2,
-                try_and_increment::{
-                    TryAndIncrement,
-                },
-            },
-        },
+        curve::hash::try_and_increment::TryAndIncrement, hash::composite::CompositeHasher,
     };
-
-
+    use rand::thread_rng;
 
     #[test]
     fn test_simple_sig() {
@@ -177,7 +144,8 @@ mod test {
         let pk = sk.to_public();
         pk.verify(&message[..], &sig, &try_and_increment).unwrap();
         let message2 = b"goodbye";
-        pk.verify(&message2[..], &sig, &try_and_increment).unwrap_err();
+        pk.verify(&message2[..], &sig, &try_and_increment)
+            .unwrap_err();
     }
 
     #[test]
@@ -196,9 +164,13 @@ mod test {
         let apk = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
         let asig = Signature::aggregate(&[&sig1, &sig2]);
         apk.verify(&message[..], &asig, &try_and_increment).unwrap();
-        apk.verify(&message[..], &sig1, &try_and_increment).unwrap_err();
-        sk1.to_public().verify(&message[..], &asig, &try_and_increment).unwrap_err();
+        apk.verify(&message[..], &sig1, &try_and_increment)
+            .unwrap_err();
+        sk1.to_public()
+            .verify(&message[..], &asig, &try_and_increment)
+            .unwrap_err();
         let message2 = b"goodbye";
-        apk.verify(&message2[..], &asig, &try_and_increment).unwrap_err();
+        apk.verify(&message2[..], &asig, &try_and_increment)
+            .unwrap_err();
     }
 }
