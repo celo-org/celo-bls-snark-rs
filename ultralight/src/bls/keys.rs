@@ -131,21 +131,32 @@ mod test {
     };
     use rand::thread_rng;
 
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
     #[test]
     fn test_simple_sig() {
-        let message = b"hello";
-        let rng = &mut thread_rng();
+        init();
 
+        let rng = &mut thread_rng();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let sk = PrivateKey::generate(rng);
 
-        let sig = sk.sign(&message[..], &try_and_increment).unwrap();
-        let pk = sk.to_public();
-        pk.verify(&message[..], &sig, &try_and_increment).unwrap();
-        let message2 = b"goodbye";
-        pk.verify(&message2[..], &sig, &try_and_increment)
-            .unwrap_err();
+        for _ in 0..100 {
+            let mut message: Vec<u8> = vec![];
+            for _ in 0..32 {
+                message.push(rng.gen());
+            }
+            let sk = PrivateKey::generate(rng);
+
+            let sig = sk.sign(&message[..], &try_and_increment).unwrap();
+            let pk = sk.to_public();
+            pk.verify(&message[..], &sig, &try_and_increment).unwrap();
+            let message2 = b"goodbye";
+            pk.verify(&message2[..], &sig, &try_and_increment)
+                .unwrap_err();
+        }
     }
 
     #[test]
