@@ -16,3 +16,9 @@ jobs:
       - checkout
       - run: cargo test
 
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - ultralight-tests
+      - zexe-tests
