@@ -1,12 +1,18 @@
 version: 2
 jobs:
+  instal-dependencies:
+    docker:
+      - image: circleci/rust:latest
+    steps:
+      - run: rustup install nightly
+
   ultralight-tests:
     docker:
       - image: circleci/rust:latest
 
     steps:
       - checkout
-      - run: cd ultralight && cargo +nightly test
+      - run: cd ultralight && cargo +nightly test --release
 
   zexe-tests:
     docker:
@@ -14,11 +20,16 @@ jobs:
 
     steps:
       - checkout
-      - run: cargo test
+      - run: cd zexe && cargo test
 
 workflows:
   version: 2
-  build-and-test:
+  run-tests:
     jobs:
+      - install-dependencies
       - ultralight-tests
+          requires:
+            - install-dependencies
       - zexe-tests
+          requires:
+            - install-dependencies
