@@ -6,7 +6,7 @@ defaults: &defaults
     - image: circleci/rust:latest
 
 jobs:
-  install-dependencies:
+  checkout-repo:
     <<: *defaults
     steps:
       - checkout
@@ -15,7 +15,6 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: .
-
 
   ultralight-tests:
     <<: *defaults
@@ -30,16 +29,17 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/app
-      - run: cd zexe && cargo test
+      - run: rustup install nightly
+      - run: cd zexe && cargo +nightly test --release
 
 workflows:
   version: 2
   run-tests:
     jobs:
-      - install-dependencies
+      - checkout-repo
       - ultralight-tests:
           requires:
-            - install-dependencies
+            - checkout-repo
       - zexe-tests:
           requires:
-            - install-dependencies
+            - checkout-repo
