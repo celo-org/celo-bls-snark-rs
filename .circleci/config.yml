@@ -1,0 +1,18 @@
+version: 2
+jobs:
+  ultralight-tests:
+    docker:
+      - image: circleci/rust:latest
+
+    steps:
+      - checkout
+      - run: cd ultralight && cargo +nightly test
+
+  zexe-tests:
+    docker:
+      - image: circleci/rust:latest
+
+    steps:
+      - checkout
+      - run: cargo test
+
