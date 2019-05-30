@@ -27,9 +27,9 @@ workflows:
   run-tests:
     jobs:
       - install-dependencies
-      - ultralight-tests
+      - ultralight-tests:
           requires:
             - install-dependencies
-      - zexe-tests
+      - zexe-tests:
           requires:
             - install-dependencies
