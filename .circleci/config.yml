@@ -1,12 +1,17 @@
 version: 2
+
+defaults: &defaults
+  working_directory: ~/app
+  docker:
+    - image: circleci/rust:latest
+
 jobs:
   install-dependencies:
-    docker:
-      - image: circleci/rust:latest
+    <<: *defaults
     steps:
+      - checkout
       - attach_workspace:
           at: ~/app
-      - checkout
       - run: rustup install nightly
       - persist_to_workspace:
           root: .
@@ -14,9 +19,7 @@ jobs:
 
 
   ultralight-tests:
-    docker:
-      - image: circleci/rust:latest
-
+    <<: *defaults
     steps:
       - attach_workspace:
           at: ~/app
@@ -24,9 +27,7 @@ jobs:
       - run: cd ultralight && cargo +nightly test --release
 
   zexe-tests:
-    docker:
-      - image: circleci/rust:latest
-
+    <<: *defaults
     steps:
       - attach_workspace:
           at: ~/app
