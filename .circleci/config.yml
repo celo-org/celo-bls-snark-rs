@@ -4,9 +4,9 @@ jobs:
     docker:
       - image: circleci/rust:latest
     steps:
-      - checkout
       - attach_workspace:
           at: ~/app
+      - checkout
       - run: rustup install nightly
       - persist_to_workspace:
           root: .
@@ -20,6 +20,7 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/app
+      - run: ls
       - run: cd ultralight && cargo +nightly test --release
 
   zexe-tests:
