@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  instal-dependencies:
+  install-dependencies:
     docker:
       - image: circleci/rust:latest
     steps:
