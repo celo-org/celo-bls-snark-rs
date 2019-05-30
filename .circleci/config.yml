@@ -12,7 +12,6 @@ jobs:
       - checkout
       - attach_workspace:
           at: ~/app
-      - run: rustup install nightly
       - persist_to_workspace:
           root: .
           paths: .
@@ -23,7 +22,7 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/app
-      - run: ls
+      - run: rustup install nightly
       - run: cd ultralight && cargo +nightly test --release
 
   zexe-tests:
