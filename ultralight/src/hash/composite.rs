@@ -8,8 +8,8 @@ use dpc::crypto_primitives::crh::{
 use failure::Error;
 use rand::{chacha::ChaChaRng, Rng, SeedableRng};
 
+use blake2_rfc::blake2s::Blake2s;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use sha2::{Digest, Sha256};
 
 type CRH = PedersenCRH<Edwards, Window>;
 type CRHParameters = PedersenParameters<Edwards>;
@@ -34,10 +34,10 @@ impl CompositeHasher {
     }
 
     fn prng() -> Result<impl Rng, Error> {
-        let mut hasher = Sha256::new();
-        hasher.input(b"ULTRALIGHT PRNG SEED");
+        let mut hasher = Blake2s::with_params(32, &[], &[], b"UL_prngs");
+        hasher.update(b"ULTRALIGHT PRNG SEED");
         let mut seed = vec![];
-        let hash_result = hasher.result();
+        let hash_result = hasher.finalize().as_ref().to_vec();
         for i in 0..hash_result.len() / 4 {
             let mut buf = &hash_result[i..i + 4];
             let num = buf.read_u32::<LittleEndian>()?;
@@ -72,11 +72,11 @@ impl PRF for CompositeHasher {
 
         let mut result = vec![];
         for i in 0..num_hashes {
-            let mut hasher = Sha256::new();
+            let mut hasher = Blake2s::with_params(32, &[], &[], b"ULforprf");
             (&mut counter[..]).write_u32::<LittleEndian>(i as u32)?;
-            hasher.input(&counter);
-            hasher.input(hashed_message);
-            let mut hash_result = hasher.result().to_vec();
+            hasher.update(&counter);
+            hasher.update(hashed_message);
+            let mut hash_result = hasher.finalize().as_ref().to_vec();
             if i == num_hashes - 1 {
                 let mut current_index = 0;
                 for j in hash_result.iter_mut() {
