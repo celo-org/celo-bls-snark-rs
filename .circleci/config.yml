@@ -1,0 +1,45 @@
+version: 2
+
+defaults: &defaults
+  working_directory: ~/app
+  docker:
+    - image: circleci/rust:latest
+
+jobs:
+  checkout-repo:
+    <<: *defaults
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/app
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  ultralight-tests:
+    <<: *defaults
+    steps:
+      - attach_workspace:
+          at: ~/app
+      - run: rustup install nightly
+      - run: cd ultralight && cargo +nightly test --release
+
+  zexe-tests:
+    <<: *defaults
+    steps:
+      - attach_workspace:
+          at: ~/app
+      - run: rustup install nightly
+      - run: cd zexe && cargo +nightly test --release
+
+workflows:
+  version: 2
+  run-tests:
+    jobs:
+      - checkout-repo
+      - ultralight-tests:
+          requires:
+            - checkout-repo
+      - zexe-tests:
+          requires:
+            - checkout-repo
