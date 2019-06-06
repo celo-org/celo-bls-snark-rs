@@ -1,0 +1,376 @@
+\def\notes{1}
+\documentclass[11pt]{article}
+%\usepackage[T1]{fontenc}
+%\usepackage[letterpaper]{geometry}
+%\geometry{verbose,tmargin=3cm,bmargin=3cm,lmargin=3cm,rmargin=3cm}
+%\usepackage{verbatim}
+\usepackage{amsfonts,amsmath,amssymb,amsthm}
+%\usepackage{setspace}
+\usepackage{xspace}%,enumitem}
+%\usepackage{times}
+\usepackage{fullpage,array}
+%\usepackage{hyperref}
+%\doublespacing
+\usepackage{color}
+\usepackage{numdef}
+\usepackage{enumitem}
+\usepackage{amsopn}
+%\usepackage{hyperref} 
+\usepackage{mathrsfs}
+\usepackage{float}
+\restylefloat{table}
+\usepackage{makecell}
+
+\renewcommand\theadalign{bc}
+\renewcommand\theadfont{\bfseries}
+\renewcommand\theadgape{\Gape[4pt]}
+\renewcommand\cellgape{\Gape[4pt]}
+\providecommand{\sqbinom}{\genfrac{\lbrack}{\rbrack}{0pt}{}}
+\DeclareMathOperator{\spn}{span}
+
+\newif\ifdraft
+%\drafttrue
+\draftfalse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Textclass specific LaTeX commands.
+%\numberwithin{equation}{section} %% Comment out for sequentially-numbered
+\numberwithin{figure}{section} %% Comment out for sequentially-numbered
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{conjecture}[thm]{Conjecture}
+\newtheorem{definition}[thm]{Definition}
+\newtheorem{dfn}[thm]{Definition}
+\newtheorem{lemma}[thm]{Lemma}
+\newtheorem{remark}[thm]{Remark}
+\newtheorem{proposition}[thm]{Proposition}
+\newtheorem{corollary}[thm]{Corollary}
+\newtheorem{claim}[thm]{Claim}
+\newtheorem{fact}[thm]{Fact}
+\newtheorem{openprob}[thm]{Open Problem}
+\newtheorem{remk}[thm]{Remark}
+\newtheorem{example}[thm]{Example}
+\newtheorem{apdxlemma}{Lemma}
+\newcommand{\question}[1]{{\sf [#1]\marginpar{?}} }
+%\usepackage{babel}
+\usepackage{tikz}
+
+\makeatletter
+\newcommand*{\circled}{\@ifstar\circledstar\circlednostar}
+\makeatother
+
+\newcommand*\circledstar[1]{%
+  \tikz[baseline=(C.base)]
+    \node[%
+      fill,
+      circle,
+      minimum size=1.35em,
+      text=white,
+      font=\sffamily,
+      inner sep=0.5pt
+    ](C) {#1};%
+}
+\newcommand*\circlednostar[1]{%
+  \tikz[baseline=(C.base)]
+    \node[%
+      draw,
+      circle,
+      minimum size=1.35em,
+      font=\sffamily,
+      inner sep=0.5pt
+    ](C) {#1};%
+}
+
+\providecommand{\bd}[1]{\circled{#1}}
+
+
+%Eli's macros
+\newcommand{\E}{{\mathbb{E}}}
+%\newcommand{\N}{{\mathbb{N}}}
+\newcommand{\R}{{\mathbb{R}}}
+\newcommand{\calF}{{\cal{F}}}
+%\newcommand{\inp}[1]{\langle{#1}\rangle}
+\newcommand{\disp}[1]{D_{#1}}
+%\newcommand{\spn}[1]{{\rm{span}}\left(#1\right)}
+%\newcommand{\supp}{{\rm{supp}}}
+\newcommand{\agree}{{\sf{agree}}}
+\newcommand{\RS}{{\sf{RS}}}
+\newcommand{\aRS}{{\sf{aRS}}}
+\newcommand{\rrs}{R_{\aRS}}
+\newcommand{\VRS}{V_\RS}
+\newcommand{\x}{\ensuremath{\mathbf{x}}\xspace}
+\renewcommand{\max}{\ensuremath{\mathrm{\mathbf{max}}}\xspace}
+\newcommand{\summ}{\ensuremath{\sum_{i\in H}}\xspace}
+\newcommand{\summa}{\ensuremath{\sum_{a\in H}}\xspace}
+\renewcommand{\a}{\ensuremath{\mathbf{a}}\xspace}
+
+\newcommand{\X}{\ensuremath{\mathbf{X}}\xspace}
+\newcommand{\Y}{\ensuremath{\mathbf{Y}}\xspace}
+\newcommand{\y}{\ensuremath{\mathbf{y}}\xspace}
+
+\newcommand{\set}[1]{\ensuremath{\left\{#1\right\}}\xspace}
+\newcommand{\angles}[1]{\langle{#1}\rangle}
+\renewcommand{\span}{\ensuremath{\mathsf{span}}\xspace}
+\newcommand{\condset}[2]{\set{#1 \mid #2 }}
+\newcommand{\zo}{\set{0,1}}
+\newcommand{\zon}{{\zo^n}}
+\newcommand{\zom}{{\zo^m}}
+\newcommand{\zok}{{\zo^}}
+\newcommand{\eps}{\epsilon}
+\newcommand{\e}{\eps}
+%\newcommand{\d}{\delta}
+\newcommand{\poly}{\ensuremath{\mathrm{poly}(\lambda)}\xspace}
+\newcommand{\polylog}{\ensuremath{\mathrm{polylog}(\lambda)}\xspace}
+\newcommand{\itone}{{\it{(i)}}\xspace}
+\newcommand{\ittwo}{{\it{(ii)}}\xspace}
+\newcommand{\itthree}{{\it{(iii)}}\xspace}
+\newcommand{\itfour}{{\it{(iv)}}\xspace}
+\newcommand{\cc}{{\rm{CC}}}
+\newcommand{\rnk}{{\rm{rank}}}
+\newcommand{\T}{T}
+\newcommand{\I}{{\mathbb{I}}}
+\ifdraft
+\newcommand{\ariel}[1]{{\color{blue}{\textit{#1 --- ariel gabizon}}}}
+\else
+\newcommand{\ariel}[1]{}
+\fi
+\providecommand{\improvement}[1]{{\color{red} \textbf{#1}}}
+ \mathchardef\mhyphen="2D
+
+\num\newcommand{\G1}{\ensuremath{{\mathbb G}_1}\xspace}
+%\newcommand{\G}{\ensuremath{{\mathbb G}}\xspace}
+\newcommand{\Gstar}{\ensuremath{{\mathbb G}^*}\xspace}
+
+\num\newcommand{\G2}{\ensuremath{{\mathbb G}_2}\xspace}
+%\num\newcommand{\G11}{\ensuremath{\G1\setminus \set{0} }\xspace}
+%\num\newcommand{\G21}{\ensuremath{\G2\setminus \set{0} }\xspace}
+\newcommand{\grouppair}{\ensuremath{G^*}\xspace}
+
+\newcommand{\Gt}{\ensuremath{{\mathbb G}_t}\xspace}
+\newcommand{\F}{\ensuremath{\mathbb F}\xspace}
+\newcommand{\Fstar}{\ensuremath{\mathbb F^*}\xspace}
+
+\newcommand{\help}[1]{$#1$-helper\xspace}
+\newcommand{\randompair}[1]{\ensuremath{\mathsf{randomPair}(#1)}\xspace}
+\newcommand{\pair}[1]{$#1$-pair\xspace}
+\newcommand{\pairs}[1]{$#1$-pairs\xspace}
+
+\newcommand{\pairone}[1]{\G1-$#1$-pair\xspace}
+\newcommand{\pairtwo}[1]{\G2-$#1$-pair\xspace}
+\newcommand{\sameratio}[2]{\ensuremath{\mathsf{SameRatio}(#1,#2)}\xspace}
+\newcommand{\vecc}[2]{\ensuremath{(#1)_{#2}}\xspace}
+\newcommand{\players}{\ensuremath{[n]}\xspace}
+\newcommand{\adv}{\ensuremath{\mathcal A}\xspace}
+\newcommand{\advprime}{\ensuremath{{\mathcal A}'}\xspace}
+\newcommand{\extprime}{\ensuremath{E'}\xspace}
+\newcommand{\advrand}{\ensuremath{\mathsf{rand}_{\adv}}\xspace}
+
+\newcommand{\ci}{\ensuremath{\mathrm{CI}}\xspace}
+\renewcommand{\deg}{\ensuremath{\mathrm{deg}}\xspace}
+\newcommand{\pairvec}[1]{$#1$-vector\xspace}
+\newcommand{\Fq}{\ensuremath{\mathbb{F}_q}\xspace}
+\newcommand{\randpair}[1]{\ensuremath{\mathsf{rp}_{#1}}\xspace}
+\newcommand{\randpairone}[1]{\ensuremath{\mathsf{rp}_{#1}^{1}}\xspace}
+\newcommand{\abase}{\ensuremath{A_{\mathrm{\mathbf{0}}}}\xspace}
+\newcommand{\bbase}{\ensuremath{B_{\mathrm{\mathbf{0}}}}\xspace}
+\newcommand{\cbase}{\ensuremath{C_{\mathrm{\mathbf{0}}}}\xspace}
+
+\newcommand{\amid}{\ensuremath{A_{\mathrm{mid}}}\xspace}
+\newcommand{\bmid}{\ensuremath{B_{\mathrm{mid}}}\xspace}
+\newcommand{\cmid}{\ensuremath{C_{\mathrm{mid}}}\xspace}
+
+\newcommand{\negl}{\ensuremath{\mathsf{negl}(\lambda)}\xspace}
+\newcommand{\randpairtwo}[1]{\ensuremath{\mathsf{rp_{#1}^2}}\xspace}%the randpair in G2
+\newcommand{\nilp}{\ensuremath{\mathscr N}\xspace}
+\newcommand{\snark}{\ensuremath{\mathscr S}\xspace}
+\newcommand{\groupgen}{\ensuremath{\mathscr G}\xspace}
+\newcommand{\qap}{\ensuremath{\mathscr Q}\xspace}
+
+\newcommand{\rej}{\ensuremath{\mathsf{rej}}\xspace}
+\newcommand{\acc}{\ensuremath{\mathsf{acc}}\xspace}
+\newcommand{\res}{\ensuremath{\mathsf{res}}\xspace}
+\newcommand{\sha}[1]{\ensuremath{\mathsf{COMMIT}(#1)}\xspace}
+ \newcommand{\shaa}{\ensuremath{\mathsf{COMMIT}}\xspace}
+ \newcommand{\comm}[1]{\ensuremath{\mathsf{comm}_{#1}}\xspace}
+ \newcommand{\defeq}{:=}
+
+\newcommand{\A}{\ensuremath{\vec{A}}\xspace}
+\newcommand{\B}{\ensuremath{\set{0,1}}\xspace}
+\newcommand{\C}{\ensuremath{\vec{C}}\xspace}
+\newcommand{\Btwo}{\ensuremath{\vec{B_2}}\xspace}
+\newcommand{\treevecsimp}{\ensuremath{(\tau,\rho_A,\rho_A \rho_B,\rho_A\alpha_A,\rho_A\rho_B\alpha_B, \rho_A\rho_B\alpha_C,\beta,\beta\gamma)}\xspace}% The sets of elements used in simplifed relation tree in main text body
+\newcommand{\rcptc}{random-coefficient subprotocol\xspace}
+\newcommand{\rcptcparams}[2]{\ensuremath{\mathrm{RCPC}(#1,#2)}\xspace}
+\newcommand{\verifyrcptcparams}[2]{\ensuremath{\mathrm{\mathsf{verify}RCPC}(#1,#2)}\xspace}
+\newcommand{\randadv}{\ensuremath{\mathsf{rand}_{\adv}}\xspace}
+ \num\newcommand{\ex1}[1]{\ensuremath{ #1\cdot g_1}\xspace}
+ \num\newcommand{\ex2}[1]{\ensuremath{#1\cdot g_2}\xspace}
+ \newcommand{\pr}{\mathrm{Pr}}
+ \newcommand{\powervec}[2]{\ensuremath{(1,#1,#1^{2},\ldots,#1^{#2})}\xspace}
+\num\newcommand{\out1}[1]{\ensuremath{\ex1{\powervec{#1}{d}}}\xspace}
+\num\newcommand{\out2}[1]{\ensuremath{\ex2{\powervec{#1}{d}}}\xspace}
+ \newcommand{\nizk}[2]{\ensuremath{\mathrm{NIZK}(#1,#2)}\xspace}% #2 is the hash concatenation input
+ \newcommand{\verifynizk}[3]{\ensuremath{\mathrm{VERIFY\mhyphen NIZK}(#1,#2,#3)}\xspace}
+\newcommand{\protver}{protocol verifier\xspace} 
+\newcommand{\mulgroup}{\ensuremath{\F^*}\xspace}
+\newcommand{\lag}[1]{\ensuremath{L_{#1}}\xspace} 
+\newcommand{\sett}[2]{\ensuremath{\set{#1}_{#2}}\xspace}
+\newcommand{\omegaprod}{\ensuremath{\alpha_{\omega}}\xspace}
+\newcommand{\lagvec}[1]{\ensuremath{\mathrm{LAG}_{#1}}\xspace}
+\newcommand{\trapdoor}{\ensuremath{r}}
+\newcommand{\trapdoorext}{\ensuremath{r_{\mathrm{ext}}}\xspace}
+\newcommand{\trapdoorsim}{\ensuremath{r_{\mathrm{sim}}}\xspace}
+\newcommand{\sk}{\ensuremath{\mathsf{sk}}\xspace}
+\newcommand{\msg}{\ensuremath{\mathsf{m}}\xspace}
+\newcommand{\pk}{\ensuremath{\mathsf{pk}}\xspace}
+\newcommand{\pkagg}{\ensuremath{\mathsf{pk_{agg}}}\xspace}
+\newcommand{\skagg}{\ensuremath{\mathsf{sk_{agg}}}\xspace}
+\newcommand{\sign}{\ensuremath{\mathbf{Sign}}\xspace}
+
+\num\newcommand{\enc1}[1]{\ensuremath{\left[#1\right]_1}\xspace}
+\num\newcommand{\enc2}[1]{\ensuremath{\left[#1\right]_2}\xspace}
+\newcommand{\gen}{\ensuremath{\mathsf{Gen}}\xspace}
+\newcommand{\prv}{\ensuremath{\mathsf{\mathbf{P}}}\xspace}
+\newcommand{\prvpoly}{\ensuremath{\mathrm{P_{\mathsf{poly}}}}\xspace}
+\newcommand{\verpoly}{\ensuremath{\mathrm{V_{\mathsf{poly}}}}\xspace}
+\newcommand{\prf}{\ensuremath{\pi}\xspace}
+\newcommand{\simprv}{\ensuremath{\mathrm{P^{sim}}}\xspace}
+
+%\newcommand{\enc}[1]{\ensuremath{\left[#1\right]}\xspace}
+%\num\newcommand{\G0}{\ensuremath{\mathbf{G}}\xspace}
+\newcommand{\GG}{\ensuremath{\mathbf{G^*}}\xspace}  % would have liked to call this G01 but problem with name
+\num\newcommand{\g0}{\ensuremath{\mathbf{g}}\xspace}
+\newcommand{\inst}{\ensuremath{\phi}\xspace}
+\newcommand{\inp}{\ensuremath{x}\xspace}
+\newcommand{\wit}{\ensuremath{\omega}\xspace}
+\newcommand{\ver}{\ensuremath{\mathsf{\mathbf{V}}}\xspace}
+\newcommand{\per}{\ensuremath{\mathsf{\mathbf{P}}}\xspace}
+\newcommand{\sonic}{\ensuremath{\mathsf{Sonic}}\xspace}
+\newcommand{\aurora}{\ensuremath{\mathsf{Aurora}}\xspace}
+\newcommand{\rel}{\ensuremath{\mathcal{R}}\xspace}
+\newcommand{\ext}{\ensuremath{E}\xspace}
+\newcommand{\params}{\ensuremath{\mathsf{params}_{\inst}}\xspace}
+\newcommand{\protparams}{\ensuremath{\mathsf{params}_{\inst}^\advv}\xspace}
+\num\newcommand{\p1}{\ensuremath{P_1}\xspace}
+\newcommand{\advv}{\ensuremath{ {\mathcal A}^{\mathbf{*}}}\xspace} % the adversary that uses protocol adversary as black box
+\newcommand{\crs}{\ensuremath{\sigma}\xspace}
+%\num\newcommand{\crs1}{\ensuremath{\mathrm{\sigma}_1}\xspace}
+%\num\newcommand{\crs2}{\ensuremath{\mathrm{\sigma}_2}\xspace}
+
+\renewcommand{\sim}{\ensuremath{\mathsf{sim}}\xspace}%the distribution of messages when \advv simulates message of \p1
+\newcommand{\real}{\ensuremath{\mathsf{real}}\xspace}%the distribution of messages when \p1 is honest and \adv controls rest of players
+ \newcommand{\koevec}[2]{\ensuremath{(1,#1,\ldots,#1^{#2},\alpha,\alpha #1,\ldots,\alpha #1^{#2})}\xspace}
+\newcommand{\mida}{\ensuremath{A_{\mathrm{mid}}}\xspace}
+\newcommand{\midb}{\ensuremath{B_{\mathrm{mid}}}\xspace}
+\newcommand{\midc}{\ensuremath{C_{\mathrm{mid}}}\xspace}
+\newcommand{\chal}{\ensuremath{\mathsf{challenge}}\xspace}
+\newcommand{\attackparams}{\ensuremath{\mathsf{params^{pin}}}\xspace}
+\newcommand{\attackdist}[2]{\ensuremath{AD_{#1}}\xspace}
+\renewcommand{\neg}{\ensuremath{\mathsf{negl}(\lambda)}\xspace}
+\newcommand{\ro}{\ensuremath{{\mathcal R}}\xspace}
+\newcommand{\elements}[1]{\ensuremath{\mathsf{elements}_{#1}}\xspace}
+ \num\newcommand{\elmpowers1}[1]{\ensuremath{\mathrm{\mathsf{e}}^1_{#1}}\xspace}
+\newcommand{\bls}{\ensuremath{\mathsf{BLS}}\xspace}
+\newcommand{\elempowrs}[1]{\ensuremath{\mathsf{e}_{#1}}\xspace}
+ \newcommand{\secrets}{\ensuremath{\mathsf{secrets}}\xspace}
+ \newcommand{\polysofdeg}[1]{\ensuremath{\F_{< #1}[X]}\xspace}
+ \newcommand{\bivar}[1]{\ensuremath{\F_{< #1}[X,Y]}\xspace}
+ \newcommand{\sig}{\ensuremath{\sigma}\xspace}
+ \newcommand{\prot}{\ensuremath{\mathscr{P}}\xspace}
+ \newcommand{\sigprv}{\ensuremath{\mathsf{P_{sc}}}\xspace}
+ \newcommand{\sigver}{\ensuremath{\mathsf{V_{sc}}}\xspace}
+\newcommand{\bctv}{\ensuremath{\mathsf{BCTV}}\xspace}
+\newcommand{\PI}{\ensuremath{\mathsf{PI}}\xspace}
+\newcommand{\PIb}{\ensuremath{\mathsf{PI_B}}\xspace}
+\newcommand{\PIc}{\ensuremath{\mathsf{PI_C}}\xspace}
+\newcommand{\dl}[1]{\ensuremath{\widehat{#1}}\xspace}
+%\newcommand{\sett}[2]{\ensuremath{\set{#1}_{#2}}\xspace}
+
+\title{%
+Celo Light Client}
+\date{\today}
+%\author{}
+\date{}
+\begin{document}
+\maketitle
+
+
+\section{Introduction}
+We assume we are given groups of prime order $r$ $\G1,\G2,\Gt$,
+and denote by \F the finite field of the same size.
+We are also given generators $g_1\in \G1, g_2\in \G2$.
+We write \G1 and \G2 additively, and \Gt multiplicatively.
+
+We denote by $H$ a hash function taking as input strings of arbitrary length
+and outputting elements of $\G2$.
+We model $H$ as a random oracle in the security proof, mainly as that is needed for security of the \bls signature scheme.
+\paragraph{BLS signature scheme:}
+\begin{itemize}
+\item The message \msg is an arbitrary string 
+\item The secret key \sk is a uniformly chosen element of \F, and the corresponding public key is $\pk \defeq \sk\cdot g_1$.
+\item The signature \sig of \msg under \sk is 
+\[\sig = \sign(\msg,\sk) \defeq  \sk\cdot H(\msg)\]
+\end{itemize}
+
+\bls has the extremely useful property that $\sign(\msg,\sk_1+\ldots \sk_t) = 
+\sum_{i\in [t]} \sign(\msg,\sk_i)$
+
+Thus, a set of users with private keys \sett{\sk_i}{i\in [t]}
+and public keys \sett{\pk_i}{i\in [t]}
+can sign \msg separately and their signatures can be aggregated to a single signature under public key $\pkagg \defeq \sum_{i\in [t]} \pk_i$.
+
+\paragraph{Registered key owners:}
+
+To avoid the so-called ``rogue key-attack'' when aggregating \bls signatures, we must only allow signatures with public keys $\pk_i$ such that a proof of knowledge of \sk has been provided.
+Thus, when a key \pk is authorized to partcipate in commitees, such a zk proof of knowledge of \sk, e.g. Schnorr, must be provided.
+
+
+\section{The light client protocol}
+We refer to stake holders by their registered public key.
+Thus, when we refer to a \emph{commitee}, we mean a set of public keys \set{\pk}.
+
+
+
+
+Denote by $C_i$ the commitee of the $i$'th epoch.\footnote{We are assuming here an idealized consensus functionality where this value is well-defined; e.g. not dealing with forks when describing the light client.}
+The light client \ver will only verify the identity of the current epoch commitee.
+It will satisfy the following completeness and soundness properties
+
+\paragraph{Completeness (liveness):}
+If all commitees up to epoch $T$ have had a 2/3-honest majority, then
+\ver will obtain the correct value $C_T$
+\paragraph{Soundness:} If all commitees $\sett{C_i}{\in [T]}$ have more than $1/3$ honest players then \ver will not be convinced of a wrong value $C_T$.
+
+\paragraph{Last block header of epoch}
+The structure of the last block header of an epoch is important for the light client protocol;
+and so we describe some of its details.
+\begin{enumerate}
+ \item It will contain a string $\msg = (S_1,S_2)$, for the two sets $S_1=\sett{\pk_i}{i\in [s]},S_2=\sett{\pk'_i}{i\in [s]}$ of the keys we add and remove from the validator set, i.e. $C_{T} = (C_{T-1}\setminus S_1)\cup S_2$.
+ \item It will contain a string $x\in \B^t$ signifying what validators from $C_{T-1}$ signed \msg.
+ \item Let $\pkagg \defeq \sum_{i\in [t]} \pk_i$, where $C_{T-1} = \sett{pk_i}{\in [t]}$.
+ The header contains the signature $\sig = \sign(\msg,\skagg)$.
+ \end{enumerate}
+
+\paragraph{Light client verification}
+\ver receives, for $i\in [T-1]$
+\begin{enumerate}
+ \item A message $\msg_i =(S_{i,1},S_{i,2})$.
+ \item A string $x_i\in \B^t$
+ \item A signature $\sig_i$.
+\end{enumerate}
+\ver starts with the validator set $C_1$ which we assume is hard coded in the genesis block and agreed upon.
+
+For each $i\in \set{2,\ldots,T}$ \ver 
+\begin{enumerate}
+ \item Checks that $x_i$ has at least $2/3\cdot t$ set bits, and sets $D_i\subset [t]$ to be the indices of the set bits of $x_i$.
+ \item Computes $\pk\defeq \sum_{j\in D_i} \pk_j$.
+ \item Checks that $\versig(\msg_i,\pk,\sig_i)$
+ \item computes $C_{i+1} = (C_{i}\setminus S_{i,1})\cup S_{i,2}$.
+ 
+\end{enumerate}
+
+
+
+
+ \bibliographystyle{alpha}
+\bibliography{References}
+
+\end{document}
+ 
