@@ -1,6 +1,7 @@
 use crate::hash::PRF;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
+use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
     FixedLengthCRH,
@@ -8,7 +9,6 @@ use dpc::crypto_primitives::crh::{
 use failure::Error;
 use rand::{chacha::ChaChaRng, Rng, SeedableRng};
 
-use blake2_rfc::blake2s::Blake2s;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 type CRH = PedersenCRH<Edwards, Window>;
@@ -34,10 +34,15 @@ impl CompositeHasher {
     }
 
     fn prng() -> Result<impl Rng, Error> {
-        let mut hasher = Blake2s::with_params(32, &[], &[], b"UL_prngs");
-        hasher.update(b"ULTRALIGHT PRNG SEED");
+        let hash_result = Params::new()
+            .hash_length(32)
+            .personal(b"UL_prngs")
+            .to_state()
+            .update(b"ULTRALIGHT PRNG SEED")
+            .finalize()
+            .as_ref()
+            .to_vec();
         let mut seed = vec![];
-        let hash_result = hasher.finalize().as_ref().to_vec();
         for i in 0..hash_result.len() / 4 {
             let mut buf = &hash_result[i..i + 4];
             let num = buf.read_u32::<LittleEndian>()?;
@@ -72,11 +77,17 @@ impl PRF for CompositeHasher {
 
         let mut result = vec![];
         for i in 0..num_hashes {
-            let mut hasher = Blake2s::with_params(32, &[], &[], b"ULforprf");
             (&mut counter[..]).write_u32::<LittleEndian>(i as u32)?;
-            hasher.update(&counter);
-            hasher.update(hashed_message);
-            let mut hash_result = hasher.finalize().as_ref().to_vec();
+
+            let mut hash_result = Params::new()
+                .hash_length(32)
+                .personal(b"ULforprf")
+                .to_state()
+                .update(&counter)
+                .update(hashed_message)
+                .finalize()
+                .as_ref()
+                .to_vec();
             if i == num_hashes - 1 {
                 let mut current_index = 0;
                 for j in hash_result.iter_mut() {

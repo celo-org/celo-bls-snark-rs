@@ -19,10 +19,8 @@ hex = "0.3.2"
 clap = "2.33.0"
 log = "0.4.6"
 env_logger = "0.6.1"
+blake2s_simd = "0.5.1"
 
-[dependencies.blake2-rfc]
-git = "https://github.com/gtank/blake2-rfc"
-rev = "7a5b5fc99ae483a0043db7547fb79a6fa44b88a9"
 
 [dev-dependencies]
 criterion = "0.2"
