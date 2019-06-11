@@ -1,6 +1,7 @@
 use crate::hash::PRF;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
+use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
     FixedLengthCRH,
@@ -9,7 +10,6 @@ use failure::Error;
 use rand::{chacha::ChaChaRng, Rng, SeedableRng};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use sha2::{Digest, Sha256};
 
 type CRH = PedersenCRH<Edwards, Window>;
 type CRHParameters = PedersenParameters<Edwards>;
@@ -19,7 +19,7 @@ struct Window;
 
 impl PedersenWindow for Window {
     const WINDOW_SIZE: usize = 4;
-    const NUM_WINDOWS: usize = 9820; //(100*385+384*2+1)/4 ~ 9820
+    const NUM_WINDOWS: usize = 9820; //(100*385+384*2+1)/4 ~ 9820 ~ 100*(Fq + sign bit) + Fq2 + sign bit
 }
 
 pub struct CompositeHasher {
@@ -34,10 +34,15 @@ impl CompositeHasher {
     }
 
     fn prng() -> Result<impl Rng, Error> {
-        let mut hasher = Sha256::new();
-        hasher.input(b"ULTRALIGHT PRNG SEED");
+        let hash_result = Params::new()
+            .hash_length(32)
+            .personal(b"UL_prngs")
+            .to_state()
+            .update(b"ULTRALIGHT PRNG SEED")
+            .finalize()
+            .as_ref()
+            .to_vec();
         let mut seed = vec![];
-        let hash_result = hasher.result();
         for i in 0..hash_result.len() / 4 {
             let mut buf = &hash_result[i..i + 4];
             let num = buf.read_u32::<LittleEndian>()?;
@@ -57,7 +62,14 @@ impl PRF for CompositeHasher {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
         h.write(&mut res)?;
-        Ok(res)
+        Ok(Params::new()
+            .hash_length(32)
+            .personal(b"ULforcrh")
+            .to_state()
+            .update(&res[..])
+            .finalize()
+            .as_ref()
+            .to_vec())
     }
 
     fn prf(&self, hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
@@ -72,11 +84,17 @@ impl PRF for CompositeHasher {
 
         let mut result = vec![];
         for i in 0..num_hashes {
-            let mut hasher = Sha256::new();
             (&mut counter[..]).write_u32::<LittleEndian>(i as u32)?;
-            hasher.input(&counter);
-            hasher.input(hashed_message);
-            let mut hash_result = hasher.result().to_vec();
+
+            let mut hash_result = Params::new()
+                .hash_length(32)
+                .personal(b"ULforprf")
+                .to_state()
+                .update(&counter)
+                .update(hashed_message)
+                .finalize()
+                .as_ref()
+                .to_vec();
             if i == num_hashes - 1 {
                 let mut current_index = 0;
                 for j in hash_result.iter_mut() {

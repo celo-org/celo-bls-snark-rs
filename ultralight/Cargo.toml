@@ -19,6 +19,8 @@ hex = "0.3.2"
 clap = "2.33.0"
 log = "0.4.6"
 env_logger = "0.6.1"
+blake2s_simd = "0.5.1"
+
 
 [dev-dependencies]
 criterion = "0.2"
