@@ -81,7 +81,7 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
 
         let fp_bits = <P::Fp as PrimeField>::Params::MODULUS_BITS as usize;
         let fp_bits_with_extra = fp_bits + EXTRA_BITS;
-        let num_bits = 2 * fp_bits_with_extra; //2*(Fq + 64), generate 2 field elements with 64 extra bits to decrease bias
+        let num_bits = 2 * fp_bits_with_extra; //2*(Fq + 80), generate 2 field elements with 80 extra bits to decrease bias
         let message_hash = self.hasher.crh(message)?;
         let mut counter: [u8; 4] = [0; 4];
         for c in 1..NUM_TRIES {

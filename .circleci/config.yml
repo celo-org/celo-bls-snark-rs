@@ -34,7 +34,7 @@ jobs:
 
   go-module-tests:
     <<: *go_defaults
-    working_directory: ~/pp
+    working_directory: ~/app
     docker:
       - image: circleci/golang:latest
     steps:
