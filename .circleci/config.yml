@@ -44,6 +44,7 @@ jobs:
       - attach_workspace:
           at: ~/app
       - run: cd ~/app/go/cmd/example && go run main.go
+      - run: cd ~/app/go && go test
 
   zexe-tests:
     <<: *rust_defaults
