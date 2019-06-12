@@ -15,7 +15,7 @@ go_defaults: &go_defaults
 
 jobs:
   checkout-repo:
-    <<: *defaults
+    <<: *rust_defaults
     steps:
       - checkout
       - attach_workspace:
@@ -23,6 +23,14 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: .
+
+  ultralight-tests:
+    <<: *rust_defaults
+    steps:
+      - attach_workspace:
+          at: ~/app
+      - run: rustup install nightly
+      - run: cd ultralight && cargo +nightly build --release && cargo +nightly test --release
 
   go-module-tests:
     <<: *go_defaults
@@ -33,14 +41,6 @@ jobs:
       - attach_workspace:
           at: ~/app
       - run: cd go/cmd/example && go run main.go
-
-  ultralight-tests:
-    <<: *rust_defaults
-    steps:
-      - attach_workspace:
-          at: ~/app
-      - run: rustup install nightly
-      - run: cd ultralight && cargo +nightly test --release
 
   zexe-tests:
     <<: *rust_defaults
