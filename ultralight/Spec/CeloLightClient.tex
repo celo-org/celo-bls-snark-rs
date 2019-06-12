@@ -20,6 +20,8 @@
 \usepackage{float}
 \restylefloat{table}
 \usepackage{makecell}
+\usepackage[linesnumbered,ruled]{algorithm2e}
+
 
 \renewcommand\theadalign{bc}
 \renewcommand\theadfont{\bfseries}
@@ -49,6 +51,8 @@
 \newtheorem{example}[thm]{Example}
 \newtheorem{apdxlemma}{Lemma}
 \newcommand{\question}[1]{{\sf [#1]\marginpar{?}} }
+\newcommand{\Mod}[1]{\ (\mathrm{mod}\ #1)}
+
 %\usepackage{babel}
 \usepackage{tikz}
 
@@ -107,7 +111,7 @@
 
 \newcommand{\set}[1]{\ensuremath{\left\{#1\right\}}\xspace}
 \newcommand{\angles}[1]{\langle{#1}\rangle}
-\renewcommand{\span}{\ensuremath{\mathsf{span}}\xspace}
+%\renewcommand{\span}{\ensuremath{\mathsf{span}}\xspace}
 \newcommand{\condset}[2]{\set{#1 \mid #2 }}
 \newcommand{\zo}{\set{0,1}}
 \newcommand{\zon}{{\zo^n}}
@@ -166,6 +170,10 @@
 \renewcommand{\deg}{\ensuremath{\mathrm{deg}}\xspace}
 \newcommand{\pairvec}[1]{$#1$-vector\xspace}
 \newcommand{\Fq}{\ensuremath{\mathbb{F}_q}\xspace}
+\newcommand{\Fp}{\ensuremath{\mathbb{F}_p}\xspace}
+\newcommand{\Fptwo}{\ensuremath{\mathbb{F}_{p^2}}\xspace}
+\newcommand{\Fr}{\ensuremath{\mathbb{F}_r}\xspace}
+\newcommand{\Ft}{\ensuremath{\mathbb{F}_t}\xspace}
 \newcommand{\randpair}[1]{\ensuremath{\mathsf{rp}_{#1}}\xspace}
 \newcommand{\randpairone}[1]{\ensuremath{\mathsf{rp}_{#1}^{1}}\xspace}
 \newcommand{\abase}{\ensuremath{A_{\mathrm{\mathbf{0}}}}\xspace}
@@ -223,6 +231,11 @@
 \newcommand{\pkagg}{\ensuremath{\mathsf{pk_{agg}}}\xspace}
 \newcommand{\skagg}{\ensuremath{\mathsf{sk_{agg}}}\xspace}
 \newcommand{\sign}{\ensuremath{\mathbf{Sign}}\xspace}
+\newcommand{\phash}{\ensuremath{\mathbf{PedersenHash}}\xspace}
+\newcommand{\ulphash}{\ensuremath{\mathbf{ULPedersenHash}}\xspace}
+\newcommand{\bhash}{\ensuremath{\mathbf{Blake2s}}\xspace}
+\newcommand{\ulpserialize}{\ensuremath{\mathbf{ULPSerialize}}\xspace}
+\newcommand{\ulfieldhash}{\ensuremath{\mathbf{ULFieldHash}}\xspace}
 
 \num\newcommand{\enc1}[1]{\ensuremath{\left[#1\right]_1}\xspace}
 \num\newcommand{\enc2}[1]{\ensuremath{\left[#1\right]_2}\xspace}
@@ -282,6 +295,8 @@
 \newcommand{\PIc}{\ensuremath{\mathsf{PI_C}}\xspace}
 \newcommand{\dl}[1]{\ensuremath{\widehat{#1}}\xspace}
 %\newcommand{\sett}[2]{\ensuremath{\set{#1}_{#2}}\xspace}
+\newcommand{\edcp}{\ensuremath{{E}_\mathtt{Ed/CP}}\xspace}
+\newcommand{\gedcp}{\ensuremath{G_{{E}_\mathtt{Ed/CP}}}\xspace}
 
 \title{%
 Celo Light Client}
@@ -361,15 +376,60 @@ For each $i\in \set{2,\ldots,T}$ \ver
 \begin{enumerate}
  \item Checks that $x_i$ has at least $2/3\cdot t$ set bits, and sets $D_i\subset [t]$ to be the indices of the set bits of $x_i$.
  \item Computes $\pk\defeq \sum_{j\in D_i} \pk_j$.
- \item Checks that $\versig(\msg_i,\pk,\sig_i)$
+% \item Checks that $\versig(\msg_i,\pk,\sig_i)$
  \item computes $C_{i+1} = (C_{i}\setminus S_{i,1})\cup S_{i,2}$.
  
 \end{enumerate}
 
+\section{Hash to group}
+
+The BLS signature scheme uses $H: \{0,1\}^* \rightarrow \G2$ as a hash function that outputs random elements in $\G2$. It is modeled as a random oracle.
+
+It is instantiated using a composition of a Pedersen hash defined over the curve $\edcp$ from \cite{bowe2018zexe}, and a few Blake2 hashes. 
+
+\paragraph{Pedersen hash}
+The Pedersen hash takes input strings of arbitrary length and outputs elements in the group $\gedcp$ of $\edcp$ - $\phash: \{0,1\}^* -> \gedcp$. Each group element is defined by $(x,y) \in \Fp^2$, where $t$ has a bit size of 377, and therefore a byte size of 48. We then define $\ulpserialize(x,y): \Fp^2 \rightarrow \{0,1\}^{392}$ as:
+
+\[ \begin{cases} 
+x || 1 & y \equiv 0 \mod 2 \\
+x || 2 & y \equiv 1 \mod 2 \\
+\end{cases}
+\]
+Finally, we define $\ulphash: \{0,1\}^* \rightarrow \{0,1\}^{392}$ as $\ulpserialize \circ \phash $.
+
+\paragraph{Hash to field}
+To hash into the group $\G2$, where each element in defined by $(x,y) \in \Fptwo^2$, we first have to hash into the field $\Fptwo$. We invoke $\bhash$ multiple times to get enough random-looking bits to generate $x = (x_0, x_1)$ and take each inner element modulo $p$. We generate extra bits reduce to modulo bias. Then, we see if $x$ is a valid $x$ on the curve, by trying to find a matching $y$.
+
+Specifically, given a function we define $\ulfieldhash(m): \{0,1\}^* \rightarrow \Fp$ as follows:
+
+First, we calculate 1024 random-looking bits using:
+\begin{align*}
+\bhash(\texttt{0x00000000} || m) &\ ||\ \bhash(\texttt{0x00000001} || m)\ ||\ \\
+\bhash(\texttt{0x00000002} || m) &\ ||\ \bhash(\texttt{0x00000003} || m)
+\end{align*}
+
+We then keep the first $(377+80)*2=914$ bits. We then divide it into two $457$ bits for $x_0$ and $x_1$, and for each we parse the bits as a little-endian integer and take it $\mod p$.
+
+\paragraph{Hash to $\G2$}
+We use the try-and-increment method - we initialize a counter, hash the counter together with the message as a possible $x$ value, attempt to find a matching $y$ and if we succeed, we multiply by the cofactor.
+
+\begin{algorithm}
+	\SetKwInOut{Input}{Input}
+	\SetKwInOut{Output}{Output}
+	\Input{$m$, a message}
+	
+	Initialize $c := 0$ \\
+	Serialize $c$ as a little-endian 32-bit unsigned integer, and store in $cb$ \\
+	$x := \ulfieldhash(c || m)$ \\
+	Attempt finding a matching y by calculating $\sqrt{x^2 + 1}$. If not successful, increment $c$ and go back to step $2$. \\
+	If successful, take the larger $y$, and return $(x, y)$.
+	.
+	
+	\caption{Try-and-increment hashing to the group}
+\end{algorithm}
 
 
-
- \bibliographystyle{alpha}
+\bibliographystyle{alpha}
 \bibliography{References}
 
 \end{document}
