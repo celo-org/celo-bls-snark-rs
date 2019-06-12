@@ -31,6 +31,9 @@ jobs:
           at: ~/app
       - run: rustup install nightly
       - run: cd ultralight && cargo +nightly build --release && cargo +nightly test --release
+      - persist_to_workspace:
+          root: .
+          paths: target/release
 
   go-module-tests:
     <<: *go_defaults
