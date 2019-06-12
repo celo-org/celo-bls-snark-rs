@@ -36,7 +36,7 @@ jobs:
     <<: *go_defaults
     working_directory: ~/pp
     docker:
-      - image: circleci/go:latest
+      - image: circleci/golang:latest
     steps:
       - attach_workspace:
           at: ~/app
