@@ -34,4 +34,4 @@ name = "simple_signature"
 path = "examples/simple_signature.rs"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["lib", "staticlib"]

@@ -58,6 +58,10 @@ workflows:
       - ultralight-tests:
           requires:
             - checkout-repo
+      - go-module-tests:
+          requires:
+            - checkout-repo
+            - ultralight-tests
       - zexe-tests:
           requires:
             - checkout-repo
