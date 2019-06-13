@@ -388,7 +388,7 @@ The BLS signature scheme uses $H: \{0,1\}^* \rightarrow \G2$ as a hash function 
 It is instantiated using a composition of a Pedersen hash defined over the curve $\edcp$ from \cite{bowe2018zexe}, and a few Blake2 hashes. 
 
 \paragraph{Pedersen hash}
-The Pedersen hash takes input strings of arbitrary length and outputs elements in the group $\gedcp$ of $\edcp$ - $\phash: \{0,1\}^* -> \gedcp$. Each group element is defined by $(x,y) \in \Fp^2$, where $t$ has a bit size of 377, and therefore a byte size of 48. We then define $\ulpserialize(x,y): \Fp^2 \rightarrow \{0,1\}^{392}$ as:
+The Pedersen hash takes input strings of arbitrary length and outputs elements in the group $\gedcp$ of $\edcp$ - $\phash: \{0,1\}^* -> \gedcp$. Each group element is defined by $(x,y) \in \Fp^2$, where $p$ has a bit size of 377, and therefore a byte size of 48. We then define $\ulpserialize(x,y): \Fp^2 \rightarrow \{0,1\}^{392}$ as:
 
 \[ \begin{cases} 
 x || 1 & y \equiv 0 \mod 2 \\
@@ -398,7 +398,7 @@ x || 2 & y \equiv 1 \mod 2 \\
 Finally, we define $\ulphash: \{0,1\}^* \rightarrow \{0,1\}^{392}$ as $\ulpserialize \circ \phash $.
 
 \paragraph{Hash to field}
-To hash into the group $\G2$, where each element in defined by $(x,y) \in \Fptwo^2$, we first have to hash into the field $\Fptwo$. We invoke $\bhash$ multiple times to get enough random-looking bits to generate $x = (x_0, x_1)$ and take each inner element modulo $p$. We generate extra bits reduce to modulo bias. Then, we see if $x$ is a valid $x$ on the curve, by trying to find a matching $y$.
+To hash into the group $\G2$, where each element in defined by $(x,y) \in \Fptwo^2$, we first have to hash into the field $\Fptwo$. We invoke $\bhash$ multiple times to get enough random-looking bits to generate $x = (x_0, x_1)$ and take each inner element modulo $p$. We generate extra bits reduce modulo bias. Then, we see if $x$ is a valid $x$ on the curve, by trying to find a matching $y$.
 
 Specifically, given a function we define $\ulfieldhash(m): \{0,1\}^* \rightarrow \Fp$ as follows:
 
@@ -408,7 +408,7 @@ First, we calculate 1024 random-looking bits using:
 \bhash(\texttt{0x00000002} || m) &\ ||\ \bhash(\texttt{0x00000003} || m)
 \end{align*}
 
-We then keep the first $(377+80)*2=914$ bits. We then divide it into two $457$ bits for $x_0$ and $x_1$, and for each we parse the bits as a little-endian integer and take it $\mod p$.
+We then divide it into two $512$ bits for $x_0$ and $x_1$, and for each we parse the bits as a little-endian integer and take it $\mod p$.
 
 \paragraph{Hash to $\G2$}
 We use the try-and-increment method - we initialize a counter, hash the counter together with the message as a possible $x$ value, attempt to find a matching $y$ and if we succeed, we multiply by the cofactor.
@@ -417,12 +417,12 @@ We use the try-and-increment method - we initialize a counter, hash the counter 
 	\SetKwInOut{Input}{Input}
 	\SetKwInOut{Output}{Output}
 	\Input{$m$, a message}
-	
+	$hm := \ulphash(m)$ \\
 	Initialize $c := 0$ \\
 	Serialize $c$ as a little-endian 32-bit unsigned integer, and store in $cb$ \\
-	$x := \ulfieldhash(c || m)$ \\
-	Attempt finding a matching y by calculating $\sqrt{x^2 + 1}$. If not successful, increment $c$ and go back to step $2$. \\
-	If successful, take the larger $y$, and return $(x, y)$.
+	$x := \ulfieldhash(c || hm)$ \\
+	Attempt finding a matching $y$ by calculating $\sqrt{x^2 + 1}$. If not successful, increment $c$ and go back to step $2$. \\
+	If successful, take the larger $y$, and return $\mathtt{cofactor} \cdot (x, y)$.
 	.
 	
 	\caption{Try-and-increment hashing to the group}
