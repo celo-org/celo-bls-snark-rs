@@ -1,7 +1,4 @@
-use crate::{
-    curves::{edwards_bls12::*, tests::curve_tests, AffineCurve, ProjectiveCurve},
-    groups::tests::group_test,
-};
+use crate::{curves::{edwards_bls12::*, tests::curve_tests, AffineCurve, ProjectiveCurve}, groups::tests::group_test, SquareRootField};
 use rand;
 
 #[test]
@@ -47,4 +44,12 @@ fn test_conversion() {
         .double();
     assert_eq!(a_b, a_b2.into_affine());
     assert_eq!(a_b.into_projective(), a_b2);
+}
+// If we want just the x-coordinate to be injective in the Edwards prime subgroup, we need that 1/d is a non-residue
+// (See thm 5.4.3 in Zcash Sapling spec
+#[test]
+fn test_injectivity() {
+    use crate::fields::LegendreSymbol::*;
+    let d = EdwardsParameters::COEFF_D;
+    assert_eq!(d.legendre(),QuadraticNonResidue);
 }
