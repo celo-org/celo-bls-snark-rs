@@ -1,9 +1,6 @@
 use crate::hash::PRF;
 
-use algebra::{
-    biginteger::BigInteger, bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards,
-    curves::edwards_sw6::EdwardsParameters, fields::PrimeField, ModelParameters,
-};
+use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
 use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
@@ -65,13 +62,6 @@ impl PRF for CompositeHasher {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
         h.x.write(&mut res)?;
-        let big_y: <<EdwardsParameters as ModelParameters>::BaseField as PrimeField>::BigInt =
-            h.y.into();
-        if big_y.is_even() {
-            res.write_u8(0x1)?;
-        } else {
-            res.write_u8(0x2)?;
-        }
 
         Ok(res)
     }
@@ -202,5 +192,13 @@ mod test {
             *i = rng.gen();
         }
         let _result = hasher.hash(&msg, 760).unwrap();
+    }
+
+    #[test]
+    fn compare_blake_hash() {
+        let hasher = Hasher::new().unwrap();
+        let msg = b"0";
+        let res = hasher.hash(&msg[..], 760).unwrap();
+        println!("test: {:?}", res);
     }
 }
