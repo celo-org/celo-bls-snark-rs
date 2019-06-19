@@ -193,12 +193,4 @@ mod test {
         }
         let _result = hasher.hash(&msg, 760).unwrap();
     }
-
-    #[test]
-    fn compare_blake_hash() {
-        let hasher = Hasher::new().unwrap();
-        let msg = b"0";
-        let res = hasher.hash(&msg[..], 760).unwrap();
-        println!("test: {:?}", res);
-    }
 }
