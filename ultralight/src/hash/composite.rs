@@ -61,15 +61,9 @@ impl PRF for CompositeHasher {
     fn crh(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
-        h.write(&mut res)?;
-        Ok(Params::new()
-            .hash_length(32)
-            .personal(b"ULforcrh")
-            .to_state()
-            .update(&res[..])
-            .finalize()
-            .as_ref()
-            .to_vec())
+        h.x.write(&mut res)?;
+
+        Ok(res)
     }
 
     fn prf(&self, hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
