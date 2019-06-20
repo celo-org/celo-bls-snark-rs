@@ -143,7 +143,7 @@ mod test {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
-        for _ in 0..100 {
+        for _ in 0..10 {
             let mut message: Vec<u8> = vec![];
             for _ in 0..32 {
                 message.push(rng.gen());
