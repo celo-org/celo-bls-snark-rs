@@ -114,7 +114,9 @@ impl PRF for CompositeHasher {
 #[cfg(test)]
 mod test {
     use super::CompositeHasher as Hasher;
+    use crate::hash::composite::CompositeHasher;
     use crate::hash::PRF;
+    use algebra::bytes::ToBytes;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -193,4 +195,43 @@ mod test {
         }
         let _result = hasher.hash(&msg, 760).unwrap();
     }
+
+    #[test]
+    fn print_pedersen_bases() {
+        let hasher = CompositeHasher::new().unwrap();
+        let mut res = vec![];
+        hasher.parameters.generators[0][0]
+            .x
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+        println!("p1x rev: {}", hex::encode(&res));
+        let mut res = vec![];
+        hasher.parameters.generators[0][0]
+            .y
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+        println!("p1y rev: {}", hex::encode(&res));
+        let mut res = vec![];
+        hasher.parameters.generators[1][0]
+            .x
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+        println!("p2x rev: {}", hex::encode(&res));
+        let mut res = vec![];
+        hasher.parameters.generators[1][0]
+            .y
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+        println!("p2y rev: {}", hex::encode(&res));
+
+        let message = 0b11111u8;
+        let mut hash = hasher.crh(&[message]).unwrap();
+        hash.reverse();
+        println!("hash: {}", hex::encode(hash));
+    }
+
 }
