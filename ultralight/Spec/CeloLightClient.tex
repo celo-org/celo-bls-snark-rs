@@ -354,11 +354,11 @@ If all commitees up to epoch $T$ have had a 2/3-honest majority, then
 \paragraph{Soundness:} If all commitees $\sett{C_i}{\in [T]}$ have more than $1/3$ honest players then \ver will not be convinced of a wrong value $C_T$.
 
 \paragraph{Last block header of epoch}
-The structure of the last block header of an epoch is important for the light client protocol;
+The structure of the $n$'th block header of an epoch is important for the light client protocol;
 and so we describe some of its details.
 \begin{enumerate}
- \item It will contain a string $\msg = (S_1,S_2)$, for the two sets $S_1=\sett{\pk_i}{i\in [s]},S_2=\sett{\pk'_i}{i\in [s]}$ of the keys we add and remove from the validator set, i.e. $C_{T} = (C_{T-1}\setminus S_1)\cup S_2$.
- \item It will contain a string $x\in \B^t$ signifying what validators from $C_{T-1}$ signed \msg.
+ \item It will contain a string $\msg^* = (S_1,S_2)$, for the two sets $S_1=\sett{\pk_i}{i\in [s]},S_2=\sett{\pk'_i}{i\in [s]}$ of the keys we add and remove from the validator set, i.e. $C_{T} = (C_{T-1}\setminus S_1)\cup S_2$.
+ \item It will contain a string $x\in \B^t$ signifying what validators from $C_{T-1}$ signed $\msg\defeq (n,\msg^*)$.
  \item Let $\pkagg \defeq \sum_{i\in [t]} \pk_i$, where $C_{T-1} = \sett{pk_i}{\in [t]}$.
  The header contains the signature $\sig = \sign(\msg,\skagg)$.
  \end{enumerate}
