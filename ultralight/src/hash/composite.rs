@@ -1,3 +1,9 @@
+extern crate hex;
+
+use std::fs::File;
+use std::io::Write;
+
+
 use crate::hash::PRF;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
@@ -32,13 +38,13 @@ impl CompositeHasher {
             parameters: CompositeHasher::setup_crh()?,
         })
     }
-
+    // what does the hash
     fn prng() -> Result<impl Rng, Error> {
         let hash_result = Params::new()
             .hash_length(32)
-            .personal(b"UL_prngs")
+            .personal(b"UL_prngs") // personalization
             .to_state()
-            .update(b"ULTRALIGHT PRNG SEED")
+            .update(b"ULTRALIGHT PRNG SEED") // message
             .finalize()
             .as_ref()
             .to_vec();
@@ -64,6 +70,7 @@ impl PRF for CompositeHasher {
         h.x.write(&mut res)?;
 
         Ok(res)
+        
     }
 
     fn prf(&self, hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
@@ -101,6 +108,7 @@ impl PRF for CompositeHasher {
                 }
             }
             result.append(&mut hash_result);
+
         }
 
         Ok(result)
@@ -232,6 +240,17 @@ mod test {
         let mut hash = hasher.crh(&[message]).unwrap();
         hash.reverse();
         println!("hash: {}", hex::encode(hash));
+    }
+
+    #[test]
+    fn compare_blake_hash(){
+        let hasher = Hasher::new().unwrap();
+        let msg = b"0";
+        let res = hasher.prf(&msg[..], 256).unwrap();
+        let hex_string = hex::encode(&res);
+        println!("{}", hex_string);
+    
+
     }
 
 }
