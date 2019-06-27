@@ -2,12 +2,20 @@ version: 2
 
 defaults: &defaults
   working_directory: ~/app
+
+rust_defaults: &rust_defaults
+  <<: *defaults
   docker:
     - image: circleci/rust:latest
 
+go_defaults: &go_defaults
+  <<: *defaults
+  docker:
+    - image: circleci/go:latest
+
 jobs:
   checkout-repo:
-    <<: *defaults
+    <<: *rust_defaults
     steps:
       - checkout
       - attach_workspace:
@@ -17,15 +25,29 @@ jobs:
           paths: .
 
   ultralight-tests:
-    <<: *defaults
+    <<: *rust_defaults
     steps:
       - attach_workspace:
           at: ~/app
       - run: rustup install nightly
-      - run: cd ultralight && cargo +nightly test --release
+      - run: cd ultralight && cargo +nightly build --release && cargo +nightly test --release
+      - persist_to_workspace:
+          root: .
+          paths: ultralight/target/release
+
+  go-module-tests:
+    <<: *go_defaults
+    working_directory: ~/app
+    docker:
+      - image: circleci/golang:latest
+    steps:
+      - attach_workspace:
+          at: ~/app
+      - run: cd ~/app/go/cmd/example && go run main.go
+      - run: cd ~/app/go && go test
 
   zexe-tests:
-    <<: *defaults
+    <<: *rust_defaults
     steps:
       - attach_workspace:
           at: ~/app
@@ -40,6 +62,10 @@ workflows:
       - ultralight-tests:
           requires:
             - checkout-repo
+      - go-module-tests:
+          requires:
+            - checkout-repo
+            - ultralight-tests
       - zexe-tests:
           requires:
             - checkout-repo
