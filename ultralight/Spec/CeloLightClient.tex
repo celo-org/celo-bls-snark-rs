@@ -388,14 +388,7 @@ The BLS signature scheme uses $H: \{0,1\}^* \rightarrow \G2$ as a hash function 
 It is instantiated using a composition of a Pedersen hash defined over the curve $\edcp$ from \cite{bowe2018zexe}, and a few Blake2 hashes. 
 
 \paragraph{Pedersen hash}
-The Pedersen hash takes input strings of arbitrary length and outputs elements in the group $\gedcp$ of $\edcp$ - $\phash: \{0,1\}^* -> \gedcp$. Each group element is defined by $(x,y) \in \Fp^2$, where $p$ has a bit size of 377, and therefore a byte size of 48. We then define $\ulpserialize(x,y): \Fp^2 \rightarrow \{0,1\}^{392}$ as:
-
-\[ \begin{cases} 
-x || 1 & y \equiv 0 \mod 2 \\
-x || 2 & y \equiv 1 \mod 2 \\
-\end{cases}
-\]
-Finally, we define $\ulphash: \{0,1\}^* \rightarrow \{0,1\}^{392}$ as $\ulpserialize \circ \phash $.
+The Pedersen hash takes input strings of arbitrary length and outputs elements in the group $\gedcp$ of $\edcp$ - $\phash: \{0,1\}^* -> \gedcp$. Each group element is defined by $(x,y) \in \Fp^2$, where $p$ has a bit size of 377, and therefore a byte size of 48. We then define $\ulpserialize(x,y): \Fp^2 \rightarrow \{0,1\}^{392}$ as $\ulpserialize(x,y) := x$. Finally, we define $\ulphash: \{0,1\}^* \rightarrow \{0,1\}^{392}$ as $\ulpserialize \circ \phash $.
 
 \paragraph{Hash to field}
 To hash into the group $\G2$, where each element in defined by $(x,y) \in \Fptwo^2$, we first have to hash into the field $\Fptwo$. We invoke $\bhash$ multiple times to get enough random-looking bits to generate $x = (x_0, x_1)$ and take each inner element modulo $p$. We generate extra bits reduce modulo bias. Then, we see if $x$ is a valid $x$ on the curve, by trying to find a matching $y$.
