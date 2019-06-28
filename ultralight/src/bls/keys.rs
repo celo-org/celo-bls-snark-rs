@@ -1,7 +1,10 @@
 use crate::curve::hash::HashToG2;
 use algebra::{
+    bytes::{FromBytes, ToBytes},
     curves::{
-        bls12_377::{Bls12_377, Bls12_377Parameters, G1Affine, G1Projective, G2Projective},
+        bls12_377::{
+            Bls12_377, Bls12_377Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
+        },
         AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve,
     },
     fields::{
@@ -9,11 +12,15 @@ use algebra::{
         Field,
     },
 };
+
 use failure::Error;
 use rand::Rng;
 
 /// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
-use std::ops::{Mul, Neg};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    ops::{Mul, Neg},
+};
 
 pub struct PrivateKey {
     sk: Fr,
@@ -42,6 +49,21 @@ impl PrivateKey {
 
     pub fn to_public(&self) -> PublicKey {
         PublicKey::from_pk(&G1Projective::prime_subgroup_generator().mul(&self.sk))
+    }
+}
+
+impl ToBytes for PrivateKey {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.sk.write(&mut writer)
+    }
+}
+
+impl FromBytes for PrivateKey {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let sk = Fr::read(&mut reader)?;
+        Ok(PrivateKey::from_sk(&sk))
     }
 }
 
@@ -100,6 +122,21 @@ impl PublicKey {
     }
 }
 
+impl ToBytes for PublicKey {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.pk.into_affine().write(&mut writer)
+    }
+}
+
+impl FromBytes for PublicKey {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let pk = G1Affine::read(&mut reader)?;
+        Ok(PublicKey::from_pk(&pk.into_projective()))
+    }
+}
+
 pub struct Signature {
     sig: G2Projective,
 }
@@ -123,6 +160,21 @@ impl Signature {
     }
 }
 
+impl ToBytes for Signature {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.sig.into_affine().write(&mut writer)
+    }
+}
+
+impl FromBytes for Signature {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let sig = G2Affine::read(&mut reader)?;
+        Ok(Signature::from_sig(&sig.into_projective()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -143,7 +195,7 @@ mod test {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
-        for _ in 0..100 {
+        for _ in 0..10 {
             let mut message: Vec<u8> = vec![];
             for _ in 0..32 {
                 message.push(rng.gen());
