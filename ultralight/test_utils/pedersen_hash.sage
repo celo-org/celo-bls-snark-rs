@@ -51,8 +51,9 @@ msg= "11111100111011"
 def gen_rand_msg(n):
   rand_msgs = []
   for i in range(n):
-    draw = random.randrange(5, 4500)
+    draw = random.randrange(5, 7)
     string = binascii.b2a_hex(os.urandom(draw))
+    print(len(string))
     rand_msgs.append(string)
 
   return(rand_msgs)
@@ -129,8 +130,14 @@ def test_hash(n):
   with open("/Users/bluemind/test_vec.csv", "w") as file:
     for i in range(len(test_array)):
       #converts hash to binary
-      binary = bin(int(test_array[i], 16))[2:]
-      row = [str(test_array[i]), str(hash_to_curve(binary)) ]
+      hexm = int(test_array[i], 16)
+      acc = ""
+      for j in range(0, len(test_array[i]), 2):
+        curr_bin = bin(int(test_array[i][j:j+2], 16))[2:]
+        acc += curr_bin
+
+      
+      row = [str(test_array[i]), str(hash_to_curve(acc)) ]
       writer = csv.writer(file)
       writer.writerow(row)
       
@@ -138,7 +145,7 @@ def test_hash(n):
 
 
 
-test_hash(1000)
+test_hash(20)
 
 
 
