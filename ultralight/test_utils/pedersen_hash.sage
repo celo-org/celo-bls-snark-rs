@@ -50,10 +50,13 @@ msg= "11111100111011"
 #generates n random msgs of 5 to 250k hex chars each
 def gen_rand_msg(n):
   rand_msgs = []
+  
   for i in range(n):
-    draw = random.randrange(5, 7)
-    string = binascii.b2a_hex(os.urandom(draw))
-    print(len(string))
+    num = random.randrange(1, 35997)
+    string = ""
+    for j in range(num):
+      draw = random.randrange(2)
+      string = string + str(draw)
     rand_msgs.append(string)
 
   return(rand_msgs)
@@ -105,11 +108,14 @@ def hash_to_curve(msg):
     if weight_arr[i]>1:
       multiplied.append(scalar_mult(A, D, weight_arr[i], x_co[i], y_co[i] ))
 
-    else:
+    if weight_arr[i]==1:
       multiplied.append((x_co[i], y_co[i]))
 
-  to_add.append(add(A, D, multiplied[0][0], multiplied[0][1], multiplied[1][0], multiplied[1][1] ))
+  if len(multiplied)>1:
+    to_add.append(add(A, D, multiplied[0][0], multiplied[0][1], multiplied[1][0], multiplied[1][1] ))
 
+  else:
+    to_add = multiplied
   for i in range(len(multiplied)-2):
       to_add.append(add(A, D, to_add[i][0], to_add[i][1], multiplied[i+2][0], multiplied[i+2][1] ))
 
@@ -119,33 +125,46 @@ def hash_to_curve(msg):
   # x2 , y2 = scalar_mult(A, D, 15, p2x, p2y)
   # x3 , y3 = add(A, D, x, y, x2, y2)
   # x, y = add(A, D, x3, y3, p3x, p3y)
-
+  
   return('%x' % int(res[0]))
+
+binary = lambda x: "".join(reversed( [i+j for i,j in zip( *[ ["{0:04b}".format(int(c,16)) for c in reversed("0"+x)][n::2] for n in [1,0] ] ) ] ))
 
 #genrate 100 msgs of n bits each and write them in a file
 def test_hash(n):
 
   test_array = gen_rand_msg(n)
 
-  with open("/Users/bluemind/test_vec.csv", "w") as file:
+  with open("/Users/bluemind/bls-zexe/ultralight/test_utils/test_vec.csv", "w") as file:
     for i in range(len(test_array)):
       #converts hash to binary
       hexm = int(test_array[i], 16)
-      acc = ""
-      for j in range(0, len(test_array[i]), 2):
-        curr_bin = bin(int(test_array[i][j:j+2], 16))[2:]
-        acc += curr_bin
+      
+      binary = lambda x: " ".join(reversed( [i+j for i,j in zip( *[ ["{0:04b}".format(int(c,16)) for c in reversed("0"+x)][n::2] for n in [1,0] ] ) ] ))
+      
 
       
-      row = [str(test_array[i]), str(hash_to_curve(acc)) ]
+      the_hex = hex(int(test_array[i], 2))[2:]
+
+      
+
+      hashed = "0"*(96-len(str(hash_to_curve(test_array[i])))) + str(hash_to_curve(test_array[i]))
+
+      if len(the_hex) %2 == 1:
+        k = "0" + the_hex
+      else:
+        k = the_hex
+
+      row = ["0" + k.strip("L") , str(hashed) ]
+      print(len("0"+k.strip("L")))
       writer = csv.writer(file)
       writer.writerow(row)
       
   file.close()
 
 
+test_hash(10)
 
-test_hash(20)
 
 
 
