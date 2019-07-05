@@ -145,7 +145,7 @@ def test_hash(n):
 
       the_hex = the_hex.strip("L")
       if len(the_hex) %2 == 1:
-        k = the_hex + "0"
+        k = "0" + the_hex
       else:
         k = the_hex
 
@@ -156,4 +156,4 @@ def test_hash(n):
 
   file.close()
 
-test_hash(10)
+test_hash(100)
