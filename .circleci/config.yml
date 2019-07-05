@@ -30,7 +30,9 @@ jobs:
       - attach_workspace:
           at: ~/app
       - run: rustup install nightly
-      - run: cd zexe && cargo +nightly test --release
+      - run:
+          command: cd zexe && cargo +nightly test --release
+          no_output_timeout: 30m
 
 workflows:
   version: 2
