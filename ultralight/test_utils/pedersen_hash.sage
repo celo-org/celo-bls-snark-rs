@@ -34,7 +34,7 @@ y_co = ["00a9cbd1a7197b7dfc0028331dbc7b379d9e08d5bd22c178037100f58988eef22e4892c
 for i in range(len(x_co)):
 
   # convert to base 16 int
-  
+
   x_co[i] = F(int(x_co[i], 16))
 
   y_co[i] = F(int(y_co[i], 16))
@@ -50,7 +50,7 @@ msg= "11111100111011"
 #generates n random msgs of 5 to 250k hex chars each
 def gen_rand_msg(n):
   rand_msgs = []
-  
+
   for i in range(n):
     num = random.randrange(1, 35997)
     string = ""
@@ -71,7 +71,7 @@ def hash_to_curve(msg):
   # makes sure the 4 bit nibble hunking happens correctly
   if k!=0:
         msg = msg[:-k] + (8-k)*"0" + msg[-k:]
-    
+
 
   #splits into 8 bit strings
   ## ceiling function
@@ -96,7 +96,7 @@ def hash_to_curve(msg):
       for k in range(len(chunk2)):
         num2 += int(chunk2[k])*weight[k]
 
-      
+
       weight_arr.append(num2)
 
   multiplied = []
@@ -125,7 +125,7 @@ def hash_to_curve(msg):
   # x2 , y2 = scalar_mult(A, D, 15, p2x, p2y)
   # x3 , y3 = add(A, D, x, y, x2, y2)
   # x, y = add(A, D, x3, y3, p3x, p3y)
-  
+
   return('%x' % int(res[0]))
 
 binary = lambda x: "".join(reversed( [i+j for i,j in zip( *[ ["{0:04b}".format(int(c,16)) for c in reversed("0"+x)][n::2] for n in [1,0] ] ) ] ))
@@ -139,33 +139,27 @@ def test_hash(n):
     for i in range(len(test_array)):
       #converts hash to binary
       hexm = int(test_array[i], 16)
-      
-      binary = lambda x: " ".join(reversed( [i+j for i,j in zip( *[ ["{0:04b}".format(int(c,16)) for c in reversed("0"+x)][n::2] for n in [1,0] ] ) ] ))
-      
 
-      
+
+
+
       the_hex = hex(int(test_array[i], 2))[2:]
 
-      
+
 
       hashed = "0"*(96-len(str(hash_to_curve(test_array[i])))) + str(hash_to_curve(test_array[i]))
 
+      the_hex = the_hex.strip("L")
       if len(the_hex) %2 == 1:
         k = "0" + the_hex
       else:
         k = the_hex
 
-      row = ["0" + k.strip("L") , str(hashed) ]
-      print(len("0"+k.strip("L")))
+      row = [k, str(hashed) ]
       writer = csv.writer(file)
       writer.writerow(row)
-      
+
   file.close()
 
 
 test_hash(10)
-
-
-
-
-
