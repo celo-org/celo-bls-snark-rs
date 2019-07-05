@@ -1,9 +1,5 @@
 extern crate hex;
 
-use std::fs::File;
-use std::io::Write;
-
-
 use crate::hash::PRF;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
@@ -126,6 +122,12 @@ mod test {
     use crate::hash::PRF;
     use algebra::bytes::ToBytes;
     use rand::{Rng, SeedableRng, XorShiftRng};
+    use std::fs::File;
+    use std::path::Path;
+    use std::io::Write;
+    use std::io;
+    use std::process;
+    use std::env;
 
     #[test]
     fn test_crh_empty() {
@@ -205,52 +207,75 @@ mod test {
     }
 
     #[test]
-    fn print_pedersen_bases() {
+    fn print_pedersen_bases(){
         let hasher = CompositeHasher::new().unwrap();
-        let mut res = vec![];
-        hasher.parameters.generators[0][0]
-            .x
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
-        println!("p1x rev: {}", hex::encode(&res));
-        let mut res = vec![];
-        hasher.parameters.generators[0][0]
-            .y
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
-        println!("p1y rev: {}", hex::encode(&res));
-        let mut res = vec![];
-        hasher.parameters.generators[1][0]
-            .x
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
-        println!("p2x rev: {}", hex::encode(&res));
-        let mut res = vec![];
-        hasher.parameters.generators[1][0]
-            .y
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
-        println!("p2y rev: {}", hex::encode(&res));
+        let mut x_co = Vec::new();
+        let mut y_co = Vec::new();
+        
 
-        let message = 0b11111u8;
-        let mut hash = hasher.crh(&[message]).unwrap();
-        hash.reverse();
-        println!("hash: {}", hex::encode(hash));
+        for i in 1..9000{
+        let mut res = vec![];
+        hasher.parameters.generators[i-1][0]
+            .x
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+
+        x_co.push(hex::encode(&res));
+
+        let mut res = vec![];
+        hasher.parameters.generators[i-1][0]
+            .y
+            .write(&mut res)
+            .unwrap();
+        res.reverse();
+        y_co.push(hex::encode(&res))
+
+    }
+        
+        let path = Path::new("test_utils/test_vec.csv");
+        //let p = env::current_dir().unwrap();
+        //println!("{}", p.to_str().unwrap());
+        let file = File::open(path).unwrap();
+        let mut rdr =csv::ReaderBuilder::new().has_headers(false).from_reader(file);
+    for record in rdr.records() {
+        let r = &record.unwrap();
+        let row: String = r[0].to_string();
+        let actual_hash: String = r[1].to_string();
+        
+        let msg = hex::decode(&row).unwrap();
+        let mut test_hash = hasher.crh(&msg).unwrap();
+        test_hash.reverse();
+        let msg_hash = hex::encode(&test_hash);
+        
+        assert_eq!( msg_hash.to_string() , actual_hash );
+
+    }
+    
     }
 
     #[test]
     fn compare_blake_hash(){
-        let hasher = Hasher::new().unwrap();
-        let msg = b"0";
-        let res = hasher.prf(&msg[..], 256).unwrap();
-        let hex_string = hex::encode(&res);
-        println!("{}", hex_string);
+        let hasher = CompositeHasher::new().unwrap();
+
+        let msg = b"11111100";
+        let hex_msg = hex::encode(&[0b10]);
+        println!("{}",  hex_msg.to_string());
+        let to_hash = hex::decode(&hex_msg).unwrap();
+        println!("{:?}", to_hash);
+        let mut test_hash = hasher.crh(&to_hash).unwrap();
+        test_hash.reverse();        
+        let hex_hash = hex::encode(&test_hash);
+        println!("{}", hex_hash.to_string() );
+
+
+
+}
+             
     
 
-    }
+       
+
+
 
 }
