@@ -143,6 +143,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn num_constraints() {
         let rng = &mut thread_rng();
         let mut cs = TestConstraintSystem::<Bls12_381>::new();
