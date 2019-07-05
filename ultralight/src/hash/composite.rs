@@ -66,7 +66,7 @@ impl PRF for CompositeHasher {
         h.x.write(&mut res)?;
 
         Ok(res)
-        
+
     }
 
     fn prf(&self, hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
@@ -124,10 +124,6 @@ mod test {
     use rand::{Rng, SeedableRng, XorShiftRng};
     use std::fs::File;
     use std::path::Path;
-    use std::io::Write;
-    use std::io;
-    use std::process;
-    use std::env;
 
     #[test]
     fn test_crh_empty() {
@@ -207,75 +203,66 @@ mod test {
     }
 
     #[test]
-    fn print_pedersen_bases(){
+    fn print_pedersen_bases() {
         let hasher = CompositeHasher::new().unwrap();
         let mut x_co = Vec::new();
         let mut y_co = Vec::new();
-        
 
-        for i in 1..9000{
-        let mut res = vec![];
-        hasher.parameters.generators[i-1][0]
-            .x
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
 
-        x_co.push(hex::encode(&res));
+        for i in 1..9000 {
+            let mut res = vec![];
+            hasher.parameters.generators[i-1][0]
+                .x
+                .write(&mut res)
+                .unwrap();
+            res.reverse();
 
-        let mut res = vec![];
-        hasher.parameters.generators[i-1][0]
-            .y
-            .write(&mut res)
-            .unwrap();
-        res.reverse();
-        y_co.push(hex::encode(&res))
+            x_co.push(hex::encode(&res));
 
-    }
-        
-        let path = Path::new("test_utils/test_vec.csv");
-        //let p = env::current_dir().unwrap();
-        //println!("{}", p.to_str().unwrap());
-        let file = File::open(path).unwrap();
-        let mut rdr =csv::ReaderBuilder::new().has_headers(false).from_reader(file);
-    for record in rdr.records() {
-        let r = &record.unwrap();
-        let row: String = r[0].to_string();
-        let actual_hash: String = r[1].to_string();
-        
-        let msg = hex::decode(&row).unwrap();
-        let mut test_hash = hasher.crh(&msg).unwrap();
-        test_hash.reverse();
-        let msg_hash = hex::encode(&test_hash);
-        
-        assert_eq!( msg_hash.to_string() , actual_hash );
-
-    }
-    
+            let mut res = vec![];
+            hasher.parameters.generators[i-1][0]
+                .y
+                .write(&mut res)
+                .unwrap();
+            res.reverse();
+            y_co.push(hex::encode(&res))
+        }
     }
 
     #[test]
-    fn compare_blake_hash(){
+    fn test_pedersen_test_vectors() {
+        let hasher = CompositeHasher::new().unwrap();
+        let path = Path::new("test_utils/test_vec.csv");
+        let file = File::open(path).unwrap();
+        let mut rdr =csv::ReaderBuilder::new().has_headers(false).from_reader(file);
+        for record in rdr.records() {
+            let r = &record.unwrap();
+            let row: String = r[0].to_string();
+            let actual_hash: String = r[1].to_string();
+
+            let msg = hex::decode(&row).unwrap();
+            let mut test_hash = hasher.crh(&msg).unwrap();
+            test_hash.reverse();
+            let msg_hash = hex::encode(&test_hash);
+
+            if msg_hash.to_string() != actual_hash {
+                println!("msg: {}", row);
+            }
+            assert_eq!( msg_hash.to_string() , actual_hash );
+        }
+    }
+
+    #[test]
+    fn test_crh_print() {
         let hasher = CompositeHasher::new().unwrap();
 
-        let msg = b"11111100";
         let hex_msg = hex::encode(&[0b10]);
         println!("{}",  hex_msg.to_string());
         let to_hash = hex::decode(&hex_msg).unwrap();
         println!("{:?}", to_hash);
         let mut test_hash = hasher.crh(&to_hash).unwrap();
-        test_hash.reverse();        
+        test_hash.reverse();
         let hex_hash = hex::encode(&test_hash);
         println!("{}", hex_hash.to_string() );
-
-
-
-}
-             
-    
-
-       
-
-
-
+    }
 }
