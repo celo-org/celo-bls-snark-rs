@@ -137,9 +137,7 @@ def test_hash(n):
     for i in range(len(test_array)):
       #converts hash to binary
 
-      print(test_array[i])
       the_hex = hex(int(test_array[i], 2))[2:]
-      print(the_hex)
 
       hashed = "0"*(96-len(str(hash_to_curve(test_array[i])))) + str(hash_to_curve(test_array[i]))
 
@@ -149,7 +147,6 @@ def test_hash(n):
       else:
         k = the_hex
 
-      print(binary(k))
       row = [k, str(hashed) ]
       writer = csv.writer(file)
       writer.writerow(row)
