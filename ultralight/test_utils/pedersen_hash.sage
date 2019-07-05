@@ -1,7 +1,6 @@
 import math, csv
 import random
 import os, binascii
-
 A = -1
 D = 79743
 
@@ -57,6 +56,10 @@ def gen_rand_msg(n):
     for j in range(num):
       draw = random.randrange(2)
       string = string + str(draw)
+
+    k = len(string) % 8
+    if k!=0:
+          string = string[:-k] + (8-k)*"0" + string[-k:]
     rand_msgs.append(string)
 
   return(rand_msgs)
@@ -67,11 +70,6 @@ def hash_to_curve(msg):
   weight = [8, 4, 2, 1]
   #make message length multiple of 8 bits
   weight_arr=[]
-  k = len(msg) % 8
-  # makes sure the 4 bit nibble hunking happens correctly
-  if k!=0:
-        msg = msg[:-k] + (8-k)*"0" + msg[-k:]
-
 
   #splits into 8 bit strings
   ## ceiling function
@@ -135,31 +133,27 @@ def test_hash(n):
 
   test_array = gen_rand_msg(n)
 
-  with open("/Users/bluemind/bls-zexe/ultralight/test_utils/test_vec.csv", "w") as file:
+  with open("./test_vec.csv", "w") as file:
     for i in range(len(test_array)):
       #converts hash to binary
-      hexm = int(test_array[i], 16)
 
-
-
-
+      print(test_array[i])
       the_hex = hex(int(test_array[i], 2))[2:]
-
-
+      print(the_hex)
 
       hashed = "0"*(96-len(str(hash_to_curve(test_array[i])))) + str(hash_to_curve(test_array[i]))
 
       the_hex = the_hex.strip("L")
       if len(the_hex) %2 == 1:
-        k = "0" + the_hex
+        k = the_hex + "0"
       else:
         k = the_hex
 
+      print(binary(k))
       row = [k, str(hashed) ]
       writer = csv.writer(file)
       writer.writerow(row)
 
   file.close()
-
 
 test_hash(10)
