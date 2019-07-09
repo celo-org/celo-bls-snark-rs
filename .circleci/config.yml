@@ -24,15 +24,15 @@ jobs:
       - run: rustup install nightly
       - run: cd ultralight && cargo +nightly test --release
 
-  zexe-tests:
-    <<: *defaults
-    steps:
-      - attach_workspace:
-          at: ~/app
-      - run: rustup install nightly
-      - run:
-          command: cd zexe && cargo +nightly test --release
-          no_output_timeout: 30m
+#  zexe-tests:
+#    <<: *defaults
+#    steps:
+#      - attach_workspace:
+#          at: ~/app
+#      - run: rustup install nightly
+#      - run:
+#          command: cd zexe && cargo +nightly test --release
+#          no_output_timeout: 30m
 
 workflows:
   version: 2
@@ -42,6 +42,6 @@ workflows:
       - ultralight-tests:
           requires:
             - checkout-repo
-      - zexe-tests:
-          requires:
-            - checkout-repo
+#      - zexe-tests:
+#          requires:
+#            - checkout-repo
