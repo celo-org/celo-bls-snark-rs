@@ -10,6 +10,9 @@ jobs:
     <<: *defaults
     steps:
       - checkout
+      - run:
+          command: |
+            git submodule update --init --recursive
       - attach_workspace:
           at: ~/app
       - persist_to_workspace:
