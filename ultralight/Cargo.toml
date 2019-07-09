@@ -33,3 +33,6 @@ harness = false
 [[example]]
 name = "simple_signature"
 path = "examples/simple_signature.rs"
+
+[lib]
+crate-type = ["lib", "staticlib"]
