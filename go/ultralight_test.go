@@ -5,6 +5,7 @@ import (
 )
 
 func TestAggregatedSig(t *testing.T) {
+	InitBLSCrypto()
 	privateKey, _ := GeneratePrivateKey()
 	defer privateKey.Destroy()
 	publicKey, _ := privateKey.ToPublic()
