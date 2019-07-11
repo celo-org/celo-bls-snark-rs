@@ -24,16 +24,16 @@ jobs:
           root: .
           paths: .
 
-  ultralight-tests:
+  bls-tests:
     <<: *rust_defaults
     steps:
       - attach_workspace:
           at: ~/app
       - run: rustup install nightly
-      - run: cd ultralight && cargo +nightly build --release && cargo +nightly test --release
+      - run: cd bls && cargo +nightly build --release && cargo +nightly test --release
       - persist_to_workspace:
           root: .
-          paths: ultralight/target/release
+          paths: bls/target/release
 
   go-module-tests:
     <<: *go_defaults
@@ -59,13 +59,13 @@ workflows:
   run-tests:
     jobs:
       - checkout-repo
-      - ultralight-tests:
+      - bls-tests:
           requires:
             - checkout-repo
       - go-module-tests:
           requires:
             - checkout-repo
-            - ultralight-tests
+            - bls-tests
 #      - zexe-tests:
 #          requires:
 #            - checkout-repo

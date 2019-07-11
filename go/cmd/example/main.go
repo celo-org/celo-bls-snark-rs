@@ -7,8 +7,8 @@ import (
 )
 
 func main() {
-	ultralight.InitBLSCrypto()
-	privateKey, _ := ultralight.GeneratePrivateKey()
+	bls.InitBLSCrypto()
+	privateKey, _ := bls.GeneratePrivateKey()
 	defer privateKey.Destroy()
 	privateKeyBytes, _ := privateKey.Serialize()
 	fmt.Printf("Private key: %x\n", privateKeyBytes)
@@ -22,7 +22,7 @@ func main() {
 	err := publicKey.VerifySignature(message, signature)
 	fmt.Printf("Verified: %t\n", err == nil)
 
-	privateKey2, _ := ultralight.GeneratePrivateKey()
+	privateKey2, _ := bls.GeneratePrivateKey()
 	defer privateKey2.Destroy()
 	privateKeyBytes2, _ := privateKey2.Serialize()
 	fmt.Printf("Private key 2: %x\n", privateKeyBytes2)
@@ -35,10 +35,10 @@ func main() {
 	err = publicKey2.VerifySignature(message, signature2)
 	fmt.Printf("Verified 2: %t\n", err == nil)
 
-	aggergatedPublicKey, _ := ultralight.AggregatePublicKeys([]*ultralight.PublicKey{publicKey, publicKey2})
+	aggergatedPublicKey, _ := bls.AggregatePublicKeys([]*bls.PublicKey{publicKey, publicKey2})
 	aggregatedPublicKeyBytes, _ := aggergatedPublicKey.Serialize()
 	fmt.Printf("Aggregated public key: %x\n", aggregatedPublicKeyBytes)
-	aggergatedSignature, _ := ultralight.AggregateSignatures([]*ultralight.Signature{signature, signature2})
+	aggergatedSignature, _ := bls.AggregateSignatures([]*bls.Signature{signature, signature2})
 	aggregatedSignatureBytes, _ := aggergatedSignature.Serialize()
 	fmt.Printf("Aggregated signature: %x\n", aggregatedSignatureBytes)
 	err = aggergatedPublicKey.VerifySignature(message, aggergatedSignature)

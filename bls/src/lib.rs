@@ -35,7 +35,7 @@ lazy_static! {
 fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
     match f() {
         Err(e) => {
-            error!("ultralight library error: {}", e.to_string());
+            error!("BLS library error: {}", e.to_string());
             false
         }
         _ => true,

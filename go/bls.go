@@ -1,8 +1,8 @@
-package ultralight
+package bls
 
 /*
-#cgo LDFLAGS: -L../ultralight/target/release -lbls_zexe -ldl -lm
-#include "ultralight.h"
+#cgo LDFLAGS: -L../bls/target/release -lbls_zexe -ldl -lm
+#include "bls.h"
 */
 import "C"
 
