@@ -1,4 +1,4 @@
-package ultralight
+package bls
 
 import (
 	"testing"
