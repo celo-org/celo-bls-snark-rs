@@ -57,3 +57,5 @@ We implement fast cofactor multiplication, as the *G2* cofactor is large.
 [pairings] Costello, C. . [Pairings for beginners](http://www.craigcostello.com.au/pairings/PairingsForBeginners.pdf).
 
 [BP17] Budroni, A., & Pintore, F. (2017). [Efficient hash maps to G2 on BLS curves](https://eprint.iacr.org/2017/419.pdf). Cryptology ePrint Archive, Report 2017/419.
+
+[RY07] Ristenpart, T., & Yilek, S. (2007, May). The power of proofs-of-possession: Securing multiparty signatures against rogue-key attacks. In Annual International Conference on the Theory and Applications of Cryptographic Techniques (pp. 228-245). Springer, Berlin, Heidelberg.
