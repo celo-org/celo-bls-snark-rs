@@ -72,9 +72,9 @@ func (self *PrivateKey) ToPublic() (*PublicKey, error) {
 	return publicKey, nil
 }
 
-func (self *PrivateKey) SignMessage(message []byte, shouldUseCompositeHasher bool) (*Signature, error) {
+func (self *PrivateKey) SignMessage(message []byte, extraData []byte, shouldUseCompositeHasher bool) (*Signature, error) {
 	signature := &Signature{}
-	success := C.sign_message(self.ptr, (*C.uchar)(unsafe.Pointer(&message[0])), C.int(len(message)), C.bool(shouldUseCompositeHasher), &signature.ptr)
+	success := C.sign_message(self.ptr, (*C.uchar)(unsafe.Pointer(&message[0])), C.int(len(message)), (*C.uchar)(unsafe.Pointer(&extraData[0])), C.int(len(extraData)), C.bool(shouldUseCompositeHasher), &signature.ptr)
 	if !success {
 		return nil, GeneralError
 	}
@@ -122,9 +122,9 @@ func (self *PublicKey) Destroy() {
 	C.destroy_public_key(self.ptr)
 }
 
-func (self *PublicKey) VerifySignature(message []byte, signature *Signature, shouldUseCompositeHasher bool) error {
+func (self *PublicKey) VerifySignature(message []byte, extraData []byte, signature *Signature, shouldUseCompositeHasher bool) error {
 	var verified C.bool
-	success := C.verify_signature(self.ptr, (*C.uchar)(unsafe.Pointer(&message[0])), C.int(len(message)), signature.ptr, C.bool(shouldUseCompositeHasher), &verified)
+	success := C.verify_signature(self.ptr, (*C.uchar)(unsafe.Pointer(&message[0])), C.int(len(message)), (*C.uchar)(unsafe.Pointer(&extraData[0])), C.int(len(extraData)), signature.ptr, C.bool(shouldUseCompositeHasher), &verified)
 	if !success {
 		return GeneralError
 	}

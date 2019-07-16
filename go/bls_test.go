@@ -10,8 +10,9 @@ func TestAggregatedSig(t *testing.T) {
 	defer privateKey.Destroy()
 	publicKey, _ := privateKey.ToPublic()
 	message := []byte("test")
-	signature, _ := privateKey.SignMessage(message, true)
-	err := publicKey.VerifySignature(message, signature, true)
+	extraData := []byte("extra")
+	signature, _ := privateKey.SignMessage(message, extraData, true)
+	err := publicKey.VerifySignature(message, extraData, signature, true)
 	if err != nil {
 		t.Fatalf("failed verifying signature for pk 1, error was: %s", err)
 	}
@@ -19,19 +20,19 @@ func TestAggregatedSig(t *testing.T) {
 	privateKey2, _ := GeneratePrivateKey()
 	defer privateKey2.Destroy()
 	publicKey2, _ := privateKey2.ToPublic()
-	signature2, _ := privateKey2.SignMessage(message, true)
-	err = publicKey2.VerifySignature(message, signature2, true)
+	signature2, _ := privateKey2.SignMessage(message, extraData, true)
+	err = publicKey2.VerifySignature(message, extraData, signature2, true)
 	if err != nil {
 		t.Fatalf("failed verifying signature for pk 2, error was: %s", err)
 	}
 
 	aggergatedPublicKey, _ := AggregatePublicKeys([]*PublicKey{publicKey, publicKey2})
 	aggergatedSignature, _ := AggregateSignatures([]*Signature{signature, signature2})
-	err = aggergatedPublicKey.VerifySignature(message, aggergatedSignature, true)
+	err = aggergatedPublicKey.VerifySignature(message, extraData, aggergatedSignature, true)
 	if err != nil {
 		t.Fatalf("failed verifying signature for aggregated pk, error was: %s", err)
 	}
-	err = publicKey.VerifySignature(message, aggergatedSignature, true)
+	err = publicKey.VerifySignature(message, extraData, aggergatedSignature, true)
 	if err == nil {
 		t.Fatalf("succeeded verifying signature for wrong pk, shouldn't have!")
 	}
@@ -66,8 +67,9 @@ func TestNonCompositeSig(t *testing.T) {
 	defer privateKey.Destroy()
 	publicKey, _ := privateKey.ToPublic()
 	message := []byte("test")
-	signature, _ := privateKey.SignMessage(message, false)
-	err := publicKey.VerifySignature(message, signature, false)
+	extraData := []byte("extra")
+	signature, _ := privateKey.SignMessage(message, extraData, false)
+	err := publicKey.VerifySignature(message, extraData, signature, false)
 	if err != nil {
 		t.Fatalf("failed verifying signature for pk 1, error was: %s", err)
 	}
@@ -75,19 +77,19 @@ func TestNonCompositeSig(t *testing.T) {
 	privateKey2, _ := GeneratePrivateKey()
 	defer privateKey2.Destroy()
 	publicKey2, _ := privateKey2.ToPublic()
-	signature2, _ := privateKey2.SignMessage(message, false)
-	err = publicKey2.VerifySignature(message, signature2, false)
+	signature2, _ := privateKey2.SignMessage(message, extraData, false)
+	err = publicKey2.VerifySignature(message, extraData, signature2, false)
 	if err != nil {
 		t.Fatalf("failed verifying signature for pk 2, error was: %s", err)
 	}
 
 	aggergatedPublicKey, _ := AggregatePublicKeys([]*PublicKey{publicKey, publicKey2})
 	aggergatedSignature, _ := AggregateSignatures([]*Signature{signature, signature2})
-	err = aggergatedPublicKey.VerifySignature(message, aggergatedSignature, false)
+	err = aggergatedPublicKey.VerifySignature(message, extraData, aggergatedSignature, false)
 	if err != nil {
 		t.Fatalf("failed verifying signature for aggregated pk, error was: %s", err)
 	}
-	err = publicKey.VerifySignature(message, aggergatedSignature, false)
+	err = publicKey.VerifySignature(message, extraData, aggergatedSignature, false)
 	if err == nil {
 		t.Fatalf("succeeded verifying signature for wrong pk, shouldn't have!")
 	}
