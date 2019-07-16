@@ -42,8 +42,8 @@ impl PrivateKey {
         self.sk.clone()
     }
 
-    pub fn sign<H: HashToG2>(&self, message: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
-        self.sign_message(SIG_DOMAIN, message, hash_to_g2)
+    pub fn sign<H: HashToG2>(&self, message: &[u8], extra_data: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
+        self.sign_message(SIG_DOMAIN, message, extra_data, hash_to_g2)
     }
 
     pub fn sign_pop<H: HashToG2>(&self, hash_to_g2: &H) -> Result<Signature, Error> {
@@ -51,14 +51,14 @@ impl PrivateKey {
         let mut pubkey_bytes = vec![];
         pubkey.write(&mut pubkey_bytes)?;
 
-        self.sign_message(POP_DOMAIN, &pubkey_bytes, hash_to_g2)
+        self.sign_message(POP_DOMAIN, &pubkey_bytes, &[], hash_to_g2)
     }
 
 
-    fn sign_message<H: HashToG2>(&self, domain: &[u8], message: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
+    fn sign_message<H: HashToG2>(&self, domain: &[u8], message: &[u8], extra_data: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
         Ok(Signature::from_sig(
             &hash_to_g2
-                .hash::<Bls12_377Parameters>(domain, message)?
+                .hash::<Bls12_377Parameters>(domain, message, extra_data)?
                 .mul(&self.sk),
         ))
     }
@@ -114,10 +114,11 @@ impl PublicKey {
     pub fn verify<H: HashToG2>(
         &self,
         message: &[u8],
+        extra_data: &[u8],
         signature: &Signature,
         hash_to_g2: &H,
     ) -> Result<(), Error> {
-        self.verify_sig(SIG_DOMAIN, message, signature, hash_to_g2)
+        self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g2)
     }
 
     pub fn verify_pop<H: HashToG2>(
@@ -127,7 +128,7 @@ impl PublicKey {
     ) -> Result<(), Error> {
         let mut pubkey_bytes = vec![];
         self.write(&mut pubkey_bytes)?;
-        self.verify_sig(POP_DOMAIN, &pubkey_bytes, signature, hash_to_g2)
+        self.verify_sig(POP_DOMAIN, &pubkey_bytes, &[], signature, hash_to_g2)
     }
 
 
@@ -135,6 +136,7 @@ impl PublicKey {
         &self,
         domain: &[u8],
         message: &[u8],
+        extra_data: &[u8],
         signature: &Signature,
         hash_to_g2: &H,
     ) -> Result<(), Error> {
@@ -146,7 +148,7 @@ impl PublicKey {
             (
                 &self.pk.into_affine().prepare(),
                 &hash_to_g2
-                    .hash::<Bls12_377Parameters>(domain, message)?
+                    .hash::<Bls12_377Parameters>(domain, message, extra_data)?
                     .into_affine()
                     .prepare(),
             ),
@@ -242,11 +244,11 @@ mod test {
             }
             let sk = PrivateKey::generate(rng);
 
-            let sig = sk.sign(&message[..], &try_and_increment).unwrap();
+            let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
             let pk = sk.to_public();
-            pk.verify(&message[..], &sig, &try_and_increment).unwrap();
+            pk.verify(&message[..], &[], &sig, &try_and_increment).unwrap();
             let message2 = b"goodbye";
-            pk.verify(&message2[..], &sig, &try_and_increment)
+            pk.verify(&message2[..], &[], &sig, &try_and_increment)
                 .unwrap_err();
         }
     }
@@ -266,11 +268,11 @@ mod test {
             }
             let sk = PrivateKey::generate(rng);
 
-            let sig = sk.sign(&message[..], &try_and_increment).unwrap();
+            let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
             let pk = sk.to_public();
-            pk.verify(&message[..], &sig, &try_and_increment).unwrap();
+            pk.verify(&message[..], &[], &sig, &try_and_increment).unwrap();
             let message2 = b"goodbye";
-            pk.verify(&message2[..], &sig, &try_and_increment)
+            pk.verify(&message2[..], &[], &sig, &try_and_increment)
                 .unwrap_err();
         }
     }
@@ -304,19 +306,19 @@ mod test {
         let sk1 = PrivateKey::generate(rng);
         let sk2 = PrivateKey::generate(rng);
 
-        let sig1 = sk1.sign(&message[..], &try_and_increment).unwrap();
-        let sig2 = sk2.sign(&message[..], &try_and_increment).unwrap();
+        let sig1 = sk1.sign(&message[..], &[], &try_and_increment).unwrap();
+        let sig2 = sk2.sign(&message[..], &[], &try_and_increment).unwrap();
 
         let apk = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
         let asig = Signature::aggregate(&[&sig1, &sig2]);
-        apk.verify(&message[..], &asig, &try_and_increment).unwrap();
-        apk.verify(&message[..], &sig1, &try_and_increment)
+        apk.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk.verify(&message[..], &[], &sig1, &try_and_increment)
             .unwrap_err();
         sk1.to_public()
-            .verify(&message[..], &asig, &try_and_increment)
+            .verify(&message[..], &[], &asig, &try_and_increment)
             .unwrap_err();
         let message2 = b"goodbye";
-        apk.verify(&message2[..], &asig, &try_and_increment)
+        apk.verify(&message2[..], &[], &asig, &try_and_increment)
             .unwrap_err();
     }
 }

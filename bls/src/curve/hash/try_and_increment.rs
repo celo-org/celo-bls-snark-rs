@@ -5,7 +5,7 @@ use crate::{
     },
     hash::PRF,
 };
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::WriteBytesExt;
 use failure::Error;
 use hex;
 
@@ -75,7 +75,7 @@ fn get_point_from_x<P: Bls12Parameters>(
     })
 }
 impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
-    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8]) -> Result<G2Projective<P>, Error> {
+    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Error> {
         const NUM_TRIES: usize = 10000;
         const EXTRA_BITS: usize = 135;
         const EXPECTED_TOTAL_BITS: usize = 1024;
@@ -85,12 +85,12 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
         let num_bits = 2 * fp_bits_with_extra; //2*(Fq + EXTRA_BITS), generate 2 field elements with extra bits to reduce modulo bias
         assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
         let message_hash = self.hasher.crh(message)?;
-        let mut counter: [u8; 4] = [0; 4];
+        let mut counter: [u8; 1] = [0; 1];
         for c in 1..NUM_TRIES {
-            (&mut counter[..]).write_u32::<LittleEndian>(c as u32)?;
+            (&mut counter[..]).write_u8(c as u8)?;
             let hash = self
                 .hasher
-                .prf(domain, &[&counter, message_hash.as_slice()].concat(), num_bits)?;
+                .prf(domain, &[&counter, extra_data, message_hash.as_slice()].concat(), num_bits)?;
             let possible_x = {
                 let possible_x_0 = bytes_to_fp::<P>(&hash[..hash.len() / 2]);
                 let possible_x_1 = bytes_to_fp::<P>(&hash[hash.len() / 2..]);
@@ -128,6 +128,6 @@ mod test {
     fn test_hash_to_curve() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>(&[], &[]).unwrap();
+        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>(&[], &[], &[]).unwrap();
     }
 }
