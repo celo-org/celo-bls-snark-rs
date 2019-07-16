@@ -5,7 +5,7 @@ use crate::hash::PRF;
 use blake2s_simd::Params;
 use failure::Error;
 
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::WriteBytesExt;
 
 pub struct DirectHasher {
 }
@@ -40,11 +40,11 @@ impl PRF for DirectHasher {
         };
         let last_byte_position = last_bits_to_keep / 8;
         let last_byte_mask = (1 << (last_bits_to_keep % 8)) - 1;
-        let mut counter: [u8; 4] = [0; 4];
+        let mut counter: [u8; 1] = [0; 1];
 
         let mut result = vec![];
         for i in 0..num_hashes {
-            (&mut counter[..]).write_u32::<LittleEndian>(i as u32)?;
+            (&mut counter[..]).write_u8(i as u8)?;
 
             let mut hash_result = Params::new()
                 .hash_length(32)
