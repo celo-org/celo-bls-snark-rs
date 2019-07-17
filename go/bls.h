@@ -28,4 +28,5 @@ void destroy_signature(Signature*);
 bool verify_signature(const PublicKey*, const unsigned char*, int32_t, const unsigned char*, int32_t, const Signature*, bool, bool*);
 bool verify_pop(const PublicKey*, const Signature*, bool*);
 bool aggregate_public_keys(const PublicKey**, int32_t, PublicKey**);
+bool aggregate_public_keys_subtract(const PublicKey*, const PublicKey**, int32_t, PublicKey**);
 bool aggregate_signatures(const Signature**, int32_t, Signature**);

@@ -308,6 +308,34 @@ pub extern "C" fn aggregate_public_keys(
 }
 
 #[no_mangle]
+pub extern "C" fn aggregate_public_keys_subtract(
+    in_aggregated_public_key: *const PublicKey,
+    in_public_keys: *const *const PublicKey,
+    in_public_keys_len: c_int,
+    out_public_key: *mut *mut PublicKey,
+) -> bool {
+    convert_result_to_bool::<_, std::io::Error, _>(|| {
+        let aggregated_public_key = unsafe { &*in_aggregated_public_key };
+        let public_keys_ptrs =
+            unsafe { slice::from_raw_parts(in_public_keys, in_public_keys_len as usize) };
+        let public_keys = public_keys_ptrs
+            .to_vec()
+            .into_iter()
+            .map(|pk| unsafe { &*pk })
+            .collect::<Vec<&PublicKey>>();
+        let aggregated_public_key_to_subtract = PublicKey::aggregate(&public_keys[..]);
+        let prepared_aggregated_public_key = PublicKey::from_pk(
+            &(aggregated_public_key.get_pk() - &aggregated_public_key_to_subtract.get_pk())
+        );
+        unsafe {
+            *out_public_key = Box::into_raw(Box::new(prepared_aggregated_public_key));
+        }
+
+        Ok(())
+    })
+}
+
+#[no_mangle]
 pub extern "C" fn aggregate_signatures(
     in_signatures: *const *const Signature,
     in_signatures_len: c_int,

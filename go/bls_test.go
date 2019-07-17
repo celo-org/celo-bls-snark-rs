@@ -37,6 +37,11 @@ func TestAggregatedSig(t *testing.T) {
 		t.Fatalf("succeeded verifying signature for wrong pk, shouldn't have!")
 	}
 
+	subtractedPublicKey, _ := AggregatePublicKeysSubtract(aggergatedPublicKey, []*PublicKey{publicKey2})
+	err = subtractedPublicKey.VerifySignature(message, extraData, signature, true)
+	if err != nil {
+		t.Fatalf("failed verifying signature for subtractedPublicKey pk, error was: %s", err)
+	}
 }
 
 func TestProofOfPossession(t *testing.T) {
