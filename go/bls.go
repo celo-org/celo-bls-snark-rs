@@ -187,6 +187,20 @@ func AggregatePublicKeys(publicKeys []*PublicKey) (*PublicKey, error) {
 	return aggregatedPublicKey, nil
 }
 
+func AggregatePublicKeysSubtract(aggregatedPublicKey *PublicKey, publicKeys []*PublicKey) (*PublicKey, error) {
+	publicKeysPtrs := []*C.struct_PublicKey{}
+	for _, pk := range publicKeys {
+		publicKeysPtrs = append(publicKeysPtrs, pk.ptr)
+	}
+	subtractedPublicKey := &PublicKey{}
+	success := C.aggregate_public_keys_subtract(aggregatedPublicKey.ptr, (**C.struct_PublicKey)(unsafe.Pointer(&publicKeysPtrs[0])), C.int(len(publicKeysPtrs)), &subtractedPublicKey.ptr)
+	if !success {
+		return nil, GeneralError
+	}
+
+	return subtractedPublicKey, nil
+}
+
 func AggregateSignatures(signatures []*Signature) (*Signature, error) {
 	signaturesPtrs := []*C.struct_Signature{}
 	for _, pk := range signatures {
