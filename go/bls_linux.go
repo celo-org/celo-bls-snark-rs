@@ -1,6 +1,5 @@
-package bls
-
 // +build linux,darwin,!android
+package bls
 
 /*
 #cgo LDFLAGS: -L../bls/target/release -lbls_zexe -ldl -lm
