@@ -1,4 +1,5 @@
-// +build linux,darwin,!android
+// +build !android
+
 package bls
 
 /*
