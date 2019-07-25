@@ -14,6 +14,7 @@ use algebra::{bytes::{FromBytes, ToBytes}, curves::{
 use failure::Error;
 use rand::Rng;
 
+static PRF_KEY: &'static [u8] = b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0";
 static SIG_DOMAIN: &'static [u8] = b"ULforprf";
 static POP_DOMAIN: &'static [u8] = b"ULforpop";
 
@@ -41,7 +42,7 @@ impl PrivateKey {
     }
 
     pub fn sign<H: HashToG2>(&self, message: &[u8], extra_data: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
-        self.sign_message(SIG_DOMAIN, message, extra_data, hash_to_g2)
+        self.sign_message(PRF_KEY, SIG_DOMAIN, message, extra_data, hash_to_g2)
     }
 
     pub fn sign_pop<H: HashToG2>(&self, hash_to_g2: &H) -> Result<Signature, Error> {
@@ -49,14 +50,14 @@ impl PrivateKey {
         let mut pubkey_bytes = vec![];
         pubkey.write(&mut pubkey_bytes)?;
 
-        self.sign_message(POP_DOMAIN, &pubkey_bytes, &[], hash_to_g2)
+        self.sign_message(PRF_KEY, POP_DOMAIN, &pubkey_bytes, &[], hash_to_g2)
     }
 
 
-    fn sign_message<H: HashToG2>(&self, domain: &[u8], message: &[u8], extra_data: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
+    fn sign_message<H: HashToG2>(&self, key: &[u8], domain: &[u8], message: &[u8], extra_data: &[u8], hash_to_g2: &H) -> Result<Signature, Error> {
         Ok(Signature::from_sig(
             &hash_to_g2
-                .hash::<Bls12_377Parameters>(domain, message, extra_data)?
+                .hash::<Bls12_377Parameters>(key, domain, message, extra_data)?
                 .mul(&self.sk),
         ))
     }
@@ -116,7 +117,7 @@ impl PublicKey {
         signature: &Signature,
         hash_to_g2: &H,
     ) -> Result<(), Error> {
-        self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g2)
+        self.verify_sig(PRF_KEY, SIG_DOMAIN, message, extra_data, signature, hash_to_g2)
     }
 
     pub fn verify_pop<H: HashToG2>(
@@ -126,12 +127,13 @@ impl PublicKey {
     ) -> Result<(), Error> {
         let mut pubkey_bytes = vec![];
         self.write(&mut pubkey_bytes)?;
-        self.verify_sig(POP_DOMAIN, &pubkey_bytes, &[], signature, hash_to_g2)
+        self.verify_sig(PRF_KEY, POP_DOMAIN, &pubkey_bytes, &[], signature, hash_to_g2)
     }
 
 
     fn verify_sig<H: HashToG2>(
         &self,
+        key: &[u8],
         domain: &[u8],
         message: &[u8],
         extra_data: &[u8],
@@ -146,7 +148,7 @@ impl PublicKey {
             (
                 &self.pk.into_affine().prepare(),
                 &hash_to_g2
-                    .hash::<Bls12_377Parameters>(domain, message, extra_data)?
+                    .hash::<Bls12_377Parameters>(key, domain, message, extra_data)?
                     .into_affine()
                     .prepare(),
             ),

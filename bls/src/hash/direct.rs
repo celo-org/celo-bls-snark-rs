@@ -29,7 +29,7 @@ impl PRF for DirectHasher {
         return Ok(hash_result.to_vec());
     }
 
-    fn prf(&self, domain: &[u8], hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
+    fn prf(&self, key: &[u8], domain: &[u8], hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
         if domain.len() > 8 {
             return Err(format_err!("domain length is too large: {}", domain.len()));
         }
@@ -50,6 +50,7 @@ impl PRF for DirectHasher {
                 .hash_length(32)
                 .personal(domain)
                 .to_state()
+                .update(&key)
                 .update(&counter)
                 .update(hashed_message)
                 .finalize()
@@ -73,9 +74,9 @@ impl PRF for DirectHasher {
         Ok(result)
     }
 
-    fn hash(&self, domain: &[u8], message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
+    fn hash(&self, key: &[u8], domain: &[u8], message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Error> {
         let prepared_message = self.crh(message)?;
-        self.prf(domain, &prepared_message, output_size_in_bits)
+        self.prf(key, domain, &prepared_message, output_size_in_bits)
     }
 }
 
@@ -112,7 +113,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"ULforprf", &result, 768).unwrap();
+        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 768).unwrap();
     }
 
     #[test]
@@ -124,7 +125,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"ULforprf", &result, 769).unwrap();
+        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 769).unwrap();
     }
 
     #[test]
@@ -136,7 +137,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"ULforprf", &result, 760).unwrap();
+        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 760).unwrap();
     }
 
     #[test]
@@ -147,6 +148,6 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"ULforprf", &msg, 760).unwrap();
+        let _result = hasher.hash(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0", b"ULforprf", &msg, 760).unwrap();
     }
 }
