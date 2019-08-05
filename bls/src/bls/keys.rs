@@ -169,7 +169,7 @@ impl ToBytes for PublicKey {
         let y_big = affine.y.into_repr();
         let half = Fq::modulus_minus_one_div_two();
         affine.x.write(&mut x_bytes)?;
-        if y_big >= half {
+        if y_big > half {
             let num_x_bytes = x_bytes.len();
             x_bytes[num_x_bytes - 1] |= 0x80;
         }
@@ -194,7 +194,7 @@ impl FromBytes for PublicKey {
             io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
         )?;
         let negy = -y;
-        let chosen_y = if (y < negy) ^ y_over_half { y } else { negy };
+        let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
         let pk = G1Affine::new(x, chosen_y, false);
         Ok(PublicKey::from_pk(&pk.into_projective()))
     }
@@ -232,11 +232,11 @@ impl ToBytes for Signature {
         let y_c1_big = affine.y.c1.into_repr();
         let half = Fq::modulus_minus_one_div_two();
         affine.x.write(&mut x_bytes)?;
-        if y_c1_big >= half {
-            if y_c1_big == half && y_c0_big >= half {
-                let num_x_bytes = x_bytes.len();
-                x_bytes[num_x_bytes - 1] |= 0x80;
-            }
+        let num_x_bytes = x_bytes.len();
+        if y_c1_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
+        } else if y_c1_big == half && y_c0_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
         }
         writer.write(&x_bytes)?;
         Ok(())
@@ -266,12 +266,10 @@ impl FromBytes for Signature {
 
         let (bigger, smaller) = {
             let half = Fq::modulus_minus_one_div_two();
-            if y_c1_big >= half {
-                if y_c1_big == half && y_c0_big >= half {
-                    (y, negy)
-                } else {
-                    (negy, y)
-                }
+            if y_c1_big > half {
+                (y, negy)
+            } else if y_c1_big == half && y_c0_big > half {
+                (y, negy)
             } else {
                 (negy, y)
             }
