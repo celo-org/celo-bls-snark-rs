@@ -29,8 +29,8 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/app
-      - run: rustup install nightly
-      - run: cd bls && cargo +nightly build --release && cargo +nightly test --release
+      - run: rustup install 1.36.0
+      - run: cd bls && cargo build --release && cargo test --release
       - persist_to_workspace:
           root: .
           paths: bls/target/release
