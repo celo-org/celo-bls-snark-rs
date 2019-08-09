@@ -2,3 +2,4 @@
 **/*.rs.bk
 *.swp
 go/cmd/example/example
+Cargo.lock

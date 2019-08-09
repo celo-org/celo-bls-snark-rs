@@ -88,6 +88,7 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
         assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
         let message_hash = self.hasher.crh(message)?;
         let mut counter: [u8; 1] = [0; 1];
+        let hash_loop_time = timer_start!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = self
@@ -119,6 +120,7 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
                         hex::encode(message),
                         c
                     );
+                    timer_end!(hash_loop_time);
                     return Ok(cofactor::scale_by_cofactor_fuentes::<P>(
                         &x.into_projective(),
                     ));
