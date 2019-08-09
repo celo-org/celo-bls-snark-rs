@@ -106,7 +106,7 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
                 }
                 let mut possible_x_1_bytes = (&hash[hash.len() / 2..]).to_vec();
                 let possible_x_1_bytes_len = possible_x_1_bytes.len();
-                let greatest = possible_x_1_bytes[possible_x_1_bytes_len - 1] & GREATEST_MASK;
+                let greatest = (possible_x_1_bytes[possible_x_1_bytes_len - 1] & GREATEST_MASK) == 1;
                 possible_x_1_bytes[possible_x_1_bytes_len - 1] &= LAST_BYTE_MASK;
                 let possible_x_1 = P::Fp::read(possible_x_1_bytes.as_slice())?;
                 if possible_x_1 == P::Fp::zero() {
