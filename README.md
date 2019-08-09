@@ -54,6 +54,10 @@ Apache License Version 2.0 (LICENSE-APACHE or http://www.apache.org/licenses/LIC
 MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
 Unless you explicitly state otherwise, any contribution submitted for inclusion in BLS-ZEXE by you shall be dual licensed as above (as defined in the Apache v2 License), without any additional terms or conditions.
 
+## Third-party Libraries
+
+BLS-ZEXE distributes the Zexe source code under [zexe](zexe). Zexe's authors are listed in its [AUTHORS](zexe/AUTHORS) file.
+
 ## Third-Party Software Licenses
 
 [ZEXE](https://github.com/scipr-lab/zexe) is licensed under either MIT or Apache License Version 2.0. The notices are the same as [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
