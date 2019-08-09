@@ -41,5 +41,9 @@ path = "examples/simple_signature.rs"
 name = "pop"
 path = "examples/pop.rs"
 
+[[example]]
+name = "pop_csv"
+path = "examples/pop_csv.rs"
+
 [lib]
 crate-type = ["lib", "staticlib"]
