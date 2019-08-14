@@ -8,7 +8,6 @@ extern crate lazy_static;
 pub mod bls;
 pub mod curve;
 pub mod hash;
-pub mod snark;
 
 use crate::{
     bls::keys::{PrivateKey, PublicKey, Signature},

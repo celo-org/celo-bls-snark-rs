@@ -1,15 +1,15 @@
 [package]
-name = "bls-zexe"
+name = "bls_algebra"
 version = "0.1.0"
 authors = ["Kobi Gurkan <kobigurk@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-snark-gadgets = { path = "../zexe/snark-gadgets" }
-snark = { path = "../zexe/snark" }
-algebra = { path = "../zexe/algebra" }
-dpc = { path = "../zexe/dpc" }
-bench-utils = { path = "../zexe/bench-utils" }
+snark-gadgets = { path = "../../zexe/snark-gadgets" }
+snark = { path = "../../zexe/snark" }
+algebra = { path = "../../zexe/algebra" }
+dpc = { path = "../../zexe/dpc" }
+bench-utils = { path = "../../zexe/bench-utils" }
 rand_chacha = { version = "0.1.1" }
 rand_core = { version = "0.4" }
 rand = { version = "0.4" }
