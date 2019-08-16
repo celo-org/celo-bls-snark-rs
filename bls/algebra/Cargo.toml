@@ -1,5 +1,5 @@
 [package]
-name = "bls_zexe"
+name = "bls-zexe"
 version = "0.1.0"
 authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org>"]
 edition = "2018"
