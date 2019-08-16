@@ -198,7 +198,7 @@ mod test {
     #[test]
     fn test_pedersen_test_vectors() {
         let hasher = CompositeHasher::new().unwrap();
-        let path = Path::new("test_utils/test_vec.csv");
+        let path = Path::new("/test_utils/test_vec.csv");
         let file = File::open(path).unwrap();
         let mut rdr =csv::ReaderBuilder::new().has_headers(false).from_reader(file);
         for record in rdr.records() {
