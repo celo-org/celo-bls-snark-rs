@@ -1,4 +1,4 @@
-/target
+bls/algebra/target
 **/*.rs.bk
 *.swp
 go/cmd/example/example
