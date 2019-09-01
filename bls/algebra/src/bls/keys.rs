@@ -48,12 +48,8 @@ impl PrivateKey {
         self.sign_message(PRF_KEY, SIG_DOMAIN, message, extra_data, hash_to_g2)
     }
 
-    pub fn sign_pop<H: HashToG2>(&self, hash_to_g2: &H) -> Result<Signature, Box<dyn Error>> {
-        let pubkey = self.to_public();
-        let mut pubkey_bytes = vec![];
-        pubkey.write(&mut pubkey_bytes)?;
-
-        self.sign_message(PRF_KEY, POP_DOMAIN, &pubkey_bytes, &[], hash_to_g2)
+    pub fn sign_pop<H: HashToG2>(&self, message: &[u8], hash_to_g2: &H) -> Result<Signature, Box<dyn Error>> {
+        self.sign_message(PRF_KEY, POP_DOMAIN, &message, &[], hash_to_g2)
     }
 
 
@@ -138,12 +134,11 @@ impl PublicKey {
 
     pub fn verify_pop<H: HashToG2>(
         &self,
+        message: &[u8],
         signature: &Signature,
         hash_to_g2: &H,
     ) -> Result<(), Box<dyn Error>> {
-        let mut pubkey_bytes = vec![];
-        self.write(&mut pubkey_bytes)?;
-        self.verify_sig(PRF_KEY, POP_DOMAIN, &pubkey_bytes, &[], signature, hash_to_g2)
+        self.verify_sig(PRF_KEY, POP_DOMAIN, &message, &[], signature, hash_to_g2)
     }
 
 
@@ -371,11 +366,13 @@ mod test {
         let sk = PrivateKey::generate(rng);
         let sk2 = PrivateKey::generate(rng);
 
-        let sig = sk.sign_pop(&try_and_increment).unwrap();
         let pk = sk.to_public();
+        let mut pk_bytes = vec![];
+        pk.write(&mut pk_bytes).unwrap();
+        let sig = sk.sign_pop(&pk_bytes, &try_and_increment).unwrap();
         let pk2 = sk2.to_public();
-        pk.verify_pop(&sig, &try_and_increment).unwrap();
-        pk2.verify_pop(&sig, &try_and_increment)
+        pk.verify_pop(&pk_bytes, &sig, &try_and_increment).unwrap();
+        pk2.verify_pop(&pk_bytes, &sig, &try_and_increment)
             .unwrap_err();
     }
 

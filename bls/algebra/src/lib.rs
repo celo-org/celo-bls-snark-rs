@@ -169,11 +169,14 @@ pub extern "C" fn sign_message(
 #[no_mangle]
 pub extern "C" fn sign_pop(
     in_private_key: *const PrivateKey,
+    in_message: *const u8,
+    in_message_len: c_int,
     out_signature: *mut *mut Signature,
 ) -> bool {
     convert_result_to_bool::<_, Box<Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
-        let signature = private_key.sign_pop( &*DIRECT_HASH_TO_G2)?;
+        let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
+        let signature = private_key.sign_pop( message, &*DIRECT_HASH_TO_G2)?;
         unsafe {
             *out_signature = Box::into_raw(Box::new(signature));
         }
@@ -274,13 +277,16 @@ pub extern "C" fn verify_signature(
 #[no_mangle]
 pub extern "C" fn verify_pop(
     in_public_key: *const PublicKey,
+    in_message: *const u8,
+    in_message_len: c_int,
     in_signature: *const Signature,
     out_verified: *mut bool,
 ) -> bool {
     convert_result_to_bool::<_, std::io::Error, _>(|| {
         let public_key = unsafe { &*in_public_key };
+        let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let signature = unsafe { &*in_signature };
-        let verified = public_key.verify_pop(signature, &*DIRECT_HASH_TO_G2).is_ok();
+        let verified = public_key.verify_pop(message, signature, &*DIRECT_HASH_TO_G2).is_ok();
         unsafe { *out_verified = verified };
 
         Ok(())

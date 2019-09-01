@@ -27,18 +27,20 @@ fn main() {
     let direct_hasher = DirectHasher::new().unwrap();
     let try_and_increment = TryAndIncrement::new(&direct_hasher);
     let sk = PrivateKey::read(key_bytes.as_slice()).unwrap();
-    let pop = sk.sign_pop(&try_and_increment).unwrap();
+    let pk = sk.to_public();
+    let mut pk_bytes = vec![];
+    pk.write(&mut pk_bytes).unwrap();
+    let pop = sk.sign_pop(&pk_bytes, &try_and_increment).unwrap();
     let mut pop_bytes = vec![];
     pop.write(&mut pop_bytes).unwrap();
 
-    let pk = sk.to_public();
     /*
     let mut pk_bytes = vec![];
     pk.write(&mut pk_bytes).unwrap();
     println!("{}", hex::encode(&pk_bytes));
     */
 
-    pk.verify_pop(&pop, &try_and_increment).unwrap();
+    pk.verify_pop(&pk_bytes, &pop, &try_and_increment).unwrap();
 
     let pop_hex = hex::encode(&pop_bytes);
     println!("{}", pop_hex);
