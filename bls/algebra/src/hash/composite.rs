@@ -62,8 +62,8 @@ impl CompositeHasher {
 }
 
 impl PRF for CompositeHasher {
-    fn crh(&self, message: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-        let h = CRH::evaluate(&self.parameters, message)?;
+    fn crh(&self, domain: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+        let h = CRH::evaluate(&self.parameters, &[domain, message].concat())?;
         let mut res = vec![];
         h.x.write(&mut res)?;
 
@@ -71,13 +71,13 @@ impl PRF for CompositeHasher {
 
     }
 
-    fn prf(&self, key: &[u8], domain: &[u8], hashed_message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        self.direct_hasher.prf(key, domain, hashed_message, output_size_in_bits)
+    fn xof(&self, domain: &[u8], hashed_message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+        self.direct_hasher.xof(domain, hashed_message, xof_digest_length)
     }
 
-    fn hash(&self, key: &[u8], domain: &[u8], message: &[u8], output_size_in_bits: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let prepared_message = self.crh(message)?;
-        self.prf(key, domain, &prepared_message, output_size_in_bits)
+    fn hash(&self, domain: &[u8], message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+        let prepared_message = self.crh(domain, message, xof_digest_length)?;
+        self.xof(domain, &prepared_message, xof_digest_length)
     }
 }
 
@@ -95,7 +95,7 @@ mod test {
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
         let hasher = Hasher::new().unwrap();
-        let _result = hasher.crh(&msg).unwrap();
+        let _result = hasher.crh(&[], &msg, 96).unwrap();
     }
 
     #[test]
@@ -106,43 +106,43 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.crh(&msg).unwrap();
+        let _result = hasher.crh(&[],  &msg, 96).unwrap();
     }
 
     #[test]
-    fn test_prf_random_768() {
+    fn test_xof_random_768() {
         let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 768).unwrap();
+        let result = hasher.crh(&[], &msg, 96).unwrap();
+        let _xof_result = hasher.xof(b"ULforxof", &result, 768).unwrap();
     }
 
     #[test]
-    fn test_prf_random_769() {
+    fn test_xof_random_769() {
         let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x0dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 769).unwrap();
+        let result = hasher.crh(&[], &msg, 96).unwrap();
+        let _xof_result = hasher.xof(b"ULforxof", &result, 769).unwrap();
     }
 
     #[test]
-    fn test_prf_random_760() {
+    fn test_xof_random_760() {
         let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.crh(&msg).unwrap();
-        let _prf_result = hasher.prf(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &result, 760).unwrap();
+        let result = hasher.crh(&[], &msg, 96).unwrap();
+        let _xof_result = hasher.xof(b"ULforxof", &result, 760).unwrap();
     }
 
     #[test]
@@ -153,7 +153,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &msg, 760).unwrap();
+        let _result = hasher.hash(b"ULforxof", &msg, 760).unwrap();
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"096b36a5804bfacef1691e173c366a47ff5ba84a44f26ddd7e8d9f79d5b42df0",b"ULforprf", &msg, 760).unwrap();
+        let _result = hasher.hash(b"ULforxof", &msg, 760).unwrap();
     }
 
     #[test]
@@ -207,7 +207,7 @@ mod test {
             let actual_hash: String = r[1].to_string();
 
             let msg = hex::decode(&row).unwrap();
-            let mut test_hash = hasher.crh(&msg).unwrap();
+            let mut test_hash = hasher.crh(&[], &msg, 96).unwrap();
             test_hash.reverse();
             let msg_hash = hex::encode(&test_hash);
 
@@ -226,7 +226,7 @@ mod test {
         println!("{}",  hex_msg.to_string());
         let to_hash = hex::decode(&hex_msg).unwrap();
         println!("{:?}", to_hash);
-        let mut test_hash = hasher.crh(&to_hash).unwrap();
+        let mut test_hash = hasher.crh(&[], &to_hash, 96).unwrap();
         test_hash.reverse();
         let hex_hash = hex::encode(&test_hash);
         println!("{}", hex_hash.to_string() );
