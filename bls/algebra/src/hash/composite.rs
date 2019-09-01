@@ -62,8 +62,8 @@ impl CompositeHasher {
 }
 
 impl PRF for CompositeHasher {
-    fn crh(&self, domain: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let h = CRH::evaluate(&self.parameters, &[domain, message].concat())?;
+    fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+        let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
         h.x.write(&mut res)?;
 
@@ -134,7 +134,7 @@ mod test {
     }
 
     #[test]
-    fn test_xof_random_760() {
+    fn test_xof_random_96() {
         let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut msg: Vec<u8> = vec![0; 32];
@@ -142,7 +142,7 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&[], &msg, 96).unwrap();
-        let _xof_result = hasher.xof(b"ULforxof", &result, 760).unwrap();
+        let _xof_result = hasher.xof(b"ULforxof", &result, 96).unwrap();
     }
 
     #[test]
@@ -153,7 +153,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"ULforxof", &msg, 760).unwrap();
+        let _result = hasher.hash(b"ULforxof", &msg, 96).unwrap();
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"ULforxof", &msg, 760).unwrap();
+        let _result = hasher.hash(b"ULforxof", &msg, 96).unwrap();
     }
 
     #[test]
