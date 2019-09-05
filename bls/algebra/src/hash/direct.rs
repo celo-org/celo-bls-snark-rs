@@ -1,6 +1,6 @@
 extern crate hex;
 
-use crate::hash::PRF;
+use crate::hash::XOF;
 
 use blake2s_simd::Params;
 use byteorder::{WriteBytesExt, LittleEndian};
@@ -23,7 +23,7 @@ fn xof_digest_length_to_node_offset(node_offset: usize, xof_digest_length: usize
     Ok(offset)
 }
 
-impl PRF for DirectHasher {
+impl XOF for DirectHasher {
     fn crh(&self, domain: &[u8], message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let hash_result = Params::new()
             .hash_length(32)
@@ -74,7 +74,7 @@ impl PRF for DirectHasher {
 #[cfg(test)]
 mod test {
     use super::DirectHasher as Hasher;
-    use crate::hash::PRF;
+    use crate::hash::XOF;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]

@@ -1,6 +1,6 @@
 extern crate hex;
 
-use crate::hash::PRF;
+use crate::hash::XOF;
 use super::direct::DirectHasher;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
@@ -61,7 +61,7 @@ impl CompositeHasher {
     }
 }
 
-impl PRF for CompositeHasher {
+impl XOF for CompositeHasher {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
@@ -85,7 +85,7 @@ impl PRF for CompositeHasher {
 mod test {
     use super::CompositeHasher as Hasher;
     use crate::hash::composite::CompositeHasher;
-    use crate::hash::PRF;
+    use crate::hash::XOF;
     use algebra::bytes::ToBytes;
     use rand::{Rng, SeedableRng, XorShiftRng};
     use std::fs::File;

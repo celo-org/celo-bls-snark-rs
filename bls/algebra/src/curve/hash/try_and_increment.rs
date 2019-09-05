@@ -3,7 +3,7 @@ use crate::{
         cofactor,
         hash::{HashToCurveError, HashToG2},
     },
-    hash::PRF,
+    hash::XOF,
 };
 use byteorder::WriteBytesExt;
 use hex;
@@ -50,11 +50,11 @@ fn bytes_to_fp<P: Bls12Parameters>(bytes: &[u8]) -> P::Fp {
 
 /// A try-and-increment method for hashing to G2. See page 521 in
 /// https://link.springer.com/content/pdf/10.1007/3-540-45682-1_30.pdf.
-pub struct TryAndIncrement<'a, H: PRF> {
+pub struct TryAndIncrement<'a, H: XOF> {
     hasher: &'a H,
 }
 
-impl<'a, H: PRF> TryAndIncrement<'a, H> {
+impl<'a, H: XOF> TryAndIncrement<'a, H> {
     pub fn new(h: &'a H) -> Self {
         TryAndIncrement::<H> { hasher: h }
     }
@@ -76,7 +76,7 @@ fn get_point_from_x<P: Bls12Parameters>(
         G2Affine::<P>::new(x, y, false)
     })
 }
-impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
+impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
     fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
         const NUM_TRIES: usize = 256;
         const EXPECTED_TOTAL_BITS: usize = 384*2;
@@ -88,14 +88,13 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
         let num_bits = 2 * fp_bits;
         assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
         let num_bytes = num_bits / 8;
-        let message_hash = self.hasher.crh(domain, message, num_bytes)?;
         let mut counter: [u8; 1] = [0; 1];
         let hash_loop_time = timer_start!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = self
                 .hasher
-                .xof(domain, &[&counter, extra_data, message_hash.as_slice()].concat(), num_bytes)?;
+                .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_0_bytes = (&hash[..hash.len()/2]).to_vec();
