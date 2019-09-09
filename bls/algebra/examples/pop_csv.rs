@@ -41,17 +41,17 @@ fn main() {
     let mut file = File::create(out).unwrap();
     for _ in 0..num {
         let sk = PrivateKey::generate(rng);
-        let pop = sk.sign_pop(&try_and_increment).unwrap();
+        let pk = sk.to_public();
+        let mut pk_bytes = vec![];
+        pk.write(&mut pk_bytes).unwrap();
+        let pop = sk.sign_pop(&pk_bytes, &try_and_increment).unwrap();
         let mut pop_bytes = vec![];
         pop.write(&mut pop_bytes).unwrap();
 
         let mut sk_bytes = vec![];
         sk.write(&mut sk_bytes).unwrap();
-        let pk = sk.to_public();
-        let mut pk_bytes = vec![];
-        pk.write(&mut pk_bytes).unwrap();
 
-        pk.verify_pop(&pop, &try_and_increment).unwrap();
+        pk.verify_pop(&pk_bytes, &pop, &try_and_increment).unwrap();
 
         file.write_all(format!("{},{},{}\n", hex::encode(sk_bytes), hex::encode(pk_bytes), hex::encode(pop_bytes)).as_bytes()).unwrap();
     }

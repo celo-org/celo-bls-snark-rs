@@ -48,8 +48,9 @@ func TestProofOfPossession(t *testing.T) {
 	privateKey, _ := GeneratePrivateKey()
 	defer privateKey.Destroy()
 	publicKey, _ := privateKey.ToPublic()
-	signature, _ := privateKey.SignPoP()
-	err := publicKey.VerifyPoP(signature)
+  message := []byte("just some message")
+	signature, _ := privateKey.SignPoP(message)
+	err := publicKey.VerifyPoP(message, signature)
 	if err != nil {
 		t.Fatalf("failed verifying PoP for pk 1, error was: %s", err)
 	}
@@ -61,7 +62,7 @@ func TestProofOfPossession(t *testing.T) {
 		t.Fatalf("failed verifying PoP for pk 2, error was: %s", err)
 	}
 
-	err = publicKey2.VerifyPoP(signature)
+	err = publicKey2.VerifyPoP(message, signature)
 	if err == nil {
 		t.Fatalf("succeeded verifying PoP for wrong pk, shouldn't have!")
 	}
