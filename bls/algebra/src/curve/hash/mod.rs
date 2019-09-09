@@ -24,5 +24,5 @@ impl Error for HashToCurveError {
 }
 
 pub trait HashToG2 {
-    fn hash<P: Bls12Parameters>(&self, key: &[u8], domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>>;
+    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>>;
 }

@@ -3,7 +3,7 @@ use crate::{
         cofactor,
         hash::{HashToCurveError, HashToG2},
     },
-    hash::PRF,
+    hash::XOF,
 };
 use byteorder::WriteBytesExt;
 use hex;
@@ -50,11 +50,11 @@ fn bytes_to_fp<P: Bls12Parameters>(bytes: &[u8]) -> P::Fp {
 
 /// A try-and-increment method for hashing to G2. See page 521 in
 /// https://link.springer.com/content/pdf/10.1007/3-540-45682-1_30.pdf.
-pub struct TryAndIncrement<'a, H: PRF> {
+pub struct TryAndIncrement<'a, H: XOF> {
     hasher: &'a H,
 }
 
-impl<'a, H: PRF> TryAndIncrement<'a, H> {
+impl<'a, H: XOF> TryAndIncrement<'a, H> {
     pub fn new(h: &'a H) -> Self {
         TryAndIncrement::<H> { hasher: h }
     }
@@ -76,8 +76,8 @@ fn get_point_from_x<P: Bls12Parameters>(
         G2Affine::<P>::new(x, y, false)
     })
 }
-impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
-    fn hash<P: Bls12Parameters>(&self, key: &[u8], domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
+impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
+    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
         const NUM_TRIES: usize = 256;
         const EXPECTED_TOTAL_BITS: usize = 384*2;
         const LAST_BYTE_MASK: u8 = 1;
@@ -87,14 +87,14 @@ impl<'a, H: PRF> HashToG2 for TryAndIncrement<'a, H> {
         let fp_bits = (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64)/8.0).ceil() as usize)*8;
         let num_bits = 2 * fp_bits;
         assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
-        let message_hash = self.hasher.crh(message)?;
+        let num_bytes = num_bits / 8;
         let mut counter: [u8; 1] = [0; 1];
         let hash_loop_time = timer_start!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = self
                 .hasher
-                .prf(key, domain, &[&counter, extra_data, message_hash.as_slice()].concat(), num_bits)?;
+                .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_0_bytes = (&hash[..hash.len()/2]).to_vec();
@@ -147,6 +147,6 @@ mod test {
     fn test_hash_to_curve() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>(&[], &[], &[], &[]).unwrap();
+        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>( &[], &[], &[]).unwrap();
     }
 }
