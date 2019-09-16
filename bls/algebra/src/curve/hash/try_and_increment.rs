@@ -80,13 +80,13 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
     fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
         const NUM_TRIES: usize = 256;
         const EXPECTED_TOTAL_BITS: usize = 384*2;
-        const LAST_BYTE_MASK: u8 = 1;
-        const GREATEST_MASK: u8 = 2;
+        const LAST_BYTE_MASK: u8 = 128;
+        const GREATEST_MASK: u8 = 64;
 
         //round up to a multiple of 8
         let fp_bits = (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64)/8.0).ceil() as usize)*8;
         let num_bits = 2 * fp_bits;
-        assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
+        debug_assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
         let num_bytes = num_bits / 8;
         let mut counter: [u8; 1] = [0; 1];
         let hash_loop_time = timer_start!(|| "try_and_increment::hash_loop");
@@ -97,14 +97,13 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
                 .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
-                let mut possible_x_0_bytes = (&hash[..hash.len()/2]).to_vec();
-                let possible_x_0_bytes_len = possible_x_0_bytes.len();
-                possible_x_0_bytes[possible_x_0_bytes_len - 1] &= LAST_BYTE_MASK;
+                let mut possible_x_0_bytes = (&hash[..(num_bytes/2)]).to_vec();
+                possible_x_0_bytes[(num_bytes/2) - 1] &= LAST_BYTE_MASK;
                 let possible_x_0 = P::Fp::read(possible_x_0_bytes.as_slice())?;
                 if possible_x_0 == P::Fp::zero() {
                     continue;
                 }
-                let mut possible_x_1_bytes = (&hash[hash.len() / 2..]).to_vec();
+                let mut possible_x_1_bytes = (&hash[(num_bytes/2)..]).to_vec();
                 let possible_x_1_bytes_len = possible_x_1_bytes.len();
                 let greatest = (possible_x_1_bytes[possible_x_1_bytes_len - 1] & GREATEST_MASK) == GREATEST_MASK;
                 possible_x_1_bytes[possible_x_1_bytes_len - 1] &= LAST_BYTE_MASK;
