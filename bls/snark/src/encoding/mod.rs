@@ -7,9 +7,7 @@ use algebra::{
     bytes::ToBytes,
 };
 use bls_zexe::bls::keys::PublicKey;
-use byteorder::{LittleEndian, WriteBytesExt};
 use std::error::Error;
-use std::thread::current;
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
 /// number in ascending order
@@ -73,11 +71,12 @@ fn encode_epoch_block_to_bits(removed_validators: &Vec<bool>, added_public_keys:
     let mut current_public_key_index = 0;
     let encoded_zero_value_public_key = encode_zero_value_public_key()?;
     for is_removed in removed_validators {
-        if (*is_removed) {
+        if *is_removed {
             epoch_bits.extend_from_slice(&encoded_zero_value_public_key);
         } else {
             epoch_bits.extend_from_slice(&encode_public_key(&added_public_keys[current_public_key_index])?);
         }
+        current_public_key_index += 1;
     }
 
     Ok(epoch_bits)
@@ -89,14 +88,14 @@ fn encode_epoch_block_to_bytes(removed_validators: &Vec<bool>, added_public_keys
 
 #[cfg(test)]
 mod test {
-
     use byteorder::{LittleEndian, WriteBytesExt};
-    use rand::{Rng, ChaChaRng, SeedableRng};
+    use rand::{Rng, SeedableRng};
     use crate::encoding::{bytes_to_bits, bits_to_bytes};
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_bytes_to_bits() {
-        let rng = &mut ChaChaRng::from_seed(&[1]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         for _ in 0..100 {
             let n = rng.gen();
             let mut bytes = vec![];
@@ -116,7 +115,7 @@ mod test {
 
     #[test]
     fn test_bits_to_bytes() {
-        let rng = &mut ChaChaRng::from_seed(&[1]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         for _ in 0..100 {
             let n = rng.gen();
             let mut bytes = vec![];

@@ -9,9 +9,9 @@ use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
     FixedLengthCRH,
 };
-use rand::{chacha::ChaChaRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaChaRng;
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use std::error::Error;
 
 type CRH = PedersenCRH<Edwards, Window>;
@@ -46,13 +46,9 @@ impl CompositeHasher {
             .finalize()
             .as_ref()
             .to_vec();
-        let mut seed = vec![];
-        for i in 0..hash_result.len() / 4 {
-            let mut buf = &hash_result[i..i + 4];
-            let num = buf.read_u32::<LittleEndian>()?;
-            seed.push(num);
-        }
-        Ok(ChaChaRng::from_seed(&seed))
+        let mut seed = [0;32];
+        seed.copy_from_slice(&hash_result[..32]);
+        Ok(ChaChaRng::from_seed(seed))
     }
 
     fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
@@ -87,7 +83,8 @@ mod test {
     use crate::hash::composite::CompositeHasher;
     use crate::hash::XOF;
     use algebra::bytes::ToBytes;
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
     use std::fs::File;
     use std::path::Path;
 
@@ -101,7 +98,7 @@ mod test {
     #[test]
     fn test_crh_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -112,7 +109,7 @@ mod test {
     #[test]
     fn test_xof_random_768() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -124,7 +121,7 @@ mod test {
     #[test]
     fn test_xof_random_769() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x0dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x0d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -136,7 +133,7 @@ mod test {
     #[test]
     fn test_xof_random_96() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -148,7 +145,7 @@ mod test {
     #[test]
     fn test_hash_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -160,7 +157,7 @@ mod test {
     #[should_panic]
     fn test_invalid_message() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8 + 1];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -191,8 +188,11 @@ mod test {
                 .write(&mut res)
                 .unwrap();
             res.reverse();
-            y_co.push(hex::encode(&res))
+            y_co.push(hex::encode(&res));
+
         }
+        println!("x_co: {:?}", x_co);
+        println!("y_co: {:?}", y_co);
     }
 
     #[test]
