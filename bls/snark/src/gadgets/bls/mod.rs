@@ -22,19 +22,22 @@ impl<
         P: PairingGadget<PairingE, ConstraintE>,
     > BlsVerifyGadget<PairingE, ConstraintE, P>
 {
-    pub fn alloc<CS: ConstraintSystem<ConstraintE>>(
-        &self,
+    pub fn verify<CS: ConstraintSystem<ConstraintE>>(
         mut cs: CS,
+        pub_keys: Vec<P::G1Gadget>,
+        message_hash: P::G2Gadget,
+        signature: P::G2Gadget,
     ) -> Result<(), SynthesisError> {
-        let mut aggregated_pk = P::G1Gadget::zero(cs.ns(|| "init pk"))?;
-        for (i, pk) in self.pub_keys.iter().enumerate() {
+        let mut zero = P::G1Gadget::zero(cs.ns(|| "init zero"))?;
+        let mut aggregated_pk = zero.clone();
+        for (i, pk) in pub_keys.iter().enumerate() {
             aggregated_pk = aggregated_pk.add(cs.ns(|| format!("add pk {}", i)), pk)?;
         }
         let prepared_aggregated_pk =
             P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
         let prepared_message_hash =
-            P::prepare_g2(cs.ns(|| "prepared message hash"), &self.message_hash)?;
-        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &self.signature)?;
+            P::prepare_g2(cs.ns(|| "prepared message hash"), &message_hash)?;
+        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &signature)?;
         let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
             Ok(PairingE::G1Projective::prime_subgroup_generator())
         })?
@@ -96,13 +99,13 @@ mod test {
             let signature_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
-            let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget> {
-                pub_keys: [pub_key_var].to_vec(),
-                message_hash: message_hash_var,
-                signature: signature_var,
-            };
+            let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                [pub_key_var].to_vec(),
+                message_hash_var,
+                signature_var,
+            );
 
-            g.alloc(cs.ns(|| "verify sig")).unwrap();
             println!("number of constraints: {}", cs.num_constraints());
 
             assert!(cs.is_satisfied());
@@ -116,13 +119,12 @@ mod test {
             let signature_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
-            let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget> {
-                pub_keys: [pub_key_var].to_vec(),
-                message_hash: message_hash_var,
-                signature: signature_var,
-            };
-
-            g.alloc(cs.ns(|| "verify sig")).unwrap();
+            let g = BlsVerifyGadget::<Bls12_377, SW6, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                [pub_key_var].to_vec(),
+                message_hash_var,
+                signature_var,
+            );
 
             assert!(!cs.is_satisfied());
         }
