@@ -4,6 +4,7 @@ use std::hash::Hash;
 
 pub mod injective_map;
 pub mod pedersen;
+pub mod bowe_hopwood;
 
 use crate::Error;
 
