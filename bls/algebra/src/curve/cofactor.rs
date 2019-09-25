@@ -131,7 +131,8 @@ pub fn scale_by_cofactor_fuentes<P: Bls12Parameters>(p: &G2Projective<P>) -> G2P
 
 #[cfg(test)]
 mod test {
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use rand_xorshift::XorShiftRng;
+    use rand::{Rng, SeedableRng};
     use std::{ops::Mul, str::FromStr};
 
     use super::{curve_x, psi, scale_by_cofactor_fuentes, scale_by_cofactor_scott};
@@ -162,7 +163,7 @@ mod test {
 
     #[test]
     fn test_twist_untwist() {
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
 
         let p: G2Projective = rng.gen();
         assert_eq!(psi::<Bls12_377Parameters>(&p, 0), p);
@@ -170,7 +171,7 @@ mod test {
 
     #[test]
     fn test_scale_by_cofactor_scott() {
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
 
         for _i in 0..5 {
             let p: G2Projective = rng.gen();
@@ -186,7 +187,7 @@ mod test {
 
     #[test]
     fn test_scale_by_cofactor_fuentes() {
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let x = curve_x::<Bls12_377Parameters>();
 
         for _i in 0..5 {
