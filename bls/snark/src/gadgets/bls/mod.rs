@@ -6,15 +6,19 @@ use r1cs_std::{
     pairing::PairingGadget,
     alloc::AllocGadget,
     eq::EqGadget,
+    boolean::Boolean,
+    select::CondSelectGadget,
 };
+use std::marker::PhantomData;
+
 pub struct BlsVerifyGadget<
     PairingE: PairingEngine,
     ConstraintF: Field,
     P: PairingGadget<PairingE, ConstraintF>,
 > {
-    pub pub_keys: Vec<P::G1Gadget>,
-    pub message_hash: P::G2Gadget,
-    pub signature: P::G2Gadget,
+    pairing_engine_type: PhantomData<PairingE>,
+    constraint_field_type: PhantomData<ConstraintF>,
+    pairing_type: PhantomData<P>,
 }
 
 impl<
@@ -25,15 +29,40 @@ impl<
 {
     pub fn verify<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
-        pub_keys: Vec<P::G1Gadget>,
+        pub_keys: &[P::G1Gadget],
+        signed_bitmap: &[Boolean],
         message_hash: P::G2Gadget,
         signature: P::G2Gadget,
     ) -> Result<(), SynthesisError> {
-        let zero = P::G1Gadget::zero(cs.ns(|| "init zero"))?;
-        let mut aggregated_pk = zero.clone();
+        assert_eq!(signed_bitmap.len(), pub_keys.len());
+        let generator = PairingE::G1Projective::prime_subgroup_generator();
+        let generator_var =
+            P::G1Gadget::alloc(cs.ns(|| "generator"), || Ok(generator))?;
+
+        let mut aggregated_pk = generator_var.clone();
+
         for (i, pk) in pub_keys.iter().enumerate() {
-            aggregated_pk = aggregated_pk.add(cs.ns(|| format!("add pk {}", i)), pk)?;
+            let added = aggregated_pk.add(
+                cs.ns(|| format!("add pk {}", i)),
+                &pk,
+            )?;
+
+            aggregated_pk = P::G1Gadget::conditionally_select(
+                &mut cs.ns(|| format!("cond_select {}", i)),
+                &signed_bitmap[i],
+                &added,
+                &aggregated_pk,
+            )?;
+
+            if i == pub_keys.len() - 1 {
+                aggregated_pk = aggregated_pk.sub(
+                    cs.ns(|| "add neg generator"),
+                    &generator_var,
+                )?;
+            }
         }
+
+
         let prepared_aggregated_pk =
             P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
         let prepared_message_hash =
@@ -79,6 +108,7 @@ mod test {
         pairing::bls12_377::PairingGadget as Bls12_377PairingGadget,
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
+        boolean::Boolean,
     };
 
     use super::BlsVerifyGadget;
@@ -103,9 +133,11 @@ mod test {
             let signature_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
+            let bitmap = vec![Boolean::constant(true)];
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
-                [pub_key_var].to_vec(),
+                &[pub_key_var],
+                &bitmap,
                 message_hash_var,
                 signature_var,
             ).unwrap();
@@ -123,12 +155,79 @@ mod test {
             let signature_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
+            let bitmap = vec![Boolean::constant(true)];
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
-                [pub_key_var].to_vec(),
+                &[pub_key_var],
+                &bitmap,
                 message_hash_var,
                 signature_var,
             ).unwrap();
+
+            assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_signature_bitmap() {
+        let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let message_hash = Bls12_377G2Projective::rand(rng);
+        let secret_key = Bls12_377Fr::rand(rng);
+        let secret_key2 = Bls12_377Fr::rand(rng);
+
+        let generator = Bls12_377G1Projective::prime_subgroup_generator();
+        let pub_key = generator.clone() * &secret_key;
+        let pub_key2 = generator.clone() * &secret_key2;
+        let signature = message_hash.clone() * &secret_key;
+        let signature2 = message_hash.clone() * &secret_key2;
+        let aggregated_signature = signature + &signature2;
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(true)];
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
 
             assert!(!cs.is_satisfied());
         }
