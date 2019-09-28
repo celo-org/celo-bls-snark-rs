@@ -1,41 +1,52 @@
-use algebra::{Field, PrimeField, Group};
+use algebra::{
+    Field, PrimeField, Group, AffineCurve,
+    curves::models::{
+        ModelParameters,
+        bls12::Bls12Parameters,
+    }
+};
 use r1cs_core::{ConstraintSystem, SynthesisError, LinearCombination};
 use r1cs_std::{
     Assignment,
     fields::{
         fp::FpGadget,
+        FieldGadget,
     },
-    groups::GroupGadget,
+    groups::{
+        GroupGadget,
+        curves::short_weierstrass::bls12::G1Gadget,
+    },
     alloc::AllocGadget,
     boolean::Boolean,
-    bits::ToBitsGadget,
+    bits::{
+        ToBitsGadget,
+        boolean::AllocatedBit,
+    },
+    select::CondSelectGadget,
 };
-use std::marker::PhantomData;
+use std::{
+    ops::Neg,
+    marker::PhantomData
+};
 
 pub struct ValidatorUpdateGadget<
-    G: Group,
-    ConstraintF: Field + PrimeField,
-    GG: GroupGadget<G, ConstraintF>,
+    P: Bls12Parameters,
 > {
-    group_type: PhantomData<G>,
-    constraint_field_type: PhantomData<ConstraintF>,
-    group_gadget_type: PhantomData<GG>,
+    parameters_type: PhantomData<P>,
 }
 
 impl<
-        G: Group,
-        ConstraintF: Field + PrimeField,
-        GG: GroupGadget<G, ConstraintF>,
-    > ValidatorUpdateGadget<G, ConstraintF, GG>
+        P: Bls12Parameters,
+    > ValidatorUpdateGadget<P>
 {
     // this will be much better when we can bound removed_validators_bitmap
-    pub fn update<CS: ConstraintSystem<ConstraintF>>(
+    pub fn update<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
-        old_pub_keys: Vec<GG>,
-        new_pub_keys: Vec<GG>,
+        old_pub_keys: Vec<G1Gadget<P>>,
+        new_pub_keys: Vec<G1Gadget<P>>,
         removed_validators_bitmap: Vec<Boolean>,
-        maximum_removed_validators: u128,
-    ) -> Result<Vec<GG>, SynthesisError> {
+        maximum_removed_validators: u64,
+    ) -> Result<Vec<G1Gadget<P>>, SynthesisError> {
         assert_eq!(old_pub_keys.len(), removed_validators_bitmap.len());
 
         let mut num_removed_validators_num = Some(0);
@@ -43,15 +54,15 @@ impl<
 
         let mut new_validator_set = vec![];
         for (i, pk) in old_pub_keys.iter().enumerate() {
-            let new_pub_key = GG::conditionally_select(
-                &mut cs.ns(|| format!("cond_select {}", i)),
+            let new_pub_key = G1Gadget::<P>::conditionally_select(
+                cs.ns(|| format!("cond_select {}", i)),
                 &removed_validators_bitmap[i],
                 &new_pub_keys[i],
                 pk,
             )?;
             new_validator_set.push(new_pub_key);
 
-            num_removed_validators_lc = num_removed_validators_lc + &removed_validators_bitmap[i].lc(CS::one(), ConstraintF::one());
+            num_removed_validators_lc = num_removed_validators_lc + &removed_validators_bitmap[i].lc(CS::one(), P::Fp::one());
             if removed_validators_bitmap[i].get_value().is_none() {
                 num_removed_validators_num = None;
             }
@@ -63,20 +74,68 @@ impl<
 
         let num_removed_validators = FpGadget::alloc(
             &mut cs.ns(|| "num removed validators"),
-            || Ok(ConstraintF::from(num_removed_validators_num.get()? as u128))
+            || Ok(P::Fp::from_repr(num_removed_validators_num.get()?.into()))
         )?;
 
         let num_removed_validators_bits = &num_removed_validators.to_bits(
             &mut cs.ns(|| "num removed validators to bits"),
         )?;
-        Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
+        Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
             &mut cs.ns(|| "enforce maximum removed validators"),
             num_removed_validators_bits,
-            ConstraintF::from(maximum_removed_validators).into_repr(),
+            P::Fp::from_repr(maximum_removed_validators.into()).into_repr(),
         )?;
 
-
         Ok(new_validator_set)
+    }
+
+    pub fn to_bits<CS: ConstraintSystem<P::Fp>>(
+        mut cs: CS,
+        validator_set: Vec<G1Gadget<P>>,
+    ) -> Result<Vec<Boolean>, SynthesisError> {
+        let mut bits = vec![];
+        let half_plus_one_neg = (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()) + &P::Fp::one()).neg();
+        for (i, pk) in validator_set.iter().enumerate() {
+            let x_bits = pk.x.to_bits(cs.ns(|| format!("unpack x {}", i)))?;
+            bits.extend_from_slice(&x_bits);
+            let y_bit = Boolean::alloc(
+                cs.ns(|| format!("alloc y bit {}", i)),
+                || {
+                    if pk.y.get_value().is_some() {
+                        let half = P::Fp::modulus_minus_one_div_two();
+                        Ok(pk.y.get_value().get()?.into_repr() > half)
+                    } else {
+                        Err(SynthesisError::AssignmentMissing)
+                    }
+                },
+            )?;
+            let y_adjusted = FpGadget::alloc(
+                cs.ns(|| format!("alloc y {}", i)),
+                || {
+                    if pk.y.get_value().is_some() {
+                        let half = P::Fp::modulus_minus_one_div_two();
+                        let y_value = pk.y.get_value().get()?;
+                        if y_value.into_repr() > half {
+                            Ok(y_value - &(P::Fp::from_repr(half) + &P::Fp::one()))
+                        } else {
+                            Ok(y_value)
+                        }
+
+                    } else {
+                        Err(SynthesisError::AssignmentMissing)
+                    }
+                }
+            )?;
+            let y_bit_lc = y_bit.lc(CS::one(), half_plus_one_neg);
+            cs.enforce(
+                || format!("check y bit {}", i),
+                |lc| lc + (P::Fp::one(), CS::one()),
+                |lc| pk.y.get_variable() + y_bit_lc + lc,
+                |lc| y_adjusted.get_variable() + lc,
+            );
+            bits.push(y_bit);
+        }
+        Ok(bits)
     }
 }
 
@@ -89,24 +148,32 @@ mod test {
         curves::{
             bls12_377::{
                 G1Projective as Bls12_377G1Projective,
+                Bls12_377Parameters,
             },
+            models::bls12::Bls12Parameters,
             ProjectiveCurve,
         },
-        fields::bls12_377::Fr as Bls12_377Fr,
-        fields::sw6::Fr as SW6Fr,
+        fields::{
+            bls12_377::Fr as Bls12_377Fr,
+            sw6::Fr as SW6Fr,
+            PrimeField,
+        },
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
-        groups::bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget},
+        Assignment,
+        groups::{
+            bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget},
+            curves::short_weierstrass::bls12::G1Gadget,
+        },
+        fields::FieldGadget,
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
         boolean::Boolean,
     };
 
     use super::ValidatorUpdateGadget;
-    use r1cs_std::groups::curves::short_weierstrass::bls12::G1Gadget;
-    use algebra::curves::bls12_377::Bls12_377Parameters;
 
     #[test]
     fn test_validator_update() {
@@ -140,7 +207,7 @@ mod test {
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
 
-            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+            ValidatorUpdateGadget::<Bls12_377Parameters>::update(
                 cs.ns(|| "validator update"),
                 old_pub_keys,
                 new_pub_keys,
@@ -173,7 +240,7 @@ mod test {
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
 
-            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+            ValidatorUpdateGadget::<Bls12_377Parameters>::update(
                 cs.ns(|| "validator update"),
                 old_pub_keys,
                 new_pub_keys,
@@ -206,7 +273,7 @@ mod test {
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
 
-            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+            ValidatorUpdateGadget::<Bls12_377Parameters>::update(
                 cs.ns(|| "validator update"),
                 old_pub_keys,
                 new_pub_keys,
@@ -217,6 +284,50 @@ mod test {
             println!("number of constraints: {}", cs.num_constraints());
 
             assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_to_bits() {
+        let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        for i in 0..100 {
+            let secret_key = Bls12_377Fr::rand(rng);
+            let secret_key2 = Bls12_377Fr::rand(rng);
+            let secret_key3 = Bls12_377Fr::rand(rng);
+
+            let generator = Bls12_377G1Projective::prime_subgroup_generator();
+            let pub_key = generator.clone() * &secret_key;
+            let pub_key2 = generator.clone() * &secret_key2;
+            let pub_key3 = generator.clone() * &secret_key3;
+
+            let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
+
+            {
+                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+
+                let validator_set = vec![pub_key.clone(), pub_key2.clone(), pub_key3.clone()]
+                    .iter().enumerate()
+                    .map(|(i, g)| G1Gadget::<Bls12_377Parameters>::alloc(
+                        &mut cs.ns(|| format!("alloc pk {}", i)),
+                        || Ok(g),
+                    ).unwrap()
+                    ).collect::<Vec<G1Gadget<Bls12_377Parameters>>>();
+
+                let bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
+                    cs.ns(|| "validator update"),
+                    validator_set.clone(),
+                ).unwrap();
+
+                for i in 0..validator_set.len() {
+                    assert_eq!(validator_set[i].y.get_value().get().unwrap().into_repr() > half, bits[377 + 378 * i].get_value().get().unwrap());
+                }
+
+                if i == 0 {
+                    println!("number of constraints: {}", cs.num_constraints());
+                }
+
+                assert!(cs.is_satisfied());
+            }
         }
     }
 }
