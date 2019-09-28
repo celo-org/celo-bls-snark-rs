@@ -1,19 +1,24 @@
-use algebra::{Field, PairingEngine, ProjectiveCurve};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use algebra::{Field, PairingEngine, ProjectiveCurve, PrimeField};
+use r1cs_core::{ConstraintSystem, SynthesisError, LinearCombination};
 use r1cs_std::{
-    fields::FieldGadget,
+    Assignment,
+    fields::{
+        FieldGadget,
+        fp::FpGadget,
+    },
     groups::GroupGadget,
     pairing::PairingGadget,
     alloc::AllocGadget,
     eq::EqGadget,
     boolean::Boolean,
     select::CondSelectGadget,
+    ToBitsGadget,
 };
 use std::marker::PhantomData;
 
 pub struct BlsVerifyGadget<
     PairingE: PairingEngine,
-    ConstraintF: Field,
+    ConstraintF: Field + PrimeField,
     P: PairingGadget<PairingE, ConstraintF>,
 > {
     pairing_engine_type: PhantomData<PairingE>,
@@ -23,7 +28,7 @@ pub struct BlsVerifyGadget<
 
 impl<
         PairingE: PairingEngine,
-        ConstraintF: Field,
+        ConstraintF: Field + PrimeField,
         P: PairingGadget<PairingE, ConstraintF>,
     > BlsVerifyGadget<PairingE, ConstraintF, P>
 {
@@ -33,6 +38,7 @@ impl<
         signed_bitmap: &[Boolean],
         message_hash: P::G2Gadget,
         signature: P::G2Gadget,
+        maximum_non_signers: u128,
     ) -> Result<(), SynthesisError> {
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         let generator = PairingE::G1Projective::prime_subgroup_generator();
@@ -41,6 +47,8 @@ impl<
 
         let mut aggregated_pk = generator_var.clone();
 
+        let mut num_non_signers_num = Some(0);
+        let mut num_non_signers_lc = LinearCombination::zero();
         for (i, pk) in pub_keys.iter().enumerate() {
             let added = aggregated_pk.add(
                 cs.ns(|| format!("add pk {}", i)),
@@ -60,8 +68,31 @@ impl<
                     &generator_var,
                 )?;
             }
+
+            num_non_signers_lc += (ConstraintF::one(), CS::one());
+            num_non_signers_lc = num_non_signers_lc + &signed_bitmap[i].lc(CS::one(), ConstraintF::one().neg());
+            if signed_bitmap[i].get_value().is_none() {
+                num_non_signers_num = None;
+            }
+
+            if num_non_signers_num.is_some() {
+                num_non_signers_num = Some(num_non_signers_num.get()? + if signed_bitmap[i].get_value().get()? { 0 } else { 1 });
+            }
         }
 
+        let num_non_signers = FpGadget::alloc(
+            &mut cs.ns(|| "num signers"),
+            || Ok(ConstraintF::from(num_non_signers_num.get()? as u128))
+        )?;
+
+        let num_non_signers_bits = &num_non_signers.to_bits(
+            &mut cs.ns(|| "num non signers to bits"),
+        )?;
+        Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
+            &mut cs.ns(|| "enforce enough signers"),
+            num_non_signers_bits,
+            ConstraintF::from(maximum_non_signers).into_repr(),
+        )?;
 
         let prepared_aggregated_pk =
             P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
@@ -140,6 +171,7 @@ mod test {
                 &bitmap,
                 message_hash_var,
                 signature_var,
+                0,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -162,6 +194,7 @@ mod test {
                 &bitmap,
                 message_hash_var,
                 signature_var,
+                0,
             ).unwrap();
 
             assert!(!cs.is_satisfied());
@@ -200,6 +233,7 @@ mod test {
                 &bitmap,
                 message_hash_var,
                 signature_var,
+                0,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -225,11 +259,64 @@ mod test {
                 &bitmap,
                 message_hash_var,
                 signature_var,
+                0,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
 
             assert!(!cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+                1,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+                2,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
         }
     }
 }

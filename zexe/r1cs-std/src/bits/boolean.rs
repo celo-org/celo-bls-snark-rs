@@ -533,7 +533,7 @@ impl Boolean {
         let mut element = F::characteristic().to_vec();
         assert_eq!(element[0] % 2, 1);
         element[0] -= 1;
-        let current_run = Self::enforce_smaller_than::<_, _, F, _>(cs, bits, element)?;
+        let current_run = Self::enforce_smaller_or_equal_than::<_, _, F, _>(cs, bits, element)?;
 
         // We should always end in a "run" of zeros, because
         // the characteristic is an odd prime. So, this should
@@ -545,7 +545,7 @@ impl Boolean {
 
     /// Asserts that this bit_gadget representation is "in
     /// the field" when interpreted in big endian.
-    pub fn enforce_smaller_than<ConstraintF, CS, F: PrimeField, E: AsRef<[u64]>>(
+    pub fn enforce_smaller_or_equal_than<ConstraintF, CS, F: PrimeField, E: AsRef<[u64]>>(
         mut cs: CS,
         bits: &[Self],
         element: E,
@@ -1835,7 +1835,7 @@ mod test {
 
             let upper_bound = Fr::from_str("501").unwrap();
 
-            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
+            Boolean::enforce_smaller_or_equal_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
 
             assert!(cs.is_satisfied());
         }
@@ -1853,7 +1853,7 @@ mod test {
 
             let upper_bound = Fr::from_str("501").unwrap();
 
-            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
+            Boolean::enforce_smaller_or_equal_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
 
             assert!(!cs.is_satisfied());
         }
@@ -1871,7 +1871,7 @@ mod test {
 
             let upper_bound = &<Fr as PrimeField>::Params::MODULUS_MINUS_ONE_DIV_TWO;
 
-            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound).unwrap();
+            Boolean::enforce_smaller_or_equal_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound).unwrap();
 
             assert!(cs.is_satisfied());
         }

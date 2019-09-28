@@ -1,67 +1,82 @@
-use algebra::{Group, Field, PairingEngine, ProjectiveCurve};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use algebra::{Field, PrimeField, Group};
+use r1cs_core::{ConstraintSystem, SynthesisError, LinearCombination};
 use r1cs_std::{
-    fields::FieldGadget,
+    Assignment,
+    fields::{
+        fp::FpGadget,
+    },
     groups::GroupGadget,
-    pairing::PairingGadget,
     alloc::AllocGadget,
-    eq::EqGadget,
     boolean::Boolean,
-    select::CondSelectGadget,
+    bits::ToBitsGadget,
 };
+use std::marker::PhantomData;
+
 pub struct ValidatorUpdateGadget<
     G: Group,
-    ConstraintF: Field,
+    ConstraintF: Field + PrimeField,
     GG: GroupGadget<G, ConstraintF>,
 > {
+    group_type: PhantomData<G>,
+    constraint_field_type: PhantomData<ConstraintF>,
+    group_gadget_type: PhantomData<GG>,
 }
 
 impl<
-        PairingE: PairingEngine,
-        ConstraintF: Field,
-        P: PairingGadget<PairingE, ConstraintF>,
-    > BlsVerifyGadget<PairingE, ConstraintF, P>
+        G: Group,
+        ConstraintF: Field + PrimeField,
+        GG: GroupGadget<G, ConstraintF>,
+    > ValidatorUpdateGadget<G, ConstraintF, GG>
 {
+    // this will be much better when we can bound removed_validators_bitmap
     pub fn update<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
-        old_pub_keys: Vec<P::G1Gadget>,
-        new_pub_keys: Vec<P::G1Gadget>,
+        old_pub_keys: Vec<GG>,
+        new_pub_keys: Vec<GG>,
         removed_validators_bitmap: Vec<Boolean>,
-    ) -> Result<Vec<P::G1Gadget>, SynthesisError> {
-        assert_eq!(bitmap.len(), pub_keys.len());
-        let zero = P::G1Gadget::zero(cs.ns(|| "init zero"))?;
-        let mut aggregated_pk = zero.clone();
-        for (i, pk) in pub_keys.iter().enumerate() {
-            let selected_point = P::G1Gadget::conditionally_select(
-                &mut cs.ns(|| "cond_select"),
-                &bitmap[i],
+        maximum_removed_validators: u128,
+    ) -> Result<Vec<GG>, SynthesisError> {
+        assert_eq!(old_pub_keys.len(), removed_validators_bitmap.len());
+
+        let mut num_removed_validators_num = Some(0);
+        let mut num_removed_validators_lc = LinearCombination::zero();
+
+        let mut new_validator_set = vec![];
+        for (i, pk) in old_pub_keys.iter().enumerate() {
+            let new_pub_key = GG::conditionally_select(
+                &mut cs.ns(|| format!("cond_select {}", i)),
+                &removed_validators_bitmap[i],
+                &new_pub_keys[i],
                 pk,
-                &zero,
             )?;
-            aggregated_pk = aggregated_pk.add(
-                cs.ns(|| format!("add pk {}", i)),
-                &selected_point,
-            )?;
+            new_validator_set.push(new_pub_key);
+
+            num_removed_validators_lc = num_removed_validators_lc + &removed_validators_bitmap[i].lc(CS::one(), ConstraintF::one());
+            if removed_validators_bitmap[i].get_value().is_none() {
+                num_removed_validators_num = None;
+            }
+
+            if num_removed_validators_num.is_some() {
+                num_removed_validators_num = Some(num_removed_validators_num.get()? + if removed_validators_bitmap[i].get_value().get()? { 0 } else { 1 });
+            }
         }
-        let prepared_aggregated_pk =
-            P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
-        let prepared_message_hash =
-            P::prepare_g2(cs.ns(|| "prepared message hash"), &message_hash)?;
-        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &signature)?;
-        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
-            Ok(PairingE::G1Projective::prime_subgroup_generator())
-        })?
-        .negate(cs.ns(|| "negate g1 generator"))?;
-        let prepared_g1_neg_generator =
-            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
-        let bls_equation = P::product_of_pairings(
-            cs.ns(|| "verify BLS signature"),
-            &[prepared_g1_neg_generator, prepared_aggregated_pk],
-            &[prepared_signature, prepared_message_hash],
+
+        let num_removed_validators = FpGadget::alloc(
+            &mut cs.ns(|| "num removed validators"),
+            || Ok(ConstraintF::from(num_removed_validators_num.get()? as u128))
         )?;
-        let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
-        bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
-        Ok(())
+
+        let num_removed_validators_bits = &num_removed_validators.to_bits(
+            &mut cs.ns(|| "num removed validators to bits"),
+        )?;
+        Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
+            &mut cs.ns(|| "enforce maximum removed validators"),
+            num_removed_validators_bits,
+            ConstraintF::from(maximum_removed_validators).into_repr(),
+        )?;
+
+
+        Ok(new_validator_set)
     }
 }
 
@@ -73,8 +88,7 @@ mod test {
     use algebra::{
         curves::{
             bls12_377::{
-                Bls12_377, G1Projective as Bls12_377G1Projective,
-                G2Projective as Bls12_377G2Projective,
+                G1Projective as Bls12_377G1Projective,
             },
             ProjectiveCurve,
         },
@@ -84,60 +98,123 @@ mod test {
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
-        groups::bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget, G2Gadget as Bls12_377G2Gadget},
-        pairing::bls12_377::PairingGadget as Bls12_377PairingGadget,
+        groups::bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget},
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
+        boolean::Boolean,
     };
 
-    use super::BlsVerifyGadget;
+    use super::ValidatorUpdateGadget;
+    use r1cs_std::groups::curves::short_weierstrass::bls12::G1Gadget;
+    use algebra::curves::bls12_377::Bls12_377Parameters;
 
     #[test]
-    fn test_signature() {
+    fn test_validator_update() {
         let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        let message_hash = Bls12_377G2Projective::rand(rng);
         let secret_key = Bls12_377Fr::rand(rng);
+        let secret_key2 = Bls12_377Fr::rand(rng);
+        let secret_key3 = Bls12_377Fr::rand(rng);
 
         let generator = Bls12_377G1Projective::prime_subgroup_generator();
-        let pub_key = generator * &secret_key;
-        let signature = message_hash * &secret_key;
-        let fake_signature = Bls12_377G2Projective::rand(rng);
+        let pub_key = generator.clone() * &secret_key;
+        let pub_key2 = generator.clone() * &secret_key2;
+        let pub_key3 = generator.clone() * &secret_key3;
 
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
-            let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
-            let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
-            let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
-            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
-                cs.ns(|| "verify sig"),
-                [pub_key_var].to_vec(),
-                message_hash_var,
-                signature_var,
+            let old_pub_keys = vec![pub_key.clone(), pub_key2.clone()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                &mut cs.ns(|| format!("alloc old {}", i)),
+                    || Ok(x),
+                ).unwrap()
+            ).collect();
+            let new_pub_keys = vec![pub_key3.clone(), Bls12_377G1Projective::zero()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                    &mut cs.ns(|| format!("alloc new {}", i)),
+                    || Ok(x),
+                ).unwrap()
+            ).collect();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+
+            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+                cs.ns(|| "validator update"),
+                old_pub_keys,
+                new_pub_keys,
+                bitmap,
+                1,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
 
             assert!(cs.is_satisfied());
         }
+
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
-            let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
-            let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
-            let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
-            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
-                cs.ns(|| "verify sig"),
-                [pub_key_var].to_vec(),
-                message_hash_var,
-                signature_var,
+            let old_pub_keys = vec![pub_key.clone(), pub_key2.clone()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                    &mut cs.ns(|| format!("alloc old {}", i)),
+                    || Ok(x),
+                ).unwrap()
+                ).collect();
+            let new_pub_keys = vec![pub_key3.clone(), Bls12_377G1Projective::zero()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                    &mut cs.ns(|| format!("alloc new {}", i)),
+                    || Ok(x),
+                ).unwrap()
+                ).collect();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+
+            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+                cs.ns(|| "validator update"),
+                old_pub_keys,
+                new_pub_keys,
+                bitmap,
+                2,
             ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+
+            let old_pub_keys = vec![pub_key.clone(), pub_key2.clone()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                    &mut cs.ns(|| format!("alloc old {}", i)),
+                    || Ok(x),
+                ).unwrap()
+                ).collect();
+            let new_pub_keys = vec![pub_key3.clone(), Bls12_377G1Projective::zero()]
+                .iter().enumerate()
+                .map(|(i, x)| G1Gadget::<Bls12_377Parameters>::alloc(
+                    &mut cs.ns(|| format!("alloc new {}", i)),
+                    || Ok(x),
+                ).unwrap()
+                ).collect();
+
+            let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+
+            ValidatorUpdateGadget::<Bls12_377G1Projective, SW6Fr, Bls12_377G1Gadget>::update(
+                cs.ns(|| "validator update"),
+                old_pub_keys,
+                new_pub_keys,
+                bitmap,
+                0,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
 
             assert!(!cs.is_satisfied());
         }
