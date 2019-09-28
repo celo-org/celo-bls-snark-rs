@@ -1,4 +1,4 @@
-use algebra::{BitIterator, Field, FpParameters, PrimeField};
+use algebra::{BitIterator, Field, PrimeField};
 
 use crate::prelude::*;
 use crate::Assignment;
@@ -520,21 +520,43 @@ impl Boolean {
     }
 
     /// Asserts that this bit_gadget representation is "in
-    /// the field" when interpreted in big endian.
+/// the field" when interpreted in big endian.
     pub fn enforce_in_field<ConstraintF, CS, F: PrimeField>(
-        mut cs: CS,
+        cs: CS,
         bits: &[Self],
     ) -> Result<(), SynthesisError>
+        where
+            ConstraintF: Field,
+            CS: ConstraintSystem<ConstraintF>,
+    {
+        // b = char() - 1
+        let mut element = F::characteristic().to_vec();
+        assert_eq!(element[0] % 2, 1);
+        element[0] -= 1;
+        let current_run = Self::enforce_smaller_than::<_, _, F, _>(cs, bits, element)?;
+
+        // We should always end in a "run" of zeros, because
+        // the characteristic is an odd prime. So, this should
+        // be empty.
+        assert!(current_run.is_empty());
+
+        Ok(())
+    }
+
+    /// Asserts that this bit_gadget representation is "in
+    /// the field" when interpreted in big endian.
+    pub fn enforce_smaller_than<ConstraintF, CS, F: PrimeField, E: AsRef<[u64]>>(
+        mut cs: CS,
+        bits: &[Self],
+        element: E,
+    ) -> Result<Vec<Boolean>, SynthesisError>
     where
         ConstraintF: Field,
         CS: ConstraintSystem<ConstraintF>,
     {
         let mut bits_iter = bits.iter();
 
-        // b = char() - 1
-        let mut b = F::characteristic().to_vec();
-        assert_eq!(b[0] % 2, 1);
-        b[0] -= 1;
+        let b: &[u64] = element.as_ref();
 
         // Runs of ones in r
         let mut last_run = Boolean::constant(true);
@@ -544,9 +566,26 @@ impl Boolean {
         let mut run_i = 0;
         let mut nand_i = 0;
 
-        let char_num_bits = <F as PrimeField>::Params::MODULUS_BITS as usize;
-        if bits.len() > char_num_bits {
-            let num_extra_bits = bits.len() - char_num_bits;
+        let num_bits = {
+            let mut leading_zeros = 0;
+            let mut total_bits = 0;
+            let mut found_one = false;
+            for b in BitIterator::new(b.clone()) {
+                total_bits += 1;
+                if !b && !found_one {
+                    leading_zeros += 1
+                }
+                if b {
+                    found_one = true;
+                }
+            }
+
+            total_bits - leading_zeros
+        };
+
+
+        if bits.len() > num_bits {
+            let num_extra_bits = bits.len() - num_bits;
             let mut or_result = Boolean::constant(false);
             for (i, should_be_zero) in bits[0..num_extra_bits].iter().enumerate() {
                 or_result = Boolean::or(
@@ -597,12 +636,7 @@ impl Boolean {
         }
         assert!(bits_iter.next().is_none());
 
-        // We should always end in a "run" of zeros, because
-        // the characteristic is an odd prime. So, this should
-        // be empty.
-        assert!(current_run.is_empty());
-
-        Ok(())
+        Ok(current_run)
     }
 }
 
@@ -738,10 +772,10 @@ mod test {
         test_constraint_system::TestConstraintSystem,
         prelude::*
     };
-    use algebra::{fields::bls12_381::Fr, BitIterator, Field, PrimeField};
+    use algebra::{fields::bls12_381::Fr, BitIterator, Field, FpParameters, PrimeField};
     use algebra::UniformRand;
-use rand::SeedableRng;
-use rand_xorshift::XorShiftRng;
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
     use r1cs_core::ConstraintSystem;
     use std::str::FromStr;
 
@@ -1787,6 +1821,64 @@ use rand_xorshift::XorShiftRng;
     }
 
     #[test]
+    fn test_enforce_smaller_than() {
+        {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let val = Fr::from_str("500").unwrap();
+            let mut bits = vec![];
+            for (i, b) in BitIterator::new(val.into_repr()).enumerate() {
+                bits.push(Boolean::from(
+                    AllocatedBit::alloc(cs.ns(|| format!("bit_gadget {}", i)), || Ok(b)).unwrap(),
+                ));
+            }
+
+            let upper_bound = Fr::from_str("501").unwrap();
+
+            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
+
+            assert!(cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let val = Fr::from_str("800").unwrap();
+            let mut bits = vec![];
+            for (i, b) in BitIterator::new(val.into_repr()).enumerate() {
+                bits.push(Boolean::from(
+                    AllocatedBit::alloc(cs.ns(|| format!("bit_gadget {}", i)), || Ok(b)).unwrap(),
+                ));
+            }
+
+            let upper_bound = Fr::from_str("501").unwrap();
+
+            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound.into_repr()).unwrap();
+
+            assert!(!cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let val = Fr::from_str("800").unwrap();
+            let mut bits = vec![];
+            for (i, b) in BitIterator::new(val.into_repr()).enumerate() {
+                bits.push(Boolean::from(
+                    AllocatedBit::alloc(cs.ns(|| format!("bit_gadget {}", i)), || Ok(b)).unwrap(),
+                ));
+            }
+
+            let upper_bound = &<Fr as PrimeField>::Params::MODULUS_MINUS_ONE_DIV_TWO;
+
+            Boolean::enforce_smaller_than::<_, _, Fr, _>(&mut cs, &bits, upper_bound).unwrap();
+
+            assert!(cs.is_satisfied());
+        }
+
+    }
+
+    #[test]
     fn test_enforce_nand() {
         {
             let mut cs = TestConstraintSystem::<Fr>::new();
@@ -1813,7 +1905,7 @@ use rand_xorshift::XorShiftRng;
                                 AllocatedBit::alloc(cs.ns(|| format!("bit_gadget {}", j)), || {
                                     Ok(b & 1 == 1)
                                 })
-                                .unwrap(),
+                                    .unwrap(),
                             ));
                         } else {
                             bits.push(
@@ -1822,9 +1914,9 @@ use rand_xorshift::XorShiftRng;
                                         cs.ns(|| format!("bit_gadget {}", j)),
                                         || Ok(b & 1 == 0),
                                     )
-                                    .unwrap(),
+                                        .unwrap(),
                                 )
-                                .not(),
+                                    .not(),
                             );
                         }
 
