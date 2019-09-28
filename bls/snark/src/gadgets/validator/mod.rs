@@ -1,7 +1,6 @@
 use algebra::{
-    Field, PrimeField, Group, AffineCurve,
+    Field, PrimeField,
     curves::models::{
-        ModelParameters,
         bls12::Bls12Parameters,
     }
 };
@@ -13,14 +12,12 @@ use r1cs_std::{
         FieldGadget,
     },
     groups::{
-        GroupGadget,
         curves::short_weierstrass::bls12::G1Gadget,
     },
     alloc::AllocGadget,
     boolean::Boolean,
     bits::{
         ToBitsGadget,
-        boolean::AllocatedBit,
     },
     select::CondSelectGadget,
 };
@@ -133,6 +130,14 @@ impl<
                 |lc| pk.y.get_variable() + y_bit_lc + lc,
                 |lc| y_adjusted.get_variable() + lc,
             );
+            let y_adjusted_bits = &y_adjusted.to_bits(
+                cs.ns(|| format!("y adjusted to bits {}", i)),
+            )?;
+            Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
+                cs.ns(|| format!("enforce smaller than modulus minus one div two {}", i)),
+                y_adjusted_bits,
+                P::Fp::modulus_minus_one_div_two(),
+            )?;
             bits.push(y_bit);
         }
         Ok(bits)
@@ -164,7 +169,6 @@ mod test {
     use r1cs_std::{
         Assignment,
         groups::{
-            bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget},
             curves::short_weierstrass::bls12::G1Gadget,
         },
         fields::FieldGadget,
@@ -290,7 +294,7 @@ mod test {
     #[test]
     fn test_to_bits() {
         let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        for i in 0..100 {
+        for i in 0..10 {
             let secret_key = Bls12_377Fr::rand(rng);
             let secret_key2 = Bls12_377Fr::rand(rng);
             let secret_key3 = Bls12_377Fr::rand(rng);
