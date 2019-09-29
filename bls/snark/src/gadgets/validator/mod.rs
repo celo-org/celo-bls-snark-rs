@@ -1,10 +1,21 @@
 use algebra::{
     Field, PrimeField,
-    curves::models::{
-        bls12::Bls12Parameters,
-    }
+    curves::{
+        edwards_sw6::{
+            EdwardsAffine,
+            EdwardsProjective,
+            EdwardsParameters,
+        },
+        models::{
+            bls12::Bls12Parameters,
+        }
+    },
+    fields::{
+        sw6::Fr as SW6Fr
+    },
+    ModelParameters,
 };
-use r1cs_core::{ConstraintSystem, SynthesisError, LinearCombination};
+use r1cs_core::{SynthesisError, LinearCombination};
 use r1cs_std::{
     Assignment,
     fields::{
@@ -12,7 +23,15 @@ use r1cs_std::{
         FieldGadget,
     },
     groups::{
-        curves::short_weierstrass::bls12::G1Gadget,
+        curves::{
+            short_weierstrass::bls12::{
+                G1Gadget,
+                G2Gadget,
+            },
+            twisted_edwards::edwards_sw6::{
+                EdwardsSWGadget,
+            }
+        },
     },
     alloc::AllocGadget,
     boolean::Boolean,
@@ -21,10 +40,24 @@ use r1cs_std::{
     },
     select::CondSelectGadget,
 };
+use dpc::{
+    gadgets::{
+        crh::pedersen::{PedersenCRHGadget, PedersenCRHGadgetParameters},
+        prf::blake2s::blake2s_gadget
+    }
+};
 use std::{
     ops::Neg,
     marker::PhantomData
 };
+
+use bls_zexe::hash::composite::{CompositeHasher, Window, CRH};
+use dpc::gadgets::FixedLengthCRHGadget;
+use dpc::crypto_primitives::FixedLengthCRH;
+use algebra::curves::sw6::SW6;
+use crate::gadgets::y_to_bit::YToBitGadget;
+
+type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
 pub struct ValidatorUpdateGadget<
     P: Bls12Parameters,
@@ -37,7 +70,7 @@ impl<
     > ValidatorUpdateGadget<P>
 {
     // this will be much better when we can bound removed_validators_bitmap
-    pub fn update<CS: ConstraintSystem<P::Fp>>(
+    pub fn update<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
         old_pub_keys: Vec<G1Gadget<P>>,
         new_pub_keys: Vec<G1Gadget<P>>,
@@ -86,57 +119,17 @@ impl<
         Ok(new_validator_set)
     }
 
-    pub fn to_bits<CS: ConstraintSystem<P::Fp>>(
+    pub fn to_bits<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
         validator_set: Vec<G1Gadget<P>>,
     ) -> Result<Vec<Boolean>, SynthesisError> {
         let mut bits = vec![];
-        let half_plus_one_neg = (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()) + &P::Fp::one()).neg();
         for (i, pk) in validator_set.iter().enumerate() {
             let x_bits = pk.x.to_bits(cs.ns(|| format!("unpack x {}", i)))?;
             bits.extend_from_slice(&x_bits);
-            let y_bit = Boolean::alloc(
-                cs.ns(|| format!("alloc y bit {}", i)),
-                || {
-                    if pk.y.get_value().is_some() {
-                        let half = P::Fp::modulus_minus_one_div_two();
-                        Ok(pk.y.get_value().get()?.into_repr() > half)
-                    } else {
-                        Err(SynthesisError::AssignmentMissing)
-                    }
-                },
-            )?;
-            let y_adjusted = FpGadget::alloc(
-                cs.ns(|| format!("alloc y {}", i)),
-                || {
-                    if pk.y.get_value().is_some() {
-                        let half = P::Fp::modulus_minus_one_div_two();
-                        let y_value = pk.y.get_value().get()?;
-                        if y_value.into_repr() > half {
-                            Ok(y_value - &(P::Fp::from_repr(half) + &P::Fp::one()))
-                        } else {
-                            Ok(y_value)
-                        }
-
-                    } else {
-                        Err(SynthesisError::AssignmentMissing)
-                    }
-                }
-            )?;
-            let y_bit_lc = y_bit.lc(CS::one(), half_plus_one_neg);
-            cs.enforce(
-                || format!("check y bit {}", i),
-                |lc| lc + (P::Fp::one(), CS::one()),
-                |lc| pk.y.get_variable() + y_bit_lc + lc,
-                |lc| y_adjusted.get_variable() + lc,
-            );
-            let y_adjusted_bits = &y_adjusted.to_bits(
-                cs.ns(|| format!("y adjusted to bits {}", i)),
-            )?;
-            Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
-                cs.ns(|| format!("enforce smaller than modulus minus one div two {}", i)),
-                y_adjusted_bits,
-                P::Fp::modulus_minus_one_div_two(),
+            let y_bit = YToBitGadget::<P>::y_to_bit_g1(
+                cs.ns(|| format!("y to bit {}", i)),
+                pk,
             )?;
             bits.push(y_bit);
         }

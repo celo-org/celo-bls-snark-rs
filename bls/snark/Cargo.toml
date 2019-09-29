@@ -5,6 +5,7 @@ authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org
 edition = "2018"
 
 [dependencies]
+dpc = { path = "../../zexe/dpc" }
 r1cs-std = { path = "../../zexe/r1cs-std" }
 r1cs-core = { path = "../../zexe/r1cs-core" }
 algebra = { path = "../../zexe/algebra" }

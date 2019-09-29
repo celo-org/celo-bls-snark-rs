@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsAffine as Edwards};
+use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards};
 use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
@@ -14,11 +14,11 @@ use rand_chacha::ChaChaRng;
 
 use std::error::Error;
 
-type CRH = PedersenCRH<Edwards, Window>;
-type CRHParameters = PedersenParameters<Edwards>;
+pub type CRH = PedersenCRH<Edwards, Window>;
+pub type CRHParameters = PedersenParameters<Edwards>;
 
 #[derive(Clone)]
-struct Window;
+pub struct Window;
 
 impl PedersenWindow for Window {
     const WINDOW_SIZE: usize = 4;
@@ -51,7 +51,7 @@ impl CompositeHasher {
         Ok(ChaChaRng::from_seed(seed))
     }
 
-    fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
+    pub fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
         let mut rng = CompositeHasher::prng()?;
         CRH::setup::<_>(&mut rng)
     }
