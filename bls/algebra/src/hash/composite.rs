@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards};
+use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
 use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
@@ -61,7 +61,7 @@ impl XOF for CompositeHasher {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
-        h.x.write(&mut res)?;
+        h.into_affine().x.write(&mut res)?;
 
         Ok(res)
 
@@ -82,7 +82,10 @@ mod test {
     use super::CompositeHasher as Hasher;
     use crate::hash::composite::CompositeHasher;
     use crate::hash::XOF;
-    use algebra::bytes::ToBytes;
+    use algebra::{
+        ProjectiveCurve,
+        bytes::ToBytes
+    };
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
     use std::fs::File;
@@ -174,7 +177,7 @@ mod test {
 
         for i in 1..9000 {
             let mut res = vec![];
-            hasher.parameters.generators[i-1][0]
+            hasher.parameters.generators[i-1][0].into_affine()
                 .x
                 .write(&mut res)
                 .unwrap();
@@ -183,7 +186,7 @@ mod test {
             x_co.push(hex::encode(&res));
 
             let mut res = vec![];
-            hasher.parameters.generators[i-1][0]
+            hasher.parameters.generators[i-1][0].into_affine()
                 .y
                 .write(&mut res)
                 .unwrap();
