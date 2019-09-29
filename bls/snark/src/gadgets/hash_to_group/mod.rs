@@ -200,12 +200,15 @@ mod test {
 
     #[test]
     fn test_hash_to_group() {
+        let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+
         let mut cs = TestConstraintSystem::<SW6Fr>::new();
 
-        let generator = Bls12_377G2Projective::prime_subgroup_generator();
-        let generator_var = G2Gadget::<Bls12_377Parameters>::alloc(
+        let secret_key = Bls12_377Fr::rand(rng);
+        let pub_key = Bls12_377G2Projective::prime_subgroup_generator() * &secret_key;
+        let pub_key_var = G2Gadget::<Bls12_377Parameters>::alloc(
             &mut cs.ns(|| "alloc"),
-            || Ok(generator),
+            || Ok(pub_key),
         ).unwrap();
 
         let message = [Boolean::constant(true)];
@@ -213,7 +216,7 @@ mod test {
         HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
             &message,
-            &generator_var,
+            &pub_key_var,
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());
