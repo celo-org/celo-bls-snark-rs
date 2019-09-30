@@ -1,7 +1,11 @@
 use algebra::{
     fields::{
+        FpParameters,
         PrimeField,
-        bls12_377::Fq
+        bls12_377::{
+            Fq,
+            FqParameters,
+        },
     },
     curves::ProjectiveCurve,
     bytes::ToBytes,
@@ -10,8 +14,8 @@ use bls_zexe::bls::keys::PublicKey;
 use std::error::Error;
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
-/// number in ascending order
-fn bytes_to_bits(bytes: &Vec<u8>) -> Vec<bool> {
+/// number in descending order
+fn bytes_to_bits(bytes: &Vec<u8>, bits_to_take: usize) -> Vec<bool> {
     let mut bits = vec![];
     for i in 0..bytes.len() {
         let mut byte = bytes[i];
@@ -21,15 +25,22 @@ fn bytes_to_bits(bytes: &Vec<u8>) -> Vec<bool> {
         }
     }
 
-    bits
+    let bits_filtered = bits.into_iter().take(bits_to_take).collect::<Vec<bool>>().into_iter().rev().collect();
+
+    bits_filtered
 }
 
 fn bits_to_bytes(bits: &Vec<bool>) -> Vec<u8> {
     let mut bytes = vec![];
-    for chunk in bits.chunks(8) {
+    let reversed_bits = {
+        let mut tmp = bits.clone();
+        tmp.reverse();
+        tmp
+    };
+    for chunk in reversed_bits.chunks(8) {
         let mut byte = 0;
         let mut twoi = 1;
-        for i in 0..8 {
+        for i in 0..chunk.len() {
             byte += twoi*(if chunk[i] { 1 } else { 0 });
             twoi *= 2;
         }
@@ -51,7 +62,7 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Er
 
     let mut x_bytes = vec![];
     x.write(&mut x_bytes)?;
-    let mut bits = bytes_to_bits(&x_bytes);
+    let mut bits = bytes_to_bits(&x_bytes, FqParameters::MODULUS_BITS as usize);
     bits.push(is_over_half);
 
     Ok(bits)
@@ -92,6 +103,10 @@ mod test {
     use rand::{Rng, SeedableRng};
     use crate::encoding::{bytes_to_bits, bits_to_bytes};
     use rand_xorshift::XorShiftRng;
+    use algebra::fields::{
+        FpParameters,
+        bls12_377::FqParameters,
+    };
 
     #[test]
     fn test_bytes_to_bits() {
@@ -101,11 +116,12 @@ mod test {
             let mut bytes = vec![];
             bytes.write_u64::<LittleEndian>(n).unwrap();
 
-            let bits = bytes_to_bits(&bytes);
+            let bits = bytes_to_bits(&bytes, FqParameters::MODULUS_BITS as usize);
             let mut twoi = 1;
             let mut result: u64 = 0;
-            for i in 0..bits.len() {
-                result += twoi * (if bits[i] { 1 } else { 0 });
+            let bits_len = bits.len();
+            for i in 0..bits_len {
+                result += twoi * (if bits[bits_len - 1 - i] { 1 } else { 0 });
                 twoi *= 2;
             }
 
@@ -121,7 +137,7 @@ mod test {
             let mut bytes = vec![];
             bytes.write_u64::<LittleEndian>(n).unwrap();
 
-            let bits = bytes_to_bits(&bytes);
+            let bits = bytes_to_bits(&bytes, FqParameters::MODULUS_BITS as usize);
             let result_bytes = bits_to_bytes(&bits);
 
             assert_eq!(bytes, result_bytes);

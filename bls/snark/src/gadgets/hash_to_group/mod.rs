@@ -1,34 +1,23 @@
-use algebra::{
-    Field,
-    PrimeField,
-    curves::{
-        ProjectiveCurve,
-        edwards_sw6::{
-            EdwardsAffine,
-            EdwardsProjective,
-            EdwardsParameters,
-        },
-        models::{
-            bls12::Bls12Parameters,
-            SWModelParameters,
-        }
-    }, fields::{
-        sw6::Fr as SW6Fr
-    }, ModelParameters, Group, BitIterator
-};
-
-use r1cs_core::{SynthesisError, LinearCombination};
+use algebra::{BigInteger, Field, curves::{
+    ProjectiveCurve,
+    edwards_sw6::{
+        EdwardsProjective,
+    },
+    models::{
+        SWModelParameters,
+    }
+}, fields::{
+    sw6::Fr as SW6Fr,
+    bls12_377::Fq as Bls12_377Fp,
+    bls12_377::Fq2 as Bls12_377Fp2,
+}, BitIterator, PrimeField, AffineCurve};
+use r1cs_core::{SynthesisError};
 use r1cs_std::{
     Assignment,
-    fields::{
-        fp::FpGadget,
-        FieldGadget,
-    },
     groups::{
         GroupGadget,
         curves::{
             short_weierstrass::bls12::{
-                G1Gadget,
                 G2Gadget,
             },
             twisted_edwards::edwards_sw6::{
@@ -41,28 +30,26 @@ use r1cs_std::{
     bits::{
         ToBitsGadget,
     },
-    select::CondSelectGadget,
 };
 use dpc::{
     gadgets::{
-        crh::pedersen::{PedersenCRHGadget, PedersenCRHGadgetParameters},
+        crh::pedersen::{PedersenCRHGadget},
         prf::blake2s::blake2s_gadget
     }
 };
-use std::{
-    ops::Neg,
-    marker::PhantomData
-};
 
-use bls_zexe::hash::composite::{CompositeHasher, Window, CRH};
+use bls_zexe::{
+    curve::hash::try_and_increment::get_point_from_x,
+    hash::composite::{CompositeHasher, CRH},
+};
 use dpc::gadgets::FixedLengthCRHGadget;
-use dpc::crypto_primitives::FixedLengthCRH;
-use algebra::curves::sw6::SW6;
 use r1cs_std::bits::uint8::UInt8;
 use crate::gadgets::y_to_bit::YToBitGadget;
-use algebra::curves::bls12_377::{Bls12_377Parameters, G2Projective as Bls12_377G2Projective};
-use algebra::curves::bls12_377::g2::Bls12_377G2Parameters;
-use r1cs_std::bits::boolean::AllocatedBit;
+use algebra::curves::bls12_377::{
+    Bls12_377Parameters,
+    G2Projective as Bls12_377G2Projective,
+    g2::Bls12_377G2Parameters,
+};
 
 type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
@@ -73,7 +60,6 @@ impl HashToGroupGadget {
     pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
         message: &[Boolean],
-        expected_point_before_cofactor: &G2Gadget<Bls12_377Parameters>,
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::ParametersGadget::alloc(
@@ -81,7 +67,10 @@ impl HashToGroupGadget {
             || {
                 match CompositeHasher::setup_crh() {
                     Ok(x) => Ok(x),
-                    Err(e) => Err(SynthesisError::AssignmentMissing),
+                    Err(e) => {
+                        println!("error: {}", e);
+                        Err(SynthesisError::AssignmentMissing)
+                    },
                 }
             }
         )?;
@@ -111,6 +100,25 @@ impl HashToGroupGadget {
             let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
+
+        let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
+            cs.ns(|| "expected point before cofactor"),
+            || {
+                let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                c0_bits.reverse();
+                let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
+                let c0 = Bls12_377Fp::from_repr(c0_big);
+                let mut c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                c1_bits.reverse();
+                let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
+                let c1 = Bls12_377Fp::from_repr(c1_big);
+                let x = Bls12_377Fp2::new(c0, c1);
+                let greatest = xof_bits[377*2].get_value().get().unwrap();
+                let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
+                Ok(p.into_projective())
+            }
+        )?;
+
         let c0_bits: Vec<Boolean> = expected_point_before_cofactor.x.c0.to_bits(
             cs.ns(|| "c0 bits")
         )?;
@@ -134,11 +142,12 @@ impl HashToGroupGadget {
                     cs.enforce(
                         || format!("enforce bit {}", i),
                         |lc| lc + (SW6Fr::one(), CS::one()),
-                        |lc| a.lc(CS::one(), SW6Fr::one()),
-                        |lc| b.lc(CS::one(), SW6Fr::one()),
+                        |_| a.lc(CS::one(), SW6Fr::one()),
+                        |_| b.lc(CS::one(), SW6Fr::one()),
                     );
                 }
             );
+
 
         let generator = Bls12_377G2Projective::prime_subgroup_generator();
         let generator_var =
@@ -177,7 +186,10 @@ mod test {
             ProjectiveCurve,
         },
         fields::{
-            bls12_377::Fr as Bls12_377Fr,
+            bls12_377::{
+                Fq as Bls12_377Fp,
+                Fr as Bls12_377Fr,
+            },
             sw6::Fr as SW6Fr,
             PrimeField,
         },
@@ -205,18 +217,12 @@ mod test {
         let mut cs = TestConstraintSystem::<SW6Fr>::new();
 
         let secret_key = Bls12_377Fr::rand(rng);
-        let pub_key = Bls12_377G2Projective::prime_subgroup_generator() * &secret_key;
-        let pub_key_var = G2Gadget::<Bls12_377Parameters>::alloc(
-            &mut cs.ns(|| "alloc"),
-            || Ok(pub_key),
-        ).unwrap();
 
         let message = [Boolean::constant(true)];
 
         HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
             &message,
-            &pub_key_var,
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());

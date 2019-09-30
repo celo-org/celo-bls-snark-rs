@@ -60,7 +60,7 @@ impl<'a, H: XOF> TryAndIncrement<'a, H> {
     }
 }
 
-fn get_point_from_x<P: Bls12Parameters>(
+pub fn get_point_from_x<P: Bls12Parameters>(
     x: <P::G2Parameters as ModelParameters>::BaseField,
     greatest: bool,
 ) -> Option<G2Affine<P>> {

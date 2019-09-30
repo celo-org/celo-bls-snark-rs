@@ -1,36 +1,22 @@
 use algebra::{
     Field, PrimeField,
     curves::{
-        edwards_sw6::{
-            EdwardsAffine,
-            EdwardsProjective,
-            EdwardsParameters,
-        },
         models::{
             bls12::Bls12Parameters,
         }
     },
-    fields::{
-        sw6::Fr as SW6Fr
-    },
-    ModelParameters,
 };
 use r1cs_core::{SynthesisError, LinearCombination};
 use r1cs_std::{
     Assignment,
     fields::{
         fp::FpGadget,
-        FieldGadget,
     },
     groups::{
         curves::{
             short_weierstrass::bls12::{
                 G1Gadget,
-                G2Gadget,
             },
-            twisted_edwards::edwards_sw6::{
-                EdwardsSWGadget,
-            }
         },
     },
     alloc::AllocGadget,
@@ -40,24 +26,11 @@ use r1cs_std::{
     },
     select::CondSelectGadget,
 };
-use dpc::{
-    gadgets::{
-        crh::pedersen::{PedersenCRHGadget, PedersenCRHGadgetParameters},
-        prf::blake2s::blake2s_gadget
-    }
-};
 use std::{
-    ops::Neg,
     marker::PhantomData
 };
 
-use bls_zexe::hash::composite::{CompositeHasher, Window, CRH};
-use dpc::gadgets::FixedLengthCRHGadget;
-use dpc::crypto_primitives::FixedLengthCRH;
-use algebra::curves::sw6::SW6;
 use crate::gadgets::y_to_bit::YToBitGadget;
-
-type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
 pub struct ValidatorUpdateGadget<
     P: Bls12Parameters,

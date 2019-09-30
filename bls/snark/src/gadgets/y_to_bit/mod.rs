@@ -2,9 +2,7 @@ use algebra::{
     Field, PrimeField,
     curves::{
         edwards_sw6::{
-            EdwardsAffine,
             EdwardsProjective,
-            EdwardsParameters,
         },
         models::{
             bls12::Bls12Parameters,
@@ -13,9 +11,8 @@ use algebra::{
     fields::{
         sw6::Fr as SW6Fr
     },
-    ModelParameters,
 };
-use r1cs_core::{SynthesisError, LinearCombination};
+use r1cs_core::{SynthesisError};
 use r1cs_std::{
     Assignment,
     fields::{
@@ -38,23 +35,16 @@ use r1cs_std::{
     bits::{
         ToBitsGadget,
     },
-    select::CondSelectGadget,
 };
 use dpc::{
     gadgets::{
-        crh::pedersen::{PedersenCRHGadget, PedersenCRHGadgetParameters},
-        prf::blake2s::blake2s_gadget
+        crh::pedersen::{PedersenCRHGadget},
     }
 };
 use std::{
     ops::Neg,
     marker::PhantomData
 };
-
-use bls_zexe::hash::composite::{CompositeHasher, Window, CRH};
-use dpc::gadgets::FixedLengthCRHGadget;
-use dpc::crypto_primitives::FixedLengthCRH;
-use algebra::curves::sw6::SW6;
 
 type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
@@ -254,7 +244,7 @@ impl<
         cs.enforce(
             || "enforce y bit derived correctly",
             |lc| lc + (P::Fp::one(), CS::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg()),
-            |lc| bc.lc(CS::one(), P::Fp::one()),
+            |_| bc.lc(CS::one(), P::Fp::one()),
             |lc| lc + y_bit.lc(CS::one(), P::Fp::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg()),
         );
 
