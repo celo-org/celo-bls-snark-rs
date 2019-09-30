@@ -105,11 +105,9 @@ impl HashToGroupGadget {
             cs.ns(|| "expected point before cofactor"),
             || {
                 let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                c0_bits.reverse();
                 let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
                 let c0 = Bls12_377Fp::from_repr(c0_big);
                 let mut c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                c1_bits.reverse();
                 let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
                 let c1 = Bls12_377Fp::from_repr(c1_big);
                 let x = Bls12_377Fp2::new(c0, c1);
