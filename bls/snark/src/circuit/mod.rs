@@ -1,7 +1,7 @@
 use algebra::{fields::sw6::Fr, curves::bls12_377::{
     G1Projective,
     G2Projective,
-}, ProjectiveCurve};
+}};
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 use crate::gadgets::{
     hash_to_group::HashToGroupGadget,
@@ -70,7 +70,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 }
             }
 
-            let updated_validator_set = ValidatorUpdateGadget::<Bls12_377Parameters>::update(
+            let _updated_validator_set = ValidatorUpdateGadget::<Bls12_377Parameters>::update(
                 cs.ns(|| format!("validator update {}", i)),
                 old_pub_keys_vars,
                 new_pub_keys_vars,

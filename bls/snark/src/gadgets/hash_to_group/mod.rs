@@ -104,10 +104,10 @@ impl HashToGroupGadget {
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {
-                let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                let c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
                 let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
                 let c0 = Bls12_377Fp::from_repr(c0_big);
-                let mut c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                let c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
                 let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
                 let c1 = Bls12_377Fp::from_repr(c1_big);
                 let x = Bls12_377Fp2::new(c0, c1);
@@ -206,7 +206,7 @@ mod test {
     };
 
     use super::HashToGroupGadget;
-    use r1cs_std::groups::curves::short_weierstrass::bls12::G2Gadget;
+    
 
     #[test]
     fn test_hash_to_group() {
@@ -214,7 +214,7 @@ mod test {
 
         let mut cs = TestConstraintSystem::<SW6Fr>::new();
 
-        let secret_key = Bls12_377Fr::rand(rng);
+        let _secret_key = Bls12_377Fr::rand(rng);
 
         let message = [Boolean::constant(true)];
 

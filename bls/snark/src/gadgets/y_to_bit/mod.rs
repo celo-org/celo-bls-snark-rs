@@ -46,8 +46,6 @@ use std::{
     marker::PhantomData
 };
 
-type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
-
 pub struct YToBitGadget<
     P: Bls12Parameters,
 > {
@@ -283,7 +281,6 @@ mod test {
         fields::FieldGadget,
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
-        boolean::Boolean,
     };
 
     use super::YToBitGadget;

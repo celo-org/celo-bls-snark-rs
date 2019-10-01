@@ -12,7 +12,6 @@ use r1cs_std::{
     eq::EqGadget,
     boolean::Boolean,
     select::CondSelectGadget,
-    ToBitsGadget,
 };
 use std::marker::PhantomData;
 use crate::gadgets::smaller_than::SmallerThanGadget;
@@ -129,7 +128,6 @@ mod test {
         },
         fields::bls12_377::Fr as Bls12_377Fr,
         fields::sw6::Fr as SW6Fr,
-        fields::Field,
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;

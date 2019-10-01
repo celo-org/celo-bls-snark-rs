@@ -1,21 +1,15 @@
-use algebra::{Field, PairingEngine, ProjectiveCurve, PrimeField};
-use r1cs_core::{ConstraintSystem, SynthesisError, LinearCombination};
+use algebra::{Field, PrimeField};
+use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    Assignment,
     fields::{
         FieldGadget,
         fp::FpGadget,
     },
-    groups::GroupGadget,
-    pairing::PairingGadget,
-    alloc::AllocGadget,
-    eq::EqGadget,
     boolean::Boolean,
-    select::CondSelectGadget,
     ToBitsGadget,
 };
 use std::marker::PhantomData;
-use algebra::curves::models::bls12::Bls12Parameters;
+
 
 pub struct SmallerThanGadget<
     ConstraintF: Field + PrimeField,
@@ -135,8 +129,8 @@ mod test {
     };
     use super::SmallerThanGadget;
     use r1cs_std::fields::fp::FpGadget;
-    use std::str::FromStr;
-    use algebra::curves::bls12_377::Bls12_377Parameters;
+    
+    
 
     #[test]
     fn test_smaller_than() {
@@ -144,7 +138,7 @@ mod test {
         fn rand_in_range<R: Rng>(rng: &mut R) -> SW6Fr {
             let pminusonedivtwo = SW6Fr::from_repr(SW6Fr::modulus_minus_one_div_two());
             let mut r = SW6Fr::zero();
-            while true {
+            loop {
                 r = SW6Fr::rand(rng);
                 if r <= pminusonedivtwo {
                     break;
@@ -185,7 +179,7 @@ mod test {
             assert!(cs.is_satisfied());
         }
 
-        for i in 0..10 {
+        for _i in 0..10 {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let a = rand_in_range(&mut rng);
             let a_var = FpGadget::<SW6Fr>::alloc(
@@ -215,7 +209,7 @@ mod test {
             assert!(!cs.is_satisfied());
         }
 
-        for i in 0..10 {
+        for _i in 0..10 {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let a = rand_in_range(&mut rng);
             let a_var = FpGadget::<SW6Fr>::alloc(
