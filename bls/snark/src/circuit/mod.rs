@@ -82,3 +82,34 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use gm17::{
+        create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+    };
+    use crate::circuit::{ValidatorSetUpdate, SingleUpdate};
+    use algebra::curves::sw6::SW6;
+    use rand::thread_rng;
+
+    fn test_circuit() {
+        let num_validators = 10;
+        let rng = &mut thread_rng();
+        let params = {
+            let update = SingleUpdate {
+                maximum_non_signers: None,
+                old_pub_keys: vec![None; num_validators],
+                removed_validators_bitmap: vec![None; num_validators],
+                new_pub_keys: vec![None; num_validators],
+                signed_bitmap: vec![None; num_validators],
+                signature: None,
+            };
+            let c = ValidatorSetUpdate {
+                maximum_removed_validators: 10,
+                num_validators: num_validators,
+                updates: vec![update],
+            };
+            generate_random_parameters::<SW6, _, _>(c, rng).unwrap()
+        };
+    }
+}
