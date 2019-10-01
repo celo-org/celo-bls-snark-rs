@@ -15,6 +15,7 @@ use r1cs_std::{
     ToBitsGadget,
 };
 use std::marker::PhantomData;
+use crate::gadgets::smaller_than::SmallerThanGadget;
 
 pub struct BlsVerifyGadget<
     PairingE: PairingEngine,
@@ -38,7 +39,7 @@ impl<
         signed_bitmap: &[Boolean],
         message_hash: P::G2Gadget,
         signature: P::G2Gadget,
-        maximum_non_signers: u128,
+        maximum_non_signers: FpGadget<ConstraintF>,
     ) -> Result<(), SynthesisError> {
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         let generator = PairingE::G1Projective::prime_subgroup_generator();
@@ -85,13 +86,10 @@ impl<
             || Ok(ConstraintF::from(num_non_signers_num.get()? as u128))
         )?;
 
-        let num_non_signers_bits = &num_non_signers.to_bits(
-            &mut cs.ns(|| "num non signers to bits"),
-        )?;
-        Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
-            &mut cs.ns(|| "enforce enough signers"),
-            num_non_signers_bits,
-            ConstraintF::from(maximum_non_signers).into_repr(),
+        SmallerThanGadget::<ConstraintF>::enforce_smaller_than(
+            cs.ns(|| "enforce enough signers"),
+            &num_non_signers,
+            &maximum_non_signers,
         )?;
 
         let prepared_aggregated_pk =
@@ -131,6 +129,7 @@ mod test {
         },
         fields::bls12_377::Fr as Bls12_377Fr,
         fields::sw6::Fr as SW6Fr,
+        fields::Field,
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
@@ -143,6 +142,8 @@ mod test {
     };
 
     use super::BlsVerifyGadget;
+    use r1cs_std::fields::fp::FpGadget;
+    use std::str::FromStr;
 
     #[test]
     fn test_signature() {
@@ -165,13 +166,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("1").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                0,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -188,13 +193,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("1").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                0,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             assert!(!cs.is_satisfied());
@@ -227,13 +236,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(true)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("1").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var, pub_key2_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                0,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -253,13 +266,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("1").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var, pub_key2_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                0,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -279,13 +296,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("2").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var, pub_key2_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                1,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());
@@ -305,13 +326,17 @@ mod test {
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("3").unwrap()),
+            ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
                 &[pub_key_var, pub_key2_var],
                 &bitmap,
                 message_hash_var,
                 signature_var,
-                2,
+                maximum_non_signers_plus_one,
             ).unwrap();
 
             println!("number of constraints: {}", cs.num_constraints());

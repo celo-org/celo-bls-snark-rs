@@ -17,6 +17,7 @@ use algebra::curves::bls12_377::Bls12_377Parameters;
 use r1cs_std::bits::boolean::Boolean;
 
 struct SingleUpdate {
+    maximum_non_signers: Option<Fr> ,
     old_pub_keys: Vec<Option<G1Projective>>,
     removed_validators_bitmap: Vec<Option<bool>>,
     new_pub_keys: Vec<Option<G1Projective>>,
@@ -25,7 +26,6 @@ struct SingleUpdate {
 }
 
 struct ValidatorSetUpdate {
-    maximum_non_signers: usize,
     maximum_removed_validators: usize,
     num_validators: usize,
     updates: Vec<SingleUpdate>,
