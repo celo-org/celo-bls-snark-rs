@@ -20,7 +20,6 @@ use r1cs_std::{
 };
 use algebra::curves::bls12_377::{Bls12_377Parameters, G1Projective};
 
-/*
 pub struct AllocPointConditionalGadget<
     P: SWModelParameters,
     ConstraintF: Field,
@@ -36,8 +35,9 @@ impl<
     ConstraintF: PrimeField,
     F: FieldGadget<P::BaseField, ConstraintF>,
 > AllocPointConditionalGadget<P, ConstraintF, F> {
-    fn alloc_conditional<FN, T, CS: ConstraintSystem<ConstraintF>>(
+    pub fn alloc_conditional<FN, T, CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
+        condition: &Boolean,
         value_gen: FN,
     ) -> Result<AffineGadget<P, ConstraintF, F>, SynthesisError>
         where
@@ -71,34 +71,13 @@ impl<
         let y2_minus_b = y2.add_constant(cs.ns(|| "y^2 - b"), &b.neg())?;
 
         let actual_result = x2_plus_a.mul(cs.ns(|| "calc_actual_result"), &x)?;
-        let x_possible_inv = F::alloc(&mut cs.ns(|| "x possible inverse"), || {
-            let x_val = x.get_value().get()?;
-            if x_val.is_zero() {
-                Ok(x_val)
-            } else {
-                Ok(x_val.inverse().unwrap())
-            }
-        })?;
-        let x_possible_bool = x.mul(cs.ns(|| "x mul"), &x_possible_inv)?;
-        let x_bool = Boolean::alloc(
-            cs.ns(|| "x bool"),
-            || {
-                let x_val = x.get_value().get()?;
-                Ok(!x_val.is_zero())
-            }
-        )?;
-        cs.enforce(
-            || "check x bool ok",
-            |_| x_bool.lc(CS::one(), ConstraintF::one()),
-            |lc| lc + (ConstraintF::one(), CS::one()),
-            |lc| x_possible_bool.get_variable() + lc,
-        );
-        y2_minus_b.conditional_enforce_equal(cs.ns(|| "on curve check"), &actual_result, &x_bool)?;
+
+        y2_minus_b.conditional_enforce_equal(cs.ns(|| "on curve check"), &actual_result, &condition)?;
 
         Ok(AffineGadget::new(x, y))
     }
 }
-*/
+/*
 pub struct AllocPointConditionalGadget {
 }
 
@@ -164,3 +143,4 @@ impl AllocPointConditionalGadget {
         Ok(G1Gadget::<Bls12_377Parameters>::new(x, y))
     }
 }
+*/

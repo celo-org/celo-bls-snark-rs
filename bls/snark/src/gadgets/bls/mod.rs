@@ -122,8 +122,10 @@ mod test {
         curves::{
             bls12_377::{
                 Bls12_377, G1Projective as Bls12_377G1Projective,
+                G1Affine as Bls12_377G1Affine,
                 G2Projective as Bls12_377G2Projective,
             },
+            AffineCurve,
             ProjectiveCurve,
         },
         fields::bls12_377::Fr as Bls12_377Fr,
@@ -138,6 +140,7 @@ mod test {
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
         boolean::Boolean,
+        fields::FieldGadget,
     };
 
     use super::BlsVerifyGadget;
@@ -364,9 +367,39 @@ mod test {
             let message_hash_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                AllocPointConditionalGadget::alloc_conditional(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                AllocPointConditionalGadget::alloc_conditional(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
+
+            let bitmap = vec![Boolean::constant(false), Boolean::constant(true)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("2").unwrap()),
+            ).unwrap();
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+                maximum_non_signers_plus_one,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
+        }
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
                 Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
 
