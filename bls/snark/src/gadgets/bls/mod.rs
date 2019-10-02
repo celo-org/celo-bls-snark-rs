@@ -128,6 +128,7 @@ mod test {
         },
         fields::bls12_377::Fr as Bls12_377Fr,
         fields::sw6::Fr as SW6Fr,
+        fields::Field,
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
@@ -142,6 +143,8 @@ mod test {
     use super::BlsVerifyGadget;
     use r1cs_std::fields::fp::FpGadget;
     use std::str::FromStr;
+    use crate::gadgets::smaller_than::SmallerThanGadget;
+    use crate::gadgets::alloc_conditional_check::AllocPointConditionalGadget;
 
     #[test]
     fn test_signature() {
@@ -327,6 +330,50 @@ mod test {
             let maximum_non_signers_plus_one = FpGadget::alloc(
                 cs.ns(|| "maximum non signers plus one"),
                 || Ok(SW6Fr::from_str("3").unwrap()),
+            ).unwrap();
+            BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
+                cs.ns(|| "verify sig"),
+                &[pub_key_var, pub_key2_var],
+                &bitmap,
+                message_hash_var,
+                signature_var,
+                maximum_non_signers_plus_one,
+            ).unwrap();
+
+            println!("number of constraints: {}", cs.num_constraints());
+
+            assert!(cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_signature_zero() {
+        let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let message_hash = Bls12_377G2Projective::rand(rng);
+        let secret_key = Bls12_377Fr::zero();
+        let secret_key2 = Bls12_377Fr::rand(rng);
+
+        let generator = Bls12_377G1Projective::prime_subgroup_generator();
+        let pub_key = generator.clone() * &secret_key;
+        let pub_key2 = generator * &secret_key2;
+        let signature = message_hash.clone() * &secret_key;
+        let signature2 = message_hash * &secret_key2;
+
+        {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let message_hash_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+            let pub_key_var =
+                AllocPointConditionalGadget::alloc_conditional(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+            let pub_key2_var =
+                AllocPointConditionalGadget::alloc_conditional(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+            let signature_var =
+                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
+
+            let bitmap = vec![Boolean::constant(false), Boolean::constant(true)];
+            let maximum_non_signers_plus_one = FpGadget::alloc(
+                cs.ns(|| "maximum non signers plus one"),
+                || Ok(SW6Fr::from_str("2").unwrap()),
             ).unwrap();
             BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::verify(
                 cs.ns(|| "verify sig"),
