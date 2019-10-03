@@ -8,13 +8,15 @@ use std::{
 
 use super::{
     FixedLengthCRH,
-    pedersen::{PedersenCRH, PedersenWindow},
+    pedersen::{PedersenCRH, PedersenWindow, bytes_to_bits},
 };
 use algebra::{
     fields::PrimeField,
     groups::Group,
     biginteger::BigInteger,
 };
+
+const CHUNK_SIZE: usize = 3;
 
 #[derive(Clone, Default)]
 pub struct BoweHopwoodPedersenParameters<G: Group> {
@@ -28,12 +30,17 @@ pub struct BoweHopwoodPedersenCRH<G: Group, W: PedersenWindow> {
 
 impl<G: Group, W: PedersenWindow> BoweHopwoodPedersenCRH<G, W> {
     pub fn create_generators<R: Rng>(rng: &mut R) -> Vec<G> {
-        let mut generators_powers = Vec::new();
+        let mut generators_for_segments = Vec::new();
         for _ in 0..W::NUM_WINDOWS {
-            let base = G::rand(rng);
-            generators_powers.push(base);
+            let mut base = G::rand(rng);
+            for _ in 0..W::WINDOW_SIZE {
+                generators_for_segments.push(base);
+                for _ in 0..4 {
+                    base.double_in_place();
+                }
+            }
         }
-        generators_powers
+        generators_for_segments
     }
 }
 
@@ -43,7 +50,7 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
     type Parameters = BoweHopwoodPedersenParameters<G>;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, Error> {
-        fn calculate_num_windows<G: Group>() -> u32 {
+        fn calculate_num_chunks_in_segment<G: Group>() -> usize {
             let upper_limit = G::ScalarField::modulus_minus_one_div_two();
             let mut c = 0;
             let mut range = <G::ScalarField as PrimeField>::BigInt::from(2_u64);
@@ -55,13 +62,16 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
             c
         }
 
-        let num_windows = calculate_num_windows::<G>();
+        let maximum_num_chunks_in_segment = calculate_num_chunks_in_segment::<G>();
+        if W::WINDOW_SIZE > maximum_num_chunks_in_segment {
+            return Err("Bowe-Hopwood hash must have a window size < (p-1)/2".into())
+        }
 
         let time = timer_start!(|| format!(
-            "BoweHopwoodPedersenCRH::Setup: {} {}-bit windows; {{0,1}}^{{{}}} -> G",
+            "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
             W::NUM_WINDOWS,
             W::WINDOW_SIZE,
-            W::WINDOW_SIZE*W::NUM_WINDOWS
+            W::WINDOW_SIZE*W::NUM_WINDOWS*CHUNK_SIZE
         ));
         let generators = Self::create_generators(rng);
         timer_end!(time);
@@ -73,49 +83,62 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
     fn evaluate(parameters: &Self::Parameters, input: &[u8]) -> Result<Self::Output, Error> {
         let eval_time = timer_start!(|| "PedersenCRH::Eval");
 
-        if (input.len() * 8) > W::WINDOW_SIZE * W::NUM_WINDOWS {
+        if (input.len() * 8) > W::WINDOW_SIZE * W::NUM_WINDOWS * CHUNK_SIZE {
             panic!(
-                "incorrect input length {:?} for window params {:?}x{:?}",
+                "incorrect input length {:?} for window params {:?}x{:?}x{}",
                 input.len(),
                 W::WINDOW_SIZE,
-                W::NUM_WINDOWS
+                W::NUM_WINDOWS,
+                CHUNK_SIZE,
             );
         }
 
         let mut padded_input = Vec::with_capacity(input.len());
         let mut input = input;
         // Pad the input if it is not the current length.
-        if (input.len() * 8) < W::WINDOW_SIZE * W::NUM_WINDOWS {
+        if (input.len() * 8) % CHUNK_SIZE != 0 {
             let current_length = input.len();
             padded_input.extend_from_slice(input);
-            for _ in current_length..((W::WINDOW_SIZE * W::NUM_WINDOWS) / 8) {
+            for _ in current_length..(input.len() + CHUNK_SIZE - 1)/CHUNK_SIZE {
                 padded_input.push(0u8);
             }
             input = padded_input.as_slice();
         }
 
+        assert!(input.len() % CHUNK_SIZE == 0);
+
         assert_eq!(
             parameters.generators.len(),
-            W::NUM_WINDOWS,
-            "Incorrect pp of size {:?}x{:?} for window params {:?}x{:?}",
-            parameters.generators[0].len(),
+            W::NUM_WINDOWS*W::WINDOW_SIZE,
+            "Incorrect pp of size {:?} for window params {:?}x{:?}x{}",
             parameters.generators.len(),
             W::WINDOW_SIZE,
-            W::NUM_WINDOWS
+            W::NUM_WINDOWS,
+            CHUNK_SIZE,
         );
+        assert_eq!(CHUNK_SIZE, 3);
 
         // Compute sum of h_i^{m_i} for all i.
         let result = bytes_to_bits(input)
-            .par_chunks(W::WINDOW_SIZE)
-            .zip(&parameters.generators)
-            .map(|(bits, generator_powers)| {
-                let mut encoded = G::zero();
-                for (bit, base) in bits.iter().zip(generator_powers.iter()) {
-                    if *bit {
-                        encoded = encoded + base;
-                    }
-                }
-                encoded
+            .par_chunks(W::WINDOW_SIZE*CHUNK_SIZE)
+            .map(|segment| {
+                segment
+                    .par_chunks(CHUNK_SIZE)
+                    .zip(&parameters.generators)
+                    .map(|(chunk_bits, generator)| {
+                        let mut encoded = generator.clone();
+                        if chunk_bits[0] {
+                            encoded = encoded + &generator;
+                        }
+                        if chunk_bits[1] {
+                            encoded = encoded + &generator.double();
+                        }
+                        if chunk_bits[2] {
+                            encoded = encoded.neg();
+                        }
+                        encoded
+                    })
+                    .reduce(|| G::zero(), |a, b| a + &b)
             })
             .reduce(|| G::zero(), |a, b| a + &b);
         timer_end!(eval_time);
@@ -124,23 +147,36 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
     }
 }
 
-pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = Vec::with_capacity(bytes.len() * 8);
-    for byte in bytes {
-        for i in 0..8 {
-            let bit = (*byte >> i) & 1;
-            bits.push(bit == 1)
-        }
-    }
-    bits
-}
-
 impl<G: Group> Debug for BoweHopwoodPedersenParameters<G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Pedersen Hash Parameters {{\n")?;
+        write!(f, "Bowe-Hopwood Pedersen Hash Parameters {{\n")?;
         for (i, g) in self.generators.iter().enumerate() {
             write!(f, "\t  Generator {}: {:?}\n", i, g)?;
         }
         write!(f, "}}\n")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::crypto_primitives::crh::pedersen::PedersenWindow;
+    use algebra::curves::edwards_sw6::EdwardsProjective;
+    use crate::crypto_primitives::crh::bowe_hopwood::BoweHopwoodPedersenCRH;
+    use rand::thread_rng;
+    use crate::crypto_primitives::FixedLengthCRH;
+
+    #[test]
+    fn test_simple_bh() {
+        #[derive(Clone)]
+        struct TestWindow {
+        }
+        impl PedersenWindow for TestWindow {
+            const WINDOW_SIZE: usize = 90;
+            const NUM_WINDOWS: usize = 8;
+        }
+
+        let rng = &mut thread_rng();
+        let params = <BoweHopwoodPedersenCRH::<EdwardsProjective, TestWindow> as FixedLengthCRH>::setup(rng).unwrap();
+        let hash = <BoweHopwoodPedersenCRH::<EdwardsProjective, TestWindow> as FixedLengthCRH>::evaluate(&params, &[1,2,3]);
     }
 }
