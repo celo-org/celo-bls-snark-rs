@@ -27,6 +27,202 @@ mod test;
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
 #[must_use]
+pub struct MontgomeryAffineGadget<P: TEModelParameters, E: PairingEngine, F: FieldGadget<P::BaseField, E>> {
+    pub x:   F,
+    pub y:   F,
+    _params: PhantomData<P>,
+    _engine: PhantomData<E>,
+}
+
+pub struct MontgomeryParams<P: TEModelParameters> {
+    a: P::BaseField,
+    scale: P::BaseField,
+}
+
+mod montgomery_affine_impl {
+    use super::*;
+    use crate::Assignment;
+    use algebra::{
+        Field,
+        AffineCurve,
+        SquareRootField,
+        twisted_edwards_extended::GroupAffine,
+    };
+    use std::ops::{MulAssign, SubAssign, AddAssign};
+
+    impl<P: TEModelParameters, E: PairingEngine, F: FieldGadget<P::BaseField, E>>
+    MontgomeryAffineGadget<P, E, F> {
+        pub fn new(x: F, y: F) -> Self {
+            Self {
+                x,
+                y,
+                _params: PhantomData,
+                _engine: PhantomData,
+            }
+        }
+
+        pub fn params() -> MontgomeryParams<P> {
+            // A = 2 * (a + d) / (a - d)
+            let a = P::BaseField::one().double()*&(P::COEFF_A + &P::COEFF_D)*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap();
+            // scaling factor = sqrt(4 / (a - d))
+            let scale = (P::BaseField::one().double().double()*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap()).sqrt().unwrap();
+            MontgomeryParams {
+                a: a,
+                scale: scale,
+            }
+        }
+
+        pub fn from_edwards<CS: ConstraintSystem<E>>(mut cs: CS, p: &TEAffine<P>) -> Result<Self, SynthesisError> {
+            let montgomery_point: GroupAffine<P> = if p.y == P::BaseField::one() {
+                GroupAffine::zero()
+            } else {
+                if p.x == P::BaseField::zero() {
+                    GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
+                } else {
+                    let montgomery_params = Self::params();
+                    let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
+                    let v = u * &p.x.inverse().unwrap() * &montgomery_params.scale;
+                    GroupAffine::new(u, v)
+                }
+            };
+
+            let u = F::alloc(
+                cs.ns(|| "u"),
+                || Ok(montgomery_point.x),
+            )?;
+
+            let v = F::alloc(
+                cs.ns(|| "v"),
+                || Ok(montgomery_point.y),
+            )?;
+
+            Ok(Self::new(u, v))
+        }
+
+        pub fn into_edwards<CS: ConstraintSystem<E>>(&self, mut cs: CS) -> Result<AffineGadget<P, E, F>, SynthesisError> {
+            let montgomery_params = Self::params();
+
+            // Compute u = (scale*x) / y
+            let u = F::alloc(cs.ns(|| "u"), || {
+                let mut t0 = self.x.get_value().get()?;
+                t0.mul_assign(&montgomery_params.scale);
+
+                match self.y.get_value().get()?.inverse() {
+                    Some(invy) => {
+                        t0.mul_assign(&invy);
+
+                        Ok(t0)
+                    }
+                    None => Err(SynthesisError::DivisionByZero),
+                }
+            })?;
+
+            let x_scaled = self.x.mul_by_constant(cs.ns(|| "scale x"), &montgomery_params.scale)?;
+            u.mul_equals(
+                cs.ns(|| "u equals"),
+                &self.y,
+                &x_scaled,
+            )?;
+
+            let v = F::alloc(cs.ns(|| "v"), || {
+                let mut t0 = self.x.get_value().get()?;
+                let mut t1 = t0.clone();
+                t0.sub_assign(&P::BaseField::one());
+                t1.add_assign(&P::BaseField::one());
+
+                match t1.inverse() {
+                    Some(t1) => {
+                        t0.mul_assign(&t1);
+
+                        Ok(t0)
+                    }
+                    None => Err(SynthesisError::DivisionByZero),
+                }
+            })?;
+
+            let xplusone = self.x.add_constant(cs.ns(|| "x plus one"), &P::BaseField::one())?;
+            let xminusone = self.x.sub_constant(cs.ns(|| "x minus one"), &P::BaseField::one())?;
+            v.mul_equals(
+                cs.ns(|| "v equals"),
+                &xplusone,
+                &xminusone,
+            )?;
+
+            Ok(AffineGadget::new(u, v))
+        }
+
+        pub fn add<CS: ConstraintSystem<E>>(
+            &self,
+            mut cs: CS,
+            other: &Self,
+        ) -> Result<Self, SynthesisError> {
+            let lambda = F::alloc(cs.ns(|| "lambda"), || {
+                let mut n = other.y.get_value().get()?;
+                n.sub_assign(&self.y.get_value().get()?);
+
+                let mut d = other.x.get_value().get()?;
+                d.sub_assign(&self.x.get_value().get()?);
+
+                match d.inverse() {
+                    Some(d) => {
+                        n.mul_assign(&d);
+                        Ok(n)
+                    }
+                    None => Err(SynthesisError::DivisionByZero),
+                }
+            })?;
+            let lambda_n = other.y.sub(cs.ns(|| "other.y - self.y"), &self.y)?;
+            let lambda_d = other.x.sub(cs.ns(|| "other.x - self.x"), &self.x)?;
+            lambda_d.mul_equals(
+                cs.ns(|| "lambda equals"),
+                &lambda,
+                &lambda_n
+            )?;
+
+            let montgomery_params = Self::params();
+            // Compute x'' = lambda^2 - A - x - x'
+            let xprime = F::alloc(cs.ns(|| "xprime"), || {
+                Ok(lambda.get_value().get()?.square()- &montgomery_params.a - &self.x.get_value().get()? - &other.x.get_value().get()?)
+            })?;
+
+            let xprime_lc = self.x.add(
+                cs.ns(|| "self.x + other.x"),
+                &other.x,
+            )?.add(
+                cs.ns(|| "+ xprime"),
+                &xprime,
+            )?.add_constant(
+                cs.ns(|| "+ A"),
+                &montgomery_params.a,
+            )?;
+            // (lambda) * (lambda) = (A + x + x' + x'')
+            lambda.mul_equals(
+                cs.ns(|| "xprime equals"),
+                &lambda,
+                &xprime_lc,
+            )?;
+
+            let yprime = F::alloc(cs.ns(|| "yprime"),
+                || {
+                    Ok(-(self.y.get_value().get()? + &(lambda.get_value().get()?*&(xprime.get_value().get()? - &self.x.get_value().get()?))))
+                }
+            )?;
+
+            let xres = self.x.sub(cs.ns(|| "xres"), &xprime)?;
+            let yres = self.y.add(cs.ns(|| "yres"), &yprime)?;
+            lambda.mul_equals(
+                cs.ns(|| "yprime equals"),
+                &xres,
+                &yres,
+            )?;
+            Ok(MontgomeryAffineGadget::new(xprime, yprime))
+        }
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug, Clone)]
+#[must_use]
 pub struct AffineGadget<P: TEModelParameters, E: PairingEngine, F: FieldGadget<P::BaseField, E>> {
     pub x:   F,
     pub y:   F,
@@ -762,6 +958,20 @@ mod projective_impl {
 
             Ok(())
         }
+
+        fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, I, B>(
+            &mut self,
+            cs: CS,
+            scalar_bits_with_base_powers: I,
+        ) -> Result<(), SynthesisError>
+            where
+                CS: ConstraintSystem<E>,
+                I: Iterator<Item = (&'a [B], &'a TEProjective<P>)>,
+                B: 'a + Borrow<Boolean>,
+        {
+            Err(SynthesisError::AssignmentMissing)
+        }
+
 
         fn cost_of_add() -> usize {
             4 + 2 * F::cost_of_mul()

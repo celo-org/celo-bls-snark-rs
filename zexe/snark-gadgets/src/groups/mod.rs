@@ -114,6 +114,20 @@ pub trait GroupGadget<G: Group, E: PairingEngine>:
         Ok(())
     }
 
+    fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, I, B>(
+        &mut self,
+        _: CS,
+        _: I,
+    ) -> Result<(), SynthesisError>
+        where
+            CS: ConstraintSystem<E>,
+            I: Iterator<Item = (&'a [B], &'a G)>,
+            B: 'a + Borrow<Boolean>,
+            G: 'a,
+    {
+        Err(SynthesisError::AssignmentMissing)
+    }
+
     fn precomputed_base_multiscalar_mul<'a, CS, T, I, B>(
         mut cs: CS,
         bases: &[B],
