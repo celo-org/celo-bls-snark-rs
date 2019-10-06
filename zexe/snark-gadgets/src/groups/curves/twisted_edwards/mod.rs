@@ -36,7 +36,7 @@ pub struct MontgomeryAffineGadget<P: TEModelParameters, E: PairingEngine, F: Fie
 
 pub struct MontgomeryParams<P: TEModelParameters> {
     a: P::BaseField,
-    scale: P::BaseField,
+    b: P::BaseField,
 }
 
 mod montgomery_affine_impl {
@@ -45,7 +45,6 @@ mod montgomery_affine_impl {
     use algebra::{
         Field,
         AffineCurve,
-        SquareRootField,
         twisted_edwards_extended::GroupAffine,
     };
     use std::ops::{MulAssign, SubAssign, AddAssign};
@@ -64,11 +63,11 @@ mod montgomery_affine_impl {
         pub fn params() -> MontgomeryParams<P> {
             // A = 2 * (a + d) / (a - d)
             let a = P::BaseField::one().double()*&(P::COEFF_A + &P::COEFF_D)*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap();
-            // scaling factor = sqrt(4 / (a - d))
-            let scale = (P::BaseField::one().double().double()*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap()).sqrt().unwrap();
+            // B = 4 / (a - d)
+            let b = P::BaseField::one().double().double()*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap();
             MontgomeryParams {
                 a: a,
-                scale: scale,
+                b: b,
             }
         }
 
@@ -81,7 +80,7 @@ mod montgomery_affine_impl {
                 } else {
                     let montgomery_params = Self::params();
                     let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
-                    let v = u * &p.x.inverse().unwrap() * &montgomery_params.scale;
+                    let v = u * &p.x.inverse().unwrap();
                     GroupAffine::new(u, v)
                 }
             };
@@ -102,10 +101,9 @@ mod montgomery_affine_impl {
         pub fn into_edwards<CS: ConstraintSystem<E>>(&self, mut cs: CS) -> Result<AffineGadget<P, E, F>, SynthesisError> {
             let montgomery_params = Self::params();
 
-            // Compute u = (scale*x) / y
+            // Compute u = x / y
             let u = F::alloc(cs.ns(|| "u"), || {
                 let mut t0 = self.x.get_value().get()?;
-                t0.mul_assign(&montgomery_params.scale);
 
                 match self.y.get_value().get()?.inverse() {
                     Some(invy) => {
@@ -117,11 +115,10 @@ mod montgomery_affine_impl {
                 }
             })?;
 
-            let x_scaled = self.x.mul_by_constant(cs.ns(|| "scale x"), &montgomery_params.scale)?;
             u.mul_equals(
                 cs.ns(|| "u equals"),
                 &self.y,
-                &x_scaled,
+                &self.x,
             )?;
 
             let v = F::alloc(cs.ns(|| "v"), || {
@@ -180,9 +177,9 @@ mod montgomery_affine_impl {
             )?;
 
             let montgomery_params = Self::params();
-            // Compute x'' = lambda^2 - A - x - x'
+            // Compute x'' = B*lambda^2 - A - x - x'
             let xprime = F::alloc(cs.ns(|| "xprime"), || {
-                Ok(lambda.get_value().get()?.square()- &montgomery_params.a - &self.x.get_value().get()? - &other.x.get_value().get()?)
+                Ok(lambda.get_value().get()?.square()*&montgomery_params.b- &montgomery_params.a - &self.x.get_value().get()? - &other.x.get_value().get()?)
             })?;
 
             let xprime_lc = self.x.add(
@@ -196,7 +193,8 @@ mod montgomery_affine_impl {
                 &montgomery_params.a,
             )?;
             // (lambda) * (lambda) = (A + x + x' + x'')
-            lambda.mul_equals(
+            let lambda_b = lambda.mul_by_constant(cs.ns(|| "lambda * b"), &montgomery_params.b)?;
+            lambda_b.mul_equals(
                 cs.ns(|| "xprime equals"),
                 &lambda,
                 &xprime_lc,
