@@ -574,6 +574,26 @@ impl<P: Fp2Parameters<Fp = ConstraintF>, ConstraintF: PrimeField> TwoBitLookupGa
     }
 }
 
+impl<P: Fp2Parameters<Fp = ConstraintF>, ConstraintF: PrimeField> ThreeBitCondNegLookupGadget<ConstraintF> for Fp2Gadget<P, ConstraintF> {
+    type TableConstant = Fp2<P>;
+
+    fn three_bit_cond_neg_lookup<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        b: &[Boolean],
+        c: &[Self::TableConstant],
+    ) -> Result<Self, SynthesisError> {
+        let c0s = c.iter().map(|f| f.c0).collect::<Vec<_>>();
+        let c1s = c.iter().map(|f| f.c1).collect::<Vec<_>>();
+        let c0 = FpGadget::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c0"), b, &c0s)?;
+        let c1 = FpGadget::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c1"), b, &c1s)?;
+        Ok(Self::new(c0, c1))
+    }
+
+    fn cost() -> usize {
+        2 * <FpGadget<ConstraintF> as ThreeBitCondNegLookupGadget<ConstraintF>>::cost()
+    }
+}
+
 impl<P: Fp2Parameters<Fp = ConstraintF>, ConstraintF: PrimeField> AllocGadget<Fp2<P>, ConstraintF> for Fp2Gadget<P, ConstraintF> {
     #[inline]
     fn alloc<F, T, CS: ConstraintSystem<ConstraintF>>(

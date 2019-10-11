@@ -797,6 +797,30 @@ where
     }
 }
 
+impl<P, ConstraintF: PrimeField> ThreeBitCondNegLookupGadget<ConstraintF> for Fp12Gadget<P, ConstraintF>
+    where
+        P: Fp12Parameters,
+        <P::Fp6Params as Fp6Parameters>::Fp2Params: Fp2Parameters<Fp = ConstraintF>,
+{
+    type TableConstant = Fp12<P>;
+
+    fn three_bit_cond_neg_lookup<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        b: &[Boolean],
+        c: &[Self::TableConstant],
+    ) -> Result<Self, SynthesisError> {
+        let c0s = c.iter().map(|f| f.c0).collect::<Vec<_>>();
+        let c1s = c.iter().map(|f| f.c1).collect::<Vec<_>>();
+        let c0 = Fp6Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c0"), b, &c0s)?;
+        let c1 = Fp6Gadget::<P,ConstraintF >::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c1"), b, &c1s)?;
+        Ok(Self::new(c0, c1))
+    }
+
+    fn cost() -> usize {
+        2 * <Fp6Gadget<P, ConstraintF> as ThreeBitCondNegLookupGadget<ConstraintF>>::cost()
+    }
+}
+
 impl<P, ConstraintF: PrimeField> AllocGadget<Fp12<P>, ConstraintF> for Fp12Gadget<P, ConstraintF>
 where
     P: Fp12Parameters,

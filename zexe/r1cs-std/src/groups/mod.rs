@@ -2,7 +2,7 @@ use crate::prelude::*;
 use algebra::{Group, Field};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 
-use std::{borrow::Borrow, fmt::Debug};
+use std::{borrow::Borrow, fmt::{Debug, self}, error::Error};
 
 pub mod curves;
 
@@ -10,6 +10,26 @@ pub use self::curves::{
     short_weierstrass::bls12,
     twisted_edwards::{edwards_sw6, jubjub},
 };
+
+#[derive(Debug)]
+pub enum BoweHopwoodCostError {
+    // A montgomery curve equivalence is not available for this group
+    MontgomeryUnavailable,
+}
+
+impl Error for BoweHopwoodCostError {
+    fn description(&self) -> &str {
+        match *self {
+            BoweHopwoodCostError::MontgomeryUnavailable => "A montgomery curve equivalence is not available for this group"
+        }
+    }
+}
+
+impl fmt::Display for BoweHopwoodCostError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.description())
+    }
+}
 
 pub trait GroupGadget<G: Group, ConstraintF: Field>:
     Sized
@@ -68,7 +88,7 @@ pub trait GroupGadget<G: Group, ConstraintF: Field>:
         &self,
         mut cs: CS,
         result: &Self,
-        bits: impl Iterator<Item = &'a Boolean>,
+        bits: impl Iterator<Item=&'a Boolean>,
     ) -> Result<Self, SynthesisError> {
         let mut power = self.clone();
         let mut result = result.clone();
@@ -90,11 +110,11 @@ pub trait GroupGadget<G: Group, ConstraintF: Field>:
         mut cs: CS,
         scalar_bits_with_base_powers: I,
     ) -> Result<(), SynthesisError>
-    where
-        CS: ConstraintSystem<ConstraintF>,
-        I: Iterator<Item = (B, &'a G)>,
-        B: Borrow<Boolean>,
-        G: 'a,
+        where
+            CS: ConstraintSystem<ConstraintF>,
+            I: Iterator<Item=(B, &'a G)>,
+            B: Borrow<Boolean>,
+            G: 'a,
     {
         for (i, (bit, base_power)) in scalar_bits_with_base_powers.enumerate() {
             let new_encoded = self.add_constant(
@@ -111,16 +131,31 @@ pub trait GroupGadget<G: Group, ConstraintF: Field>:
         Ok(())
     }
 
+    fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, T, I, B>(
+        _: CS,
+        _: &[B],
+        _: I,
+        _: usize,
+    ) -> Result<Self, SynthesisError>
+        where
+            CS: ConstraintSystem<ConstraintF>,
+            T: 'a + ToBitsGadget<ConstraintF> + ?Sized,
+            I: Iterator<Item=&'a T>,
+            B: Borrow<G>,
+    {
+        Err(SynthesisError::AssignmentMissing)
+    }
+
     fn precomputed_base_multiscalar_mul<'a, CS, T, I, B>(
         mut cs: CS,
         bases: &[B],
         scalars: I,
     ) -> Result<Self, SynthesisError>
-    where
-        CS: ConstraintSystem<ConstraintF>,
-        T: 'a + ToBitsGadget<ConstraintF> + ?Sized,
-        I: Iterator<Item = &'a T>,
-        B: Borrow<[G]>,
+        where
+            CS: ConstraintSystem<ConstraintF>,
+            T: 'a + ToBitsGadget<ConstraintF> + ?Sized,
+            I: Iterator<Item=&'a T>,
+            B: Borrow<[G]>,
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
         // Compute ∏(h_i^{m_i}) for all i.

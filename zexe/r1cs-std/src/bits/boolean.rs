@@ -1,4 +1,4 @@
-use algebra::{BitIterator, Field, PrimeField};
+use algebra::{BitIterator, Field, FpParameters, PrimeField};
 
 use crate::prelude::*;
 use crate::Assignment;
@@ -545,7 +545,7 @@ impl Boolean {
 
     /// Asserts that this bit_gadget representation is "in
     /// the field" when interpreted in big endian.
-    pub fn enforce_smaller_or_equal_than<ConstraintF, CS, F: PrimeField, E: AsRef<[u64]>>(
+    pub fn enforce_in_field<ConstraintF, CS, F: PrimeField>(
         mut cs: CS,
         bits: &[Self],
         element: E,
@@ -772,10 +772,10 @@ mod test {
         test_constraint_system::TestConstraintSystem,
         prelude::*
     };
-    use algebra::{fields::bls12_381::Fr, BitIterator, Field, FpParameters, PrimeField};
+    use algebra::{fields::bls12_381::Fr, BitIterator, Field, PrimeField};
     use algebra::UniformRand;
-    use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
     use r1cs_core::ConstraintSystem;
     use std::str::FromStr;
 

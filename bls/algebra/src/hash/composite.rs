@@ -3,10 +3,11 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
+use algebra::{bytes::ToBytes, curves::edwards_bls12::EdwardsAffine as Edwards};
 use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
-    pedersen::{PedersenCRH, PedersenParameters, PedersenWindow},
+    pedersen::PedersenWindow,
+    bowe_hopwood::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenParameters},
     FixedLengthCRH,
 };
 use rand::{Rng, SeedableRng};
@@ -14,8 +15,8 @@ use rand_chacha::ChaChaRng;
 
 use std::error::Error;
 
-pub type CRH = PedersenCRH<Edwards, Window>;
-pub type CRHParameters = PedersenParameters<Edwards>;
+type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
+type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
 
 #[derive(Clone)]
 pub struct Window;
@@ -82,14 +83,8 @@ mod test {
     use super::CompositeHasher as Hasher;
     use crate::hash::composite::CompositeHasher;
     use crate::hash::XOF;
-    use algebra::{
-        ProjectiveCurve,
-        bytes::ToBytes
-    };
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
-    use std::fs::File;
-    use std::path::Path;
 
     #[test]
     fn test_crh_empty() {
@@ -161,13 +156,14 @@ mod test {
     fn test_invalid_message() {
         let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8 + 1];
+        let mut msg: Vec<u8> = vec![0; 100000];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
         let _result = hasher.hash(b"ULforxof", &msg, 96).unwrap();
     }
 
+    /*
     #[test]
     fn print_pedersen_bases() {
         let hasher = CompositeHasher::new().unwrap();
@@ -220,6 +216,7 @@ mod test {
             assert_eq!( msg_hash.to_string() , actual_hash );
         }
     }
+    */
 
     #[test]
     fn test_crh_print() {
