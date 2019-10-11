@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_bls12::EdwardsAffine as Edwards};
+use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards};
 use blake2s_simd::Params;
 use dpc::crypto_primitives::crh::{
     pedersen::PedersenWindow,
@@ -15,8 +15,8 @@ use rand_chacha::ChaChaRng;
 
 use std::error::Error;
 
-type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
-type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
+pub type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
+pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
 
 #[derive(Clone)]
 pub struct Window;
@@ -62,7 +62,7 @@ impl XOF for CompositeHasher {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let h = CRH::evaluate(&self.parameters, message)?;
         let mut res = vec![];
-        h.into_affine().x.write(&mut res)?;
+        h.x.write(&mut res)?;
 
         Ok(res)
 

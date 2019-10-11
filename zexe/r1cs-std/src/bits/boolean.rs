@@ -1,4 +1,4 @@
-use algebra::{BitIterator, Field, FpParameters, PrimeField};
+use algebra::{BitIterator, Field, PrimeField};
 
 use crate::prelude::*;
 use crate::Assignment;
@@ -544,15 +544,15 @@ impl Boolean {
     }
 
     /// Asserts that this bit_gadget representation is "in
-    /// the field" when interpreted in big endian.
-    pub fn enforce_in_field<ConstraintF, CS, F: PrimeField>(
+/// the field" when interpreted in big endian.
+    pub fn enforce_smaller_or_equal_than<ConstraintF, CS, F: PrimeField, E: AsRef<[u64]>>(
         mut cs: CS,
         bits: &[Self],
         element: E,
     ) -> Result<Vec<Boolean>, SynthesisError>
-    where
-        ConstraintF: Field,
-        CS: ConstraintSystem<ConstraintF>,
+        where
+            ConstraintF: Field,
+            CS: ConstraintSystem<ConstraintF>,
     {
         let mut bits_iter = bits.iter();
 

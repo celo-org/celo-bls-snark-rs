@@ -8,6 +8,7 @@ use algebra::{BigInteger, Field, curves::{
     }
 }, fields::{
     sw6::Fr as SW6Fr,
+    bls12_377::Fr as Bls12_377Fr,
     bls12_377::Fq as Bls12_377Fp,
     bls12_377::Fq2 as Bls12_377Fp2,
 }, BitIterator, PrimeField, AffineCurve};
@@ -33,7 +34,7 @@ use r1cs_std::{
 };
 use dpc::{
     gadgets::{
-        crh::pedersen::{PedersenCRHGadget},
+        crh::bowe_hopwood::{BoweHopwoodPedersenCRHGadget},
         prf::blake2s::blake2s_gadget
     }
 };
@@ -51,7 +52,7 @@ use algebra::curves::bls12_377::{
     g2::Bls12_377G2Parameters,
 };
 
-type CRHGadget = PedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
+type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
 pub struct HashToGroupGadget {
 }
@@ -63,17 +64,17 @@ impl HashToGroupGadget {
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::ParametersGadget::alloc(
-            &mut cs.ns(|| "pedersen parameters"),
-            || {
-                match CompositeHasher::setup_crh() {
-                    Ok(x) => Ok(x),
-                    Err(e) => {
-                        println!("error: {}", e);
-                        Err(SynthesisError::AssignmentMissing)
-                    },
+                &mut cs.ns(|| "pedersen parameters"),
+                || {
+                    match CompositeHasher::setup_crh() {
+                        Ok(x) => Ok(x),
+                        Err(e) => {
+                            println!("error: {}", e);
+                            Err(SynthesisError::AssignmentMissing)
+                        },
+                    }
                 }
-            }
-        )?;
+            )?;
         let input_bytes: Vec<UInt8> = message.chunks(8).map(|chunk| {
             let mut chunk_padded = chunk.clone().to_vec();
             if chunk_padded.len() < 8 {
@@ -206,7 +207,7 @@ mod test {
     };
 
     use super::HashToGroupGadget;
-    
+
 
     #[test]
     fn test_hash_to_group() {
