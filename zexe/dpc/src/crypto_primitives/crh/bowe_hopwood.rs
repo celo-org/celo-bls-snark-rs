@@ -67,21 +67,21 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
             return Err(format!("Bowe-Hopwood hash must have a window size < (p-1)/2, maximum segment size is {}", maximum_num_chunks_in_segment).into())
         }
 
-        let time = timer_start!(|| format!(
+        let time = start_timer!(|| format!(
             "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
             W::NUM_WINDOWS,
             W::WINDOW_SIZE,
             W::WINDOW_SIZE*W::NUM_WINDOWS*CHUNK_SIZE
         ));
         let generators = Self::create_generators(rng);
-        timer_end!(time);
+        end_timer!(time);
         Ok(Self::Parameters {
             generators
         })
     }
 
     fn evaluate(parameters: &Self::Parameters, input: &[u8]) -> Result<Self::Output, Error> {
-        let eval_time = timer_start!(|| "PedersenCRH::Eval");
+        let eval_time = start_timer!(|| "PedersenCRH::Eval");
 
         if (input.len() * 8) > W::WINDOW_SIZE * W::NUM_WINDOWS * CHUNK_SIZE {
             panic!(
@@ -138,7 +138,7 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
                 || G::zero(),
                 |a, b| a + &b
             );
-        timer_end!(eval_time);
+        end_timer!(eval_time);
 
         Ok(result)
     }
