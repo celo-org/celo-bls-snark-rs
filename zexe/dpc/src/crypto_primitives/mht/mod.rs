@@ -219,7 +219,7 @@ impl<H: FixedLengthCRH, L: ToBytes + Eq + Clone> MerkleHashTree<H, L> {
     }
 
     pub fn new(parameters: Rc<H::Parameters>, leaves: &[L]) -> Result<Self, Error> {
-        let new_time = timer_start!(|| "MHT::New");
+        let new_time = start_timer!(|| "MHT::New");
 
         let last_level_size = leaves.len().next_power_of_two();
         let tree_size = 2 * last_level_size - 1;
@@ -281,7 +281,7 @@ impl<H: FixedLengthCRH, L: ToBytes + Eq + Clone> MerkleHashTree<H, L> {
 
         let root_hash = hash_inner_node::<H>(&parameters, &cur_hash, &empty_hash, &mut buffer)?;
 
-        timer_end!(new_time);
+        end_timer!(new_time);
 
         Ok(MerkleHashTree {
             tree,
@@ -302,7 +302,7 @@ impl<H: FixedLengthCRH, L: ToBytes + Eq + Clone> MerkleHashTree<H, L> {
         index: usize,
         leaf: &L,
     ) -> Result<HashMembershipProof<H, L>, Error> {
-        let prove_time = timer_start!(|| "MHT::GenProof");
+        let prove_time = start_timer!(|| "MHT::GenProof");
         let mut path = Vec::new();
 
         let mut buffer = [0u8; 128];
@@ -341,7 +341,7 @@ impl<H: FixedLengthCRH, L: ToBytes + Eq + Clone> MerkleHashTree<H, L> {
                 path.push((hash.clone(), sibling_hash.clone()));
             }
         }
-        timer_end!(prove_time);
+        end_timer!(prove_time);
         if path.len() != (Self::MAX_HEIGHT - 1) as usize {
             Err(MHTError::IncorrectPathLength(path.len()))?
         } else {
@@ -360,7 +360,8 @@ mod test {
         mht::*,
     };
     use algebra::curves::jubjub::JubJubAffine as JubJub;
-    use rand::{ChaChaRng, SeedableRng};
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
 
     #[derive(Clone)]
     pub(super) struct Window4x256;
@@ -373,11 +374,7 @@ mod test {
     type JubJubMHT<L> = MerkleHashTree<H, L>;
 
     fn generate_merkle_tree<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
-        let seed: [u32; 8] = [
-            2053759276, 152413135, 1690980041, 4293109333, 2390175708, 686052238, 1844363894,
-            1379683288,
-        ];
-        let mut rng = ChaChaRng::from_seed(&seed);
+        let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
         let crh_parameters = Rc::new(H::setup(&mut rng).unwrap());
         let tree = JubJubMHT::<L>::new(crh_parameters.clone(), &leaves).unwrap();
@@ -404,11 +401,7 @@ mod test {
 
     fn bad_merkle_tree_verify<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
         use algebra::groups::Group;
-        let seed: [u32; 8] = [
-            2053759276, 152413135, 1690980041, 4293109333, 2390175708, 686052238, 1844363894,
-            1379683288,
-        ];
-        let mut rng = ChaChaRng::from_seed(&seed);
+        let mut rng = XorShiftRng::seed_from_u64(13423423u64);
 
         let crh_parameters = Rc::new(H::setup(&mut rng).unwrap());
         let tree = JubJubMHT::<L>::new(crh_parameters.clone(), &leaves).unwrap();

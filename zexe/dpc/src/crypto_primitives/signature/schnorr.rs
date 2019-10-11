@@ -7,7 +7,8 @@ use algebra::{
 };
 use digest::Digest;
 use crate::Error;
-use rand::{Rand, Rng};
+use algebra::UniformRand;
+use rand::Rng;
 use std::{
     hash::Hash,
     io::{Result as IoResult, Write},
@@ -58,13 +59,13 @@ where
     type Signature = SchnorrSig<G>;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, Error> {
-        let setup_time = timer_start!(|| "SchnorrSig::Setup");
+        let setup_time = start_timer!(|| "SchnorrSig::Setup");
 
         let mut salt = [0u8; 32];
         rng.fill_bytes(&mut salt);
         let generator = G::rand(rng);
 
-        timer_end!(setup_time);
+        end_timer!(setup_time);
         Ok(SchnorrSigParameters {
             _hash: PhantomData,
             generator,
@@ -76,12 +77,12 @@ where
         parameters: &Self::Parameters,
         rng: &mut R,
     ) -> Result<(Self::PublicKey, Self::SecretKey), Error> {
-        let keygen_time = timer_start!(|| "SchnorrSig::KeyGen");
+        let keygen_time = start_timer!(|| "SchnorrSig::KeyGen");
 
         let secret_key = G::ScalarField::rand(rng);
         let public_key = parameters.generator.mul(&secret_key);
 
-        timer_end!(keygen_time);
+        end_timer!(keygen_time);
         Ok((public_key, SchnorrSecretKey(secret_key)))
     }
 
@@ -91,7 +92,7 @@ where
         message: &[u8],
         rng: &mut R,
     ) -> Result<Self::Signature, Error> {
-        let sign_time = timer_start!(|| "SchnorrSig::Sign");
+        let sign_time = start_timer!(|| "SchnorrSig::Sign");
         // (k, e);
         let (random_scalar, verifier_challenge) = loop {
             // Sample a random scalar `k` from the prime scalar field.
@@ -121,7 +122,7 @@ where
             verifier_challenge,
         };
 
-        timer_end!(sign_time);
+        end_timer!(sign_time);
         Ok(signature)
     }
 
@@ -131,7 +132,7 @@ where
         message: &[u8],
         signature: &Self::Signature,
     ) -> Result<bool, Error> {
-        let verify_time = timer_start!(|| "SchnorrSig::Verify");
+        let verify_time = start_timer!(|| "SchnorrSig::Verify");
 
         let &SchnorrSig {
             ref prover_response,
@@ -153,7 +154,7 @@ where
         } else {
             return Ok(false);
         };
-        timer_end!(verify_time);
+        end_timer!(verify_time);
         Ok(verifier_challenge == &obtained_verifier_challenge)
     }
 
@@ -162,7 +163,7 @@ where
         public_key: &Self::PublicKey,
         randomness: &[u8],
     ) -> Result<Self::PublicKey, Error> {
-        let rand_pk_time = timer_start!(|| "SchnorrSig::RandomizePubKey");
+        let rand_pk_time = start_timer!(|| "SchnorrSig::RandomizePubKey");
 
         let mut randomized_pk = *public_key;
         let mut base = parameters.generator;
@@ -175,7 +176,7 @@ where
         }
         randomized_pk += &encoded;
 
-        timer_end!(rand_pk_time);
+        end_timer!(rand_pk_time);
 
         Ok(randomized_pk)
     }
@@ -185,7 +186,7 @@ where
         signature: &Self::Signature,
         randomness: &[u8],
     ) -> Result<Self::Signature, Error> {
-        let rand_signature_time = timer_start!(|| "SchnorrSig::RandomizeSig");
+        let rand_signature_time = start_timer!(|| "SchnorrSig::RandomizeSig");
         let &SchnorrSig {
             ref prover_response,
             ref verifier_challenge,
@@ -203,7 +204,7 @@ where
             prover_response:    prover_response.sub(&(*verifier_challenge * &multiplier)),
             verifier_challenge: *verifier_challenge,
         };
-        timer_end!(rand_signature_time);
+        end_timer!(rand_signature_time);
         Ok(new_sig)
     }
 }

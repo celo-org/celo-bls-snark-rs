@@ -1,20 +1,17 @@
-use algebra::PairingEngine;
-use snark::{ConstraintSystem, SynthesisError};
-use snark_gadgets::{
-    uint8::UInt8,
-    utils::{AllocGadget, EqGadget, ToBytesGadget},
-};
+use algebra::Field;
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::prelude::*;
 
 use crate::crypto_primitives::signature::SignatureScheme;
 
 pub mod schnorr;
 
-pub trait SigRandomizePkGadget<S: SignatureScheme, E: PairingEngine> {
-    type ParametersGadget: AllocGadget<S::Parameters, E> + Clone;
+pub trait SigRandomizePkGadget<S: SignatureScheme, ConstraintF: Field> {
+    type ParametersGadget: AllocGadget<S::Parameters, ConstraintF> + Clone;
 
-    type PublicKeyGadget: ToBytesGadget<E> + EqGadget<E> + AllocGadget<S::PublicKey, E> + Clone;
+    type PublicKeyGadget: ToBytesGadget<ConstraintF> + EqGadget<ConstraintF> + AllocGadget<S::PublicKey, ConstraintF> + Clone;
 
-    fn check_randomization_gadget<CS: ConstraintSystem<E>>(
+    fn check_randomization_gadget<CS: ConstraintSystem<ConstraintF>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
         public_key: &Self::PublicKeyGadget,

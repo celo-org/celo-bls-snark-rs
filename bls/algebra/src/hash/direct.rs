@@ -76,7 +76,8 @@ impl XOF for DirectHasher {
 mod test {
     use super::DirectHasher as Hasher;
     use crate::hash::XOF;
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_crh_empty() {
@@ -88,7 +89,7 @@ mod test {
     #[test]
     fn test_crh_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -99,7 +100,7 @@ mod test {
     #[test]
     fn test_xof_random_96() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -111,7 +112,7 @@ mod test {
     #[test]
     fn test_hash_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
         let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8];
         for i in msg.iter_mut() {
             *i = rng.gen();

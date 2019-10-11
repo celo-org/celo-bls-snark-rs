@@ -1,27 +1,24 @@
 use crate::crypto_primitives::CommitmentScheme;
-use algebra::PairingEngine;
-use snark::{ConstraintSystem, SynthesisError};
-use snark_gadgets::{
-    uint8::UInt8,
-    utils::{AllocGadget, EqGadget, ToBytesGadget},
-};
+use algebra::Field;
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::prelude::*;
 use std::fmt::Debug;
 
 pub mod blake2s;
 pub mod injective_map;
 pub mod pedersen;
 
-pub trait CommitmentGadget<C: CommitmentScheme, E: PairingEngine> {
-    type OutputGadget: EqGadget<E>
-        + ToBytesGadget<E>
-        + AllocGadget<C::Output, E>
+pub trait CommitmentGadget<C: CommitmentScheme, ConstraintF: Field> {
+    type OutputGadget: EqGadget<ConstraintF>
+        + ToBytesGadget<ConstraintF>
+        + AllocGadget<C::Output, ConstraintF>
         + Clone
         + Sized
         + Debug;
-    type ParametersGadget: AllocGadget<C::Parameters, E> + Clone;
-    type RandomnessGadget: AllocGadget<C::Randomness, E> + Clone;
+    type ParametersGadget: AllocGadget<C::Parameters, ConstraintF> + Clone;
+    type RandomnessGadget: AllocGadget<C::Randomness, ConstraintF> + Clone;
 
-    fn check_commitment_gadget<CS: ConstraintSystem<E>>(
+    fn check_commitment_gadget<CS: ConstraintSystem<ConstraintF>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],

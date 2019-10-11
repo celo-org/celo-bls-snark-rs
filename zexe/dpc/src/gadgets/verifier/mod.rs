@@ -1,15 +1,15 @@
-use algebra::PairingEngine;
-use snark::{ConstraintSystem, SynthesisError};
+use algebra::Field;
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::prelude::*;
 
 use crate::crypto_primitives::nizk::NIZK;
-use snark_gadgets::utils::{AllocGadget, ToBitsGadget, ToBytesGadget};
 
 pub mod gm17;
 
-pub trait NIZKVerifierGadget<N: NIZK, E: PairingEngine> {
-    type VerificationKeyGadget: AllocGadget<N::VerificationParameters, E> + ToBytesGadget<E>;
+pub trait NIZKVerifierGadget<N: NIZK, ConstraintF: Field> {
+    type VerificationKeyGadget: AllocGadget<N::VerificationParameters, ConstraintF> + ToBytesGadget<ConstraintF>;
 
-    type ProofGadget: AllocGadget<N::Proof, E>;
+    type ProofGadget: AllocGadget<N::Proof, ConstraintF>;
 
     fn check_verify<'a, CS, I, T>(
         cs: CS,
@@ -18,7 +18,7 @@ pub trait NIZKVerifierGadget<N: NIZK, E: PairingEngine> {
         proof: &Self::ProofGadget,
     ) -> Result<(), SynthesisError>
     where
-        CS: ConstraintSystem<E>,
+        CS: ConstraintSystem<ConstraintF>,
         I: Iterator<Item = &'a T>,
-        T: 'a + ToBitsGadget<E> + ?Sized;
+        T: 'a + ToBitsGadget<ConstraintF> + ?Sized;
 }

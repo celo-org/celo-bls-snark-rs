@@ -1,4 +1,4 @@
-use algebra::PairingEngine;
+use algebra::Field;
 use std::hash::Hash;
 
 use crate::{
@@ -7,45 +7,45 @@ use crate::{
     gadgets::crh::FixedLengthCRHGadget,
 };
 use algebra::groups::Group;
-use snark::{ConstraintSystem, SynthesisError};
-use snark_gadgets::{groups::GroupGadget, uint8::UInt8, utils::AllocGadget};
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::{groups::GroupGadget, uint8::UInt8, alloc::AllocGadget};
 
 use std::{borrow::Borrow, marker::PhantomData};
-use snark_gadgets::bits::boolean::Boolean;
+use r1cs_std::bits::boolean::Boolean;
 
 #[derive(Derivative)]
 #[derivative(Clone(
-    bound = "G: Group, W: PedersenWindow, E: PairingEngine, GG: GroupGadget<G, E>"
+    bound = "G: Group, W: PedersenWindow, ConstraintF: Field, GG: GroupGadget<G, ConstraintF>"
 ))]
 pub struct BoweHopwoodPedersenCRHGadgetParameters<
     G: Group,
     W: PedersenWindow,
-    E: PairingEngine,
-    GG: GroupGadget<G, E>,
+    ConstraintF: Field,
+    GG: GroupGadget<G, ConstraintF>,
 > {
     params:   BoweHopwoodPedersenParameters<G>,
     _group_g: PhantomData<GG>,
-    _engine:  PhantomData<E>,
+    _engine:  PhantomData<ConstraintF>,
     _window:  PhantomData<W>,
 }
 
-pub struct BoweHopwoodPedersenCRHGadget<G: Group, E: PairingEngine, GG: GroupGadget<G, E>> {
+pub struct BoweHopwoodPedersenCRHGadget<G: Group, ConstraintF: Field, GG: GroupGadget<G, ConstraintF>> {
     _group:        PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,
-    _engine:       PhantomData<E>,
+    _engine:       PhantomData<ConstraintF>,
 }
 
-impl<E, G, GG, W> FixedLengthCRHGadget<BoweHopwoodPedersenCRH<G, W>, E> for BoweHopwoodPedersenCRHGadget<G, E, GG>
+impl<ConstraintF, G, GG, W> FixedLengthCRHGadget<BoweHopwoodPedersenCRH<G, W>, ConstraintF> for BoweHopwoodPedersenCRHGadget<G, ConstraintF, GG>
 where
-    E: PairingEngine,
+    ConstraintF: Field,
     G: Group + Hash,
-    GG: GroupGadget<G, E>,
+    GG: GroupGadget<G, ConstraintF>,
     W: PedersenWindow,
 {
     type OutputGadget = GG;
-    type ParametersGadget = BoweHopwoodPedersenCRHGadgetParameters<G, W, E, GG>;
+    type ParametersGadget = BoweHopwoodPedersenCRHGadgetParameters<G, W, ConstraintF, GG>;
 
-    fn check_evaluation_gadget<CS: ConstraintSystem<E>>(
+    fn check_evaluation_gadget<CS: ConstraintSystem<ConstraintF>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
@@ -72,16 +72,12 @@ where
 
         Ok(result)
     }
-
-    fn cost() -> usize {
-        GG::cost_of_bowe_hopwood(W::NUM_WINDOWS, W::WINDOW_SIZE, CHUNK_SIZE).unwrap()
-    }
 }
 
-impl<G: Group, W: PedersenWindow, E: PairingEngine, GG: GroupGadget<G, E>>
-    AllocGadget<BoweHopwoodPedersenParameters<G>, E> for BoweHopwoodPedersenCRHGadgetParameters<G, W, E, GG>
+impl<G: Group, W: PedersenWindow, ConstraintF: Field, GG: GroupGadget<G, ConstraintF>>
+    AllocGadget<BoweHopwoodPedersenParameters<G>, ConstraintF> for BoweHopwoodPedersenCRHGadgetParameters<G, W, ConstraintF, GG>
 {
-    fn alloc<F, T, CS: ConstraintSystem<E>>(_cs: CS, value_gen: F) -> Result<Self, SynthesisError>
+    fn alloc<F, T, CS: ConstraintSystem<ConstraintF>>(_cs: CS, value_gen: F) -> Result<Self, SynthesisError>
     where
         F: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<BoweHopwoodPedersenParameters<G>>,
@@ -95,7 +91,7 @@ impl<G: Group, W: PedersenWindow, E: PairingEngine, GG: GroupGadget<G, E>>
         })
     }
 
-    fn alloc_input<F, T, CS: ConstraintSystem<E>>(
+    fn alloc_input<F, T, CS: ConstraintSystem<ConstraintF>>(
         _cs: CS,
         value_gen: F,
     ) -> Result<Self, SynthesisError>
@@ -115,7 +111,7 @@ impl<G: Group, W: PedersenWindow, E: PairingEngine, GG: GroupGadget<G, E>>
 
 #[cfg(test)]
 mod test {
-    use algebra::curves::sw6::SW6;
+    use algebra::fields::sw6::fr::Fr;
     use rand::{thread_rng, Rng};
 
     use crate::{
@@ -127,15 +123,15 @@ mod test {
         gadgets::crh::{bowe_hopwood::BoweHopwoodPedersenCRHGadget, FixedLengthCRHGadget},
     };
     use algebra::curves::edwards_sw6::EdwardsProjective as Edwards;
-    use snark::ConstraintSystem;
-    use snark_gadgets::{
+    use r1cs_core::ConstraintSystem;
+    use r1cs_std::{
         groups::curves::twisted_edwards::edwards_sw6::EdwardsSWGadget,
-        test_constraint_system::TestConstraintSystem, uint8::UInt8, utils::AllocGadget,
+        test_constraint_system::TestConstraintSystem, uint8::UInt8, alloc::AllocGadget,
     };
     use algebra::ProjectiveCurve;
 
     type TestCRH = BoweHopwoodPedersenCRH<Edwards, Window>;
-    type TestCRHGadget = BoweHopwoodPedersenCRHGadget<Edwards, SW6, EdwardsSWGadget>;
+    type TestCRHGadget = BoweHopwoodPedersenCRHGadget<Edwards, Fr, EdwardsSWGadget>;
 
     #[derive(Clone, PartialEq, Eq, Hash)]
     pub(super) struct Window;
@@ -145,52 +141,9 @@ mod test {
         const NUM_WINDOWS: usize = 8;
     }
 
-    #[test]
-    fn num_constraints() {
-        let rng = &mut thread_rng();
-        let mut cs = TestConstraintSystem::<SW6>::new();
-
-        let (_input, input_bytes) = generate_input(&mut cs, rng);
-        let input_constraints = cs.num_constraints();
-        println!("number of constraints for input: {}", cs.num_constraints());
-
-        let parameters = TestCRH::setup(rng).unwrap();
-
-        let gadget_parameters =
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::ParametersGadget::alloc(
-                &mut cs.ns(|| "gadget_parameters"),
-                || Ok(&parameters),
-            )
-            .unwrap();
-        let param_constraints = cs.num_constraints() - input_constraints;
-        println!(
-            "number of constraints for input + params: {}",
-            cs.num_constraints()
-        );
-
-        let _ =
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::check_evaluation_gadget(
-                &mut cs.ns(|| "gadget_evaluation"),
-                &gadget_parameters,
-                &input_bytes,
-            )
-            .unwrap();
-
-        println!("number of constraints total: {}", cs.num_constraints());
-        let eval_constraints = cs.num_constraints() - param_constraints - input_constraints;
-        assert_eq!(
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::cost(),
-            eval_constraints
-        );
-        assert_eq!(
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::cost(),
-            8 * (89*3 + 90 * (1 + 2) + 2) + 7*6
-        );
-    }
-
-    fn generate_input<CS: ConstraintSystem<SW6>>(
+    fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(
         mut cs: CS,
-        rng: &mut dyn Rng,
+        rng: &mut R,
     ) -> ([u8; 270], Vec<UInt8>) {
         let mut input = [1u8; 270];
         rng.fill_bytes(&mut input);
@@ -206,7 +159,7 @@ mod test {
     #[test]
     fn crh_primitive_gadget_test() {
         let rng = &mut thread_rng();
-        let mut cs = TestConstraintSystem::<SW6>::new();
+        let mut cs = TestConstraintSystem::<Fr>::new();
 
         let (input, input_bytes) = generate_input(&mut cs, rng);
         println!("number of constraints for input: {}", cs.num_constraints());
@@ -215,7 +168,7 @@ mod test {
         let primitive_result = TestCRH::evaluate(&parameters, &input).unwrap();
 
         let gadget_parameters =
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::ParametersGadget::alloc(
+            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, Fr>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "gadget_parameters"),
                 || Ok(&parameters),
             )
@@ -226,7 +179,7 @@ mod test {
         );
 
         let gadget_result =
-            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, SW6>>::check_evaluation_gadget(
+            <TestCRHGadget as FixedLengthCRHGadget<TestCRH, Fr>>::check_evaluation_gadget(
                 &mut cs.ns(|| "gadget_evaluation"),
                 &gadget_parameters,
                 &input_bytes,

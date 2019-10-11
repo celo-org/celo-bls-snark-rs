@@ -1,21 +1,28 @@
 use crate::curve::hash::HashToG2;
-use algebra::{bytes::{FromBytes, ToBytes}, curves::{
-    bls12_377::{
-        Bls12_377, Bls12_377Parameters, g1::Bls12_377G1Parameters, g2::Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
+use algebra::{
+    bytes::{
+        FromBytes,
+        ToBytes
     },
+    curves::{
+        bls12_377::{
+            Bls12_377, Bls12_377Parameters, g1::Bls12_377G1Parameters, g2::Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
+        },
     AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve,
     models::SWModelParameters,
-}, fields::{
-    bls12_377::{Fq12, Fq, Fq2, Fr},
-    Field,
-    PrimeField,
-}, SquareRootField};
+    }, fields::{
+        bls12_377::{Fq12, Fq, Fq2, Fr},
+        Field,
+        PrimeField,
+    }, SquareRootField,
+    UniformRand,
+};
+use rand::Rng;
 
 use std::{
     fmt::{self, Display},
     error::Error,
 };
-use rand::Rng;
 
 static SIG_DOMAIN: &'static [u8] = b"ULforxof";
 static POP_DOMAIN: &'static [u8] = b"ULforpop";
@@ -32,7 +39,7 @@ pub struct PrivateKey {
 
 impl PrivateKey {
     pub fn generate<R: Rng>(rng: &mut R) -> PrivateKey {
-        PrivateKey { sk: rng.gen() }
+        PrivateKey { sk: Fr::rand(rng) }
     }
 
     pub fn from_sk(sk: &Fr) -> PrivateKey {

@@ -1,15 +1,13 @@
 use crate::crypto_primitives::commitment::blake2s::Blake2sCommitment;
-use snark::{ConstraintSystem, SynthesisError};
+use r1cs_core::{ConstraintSystem, SynthesisError};
 
 use crate::gadgets::{
     prf::blake2s::{blake2s_gadget, Blake2sOutputGadget},
     CommitmentGadget,
 };
-use algebra::PairingEngine;
-use snark_gadgets::{
-    uint8::UInt8,
-    utils::{AllocGadget, ToBytesGadget},
-};
+use algebra::{PrimeField, Field};
+use r1cs_std::prelude::*;
+
 use std::borrow::Borrow;
 
 #[derive(Clone)]
@@ -20,12 +18,12 @@ pub struct Blake2sRandomnessGadget(pub Vec<UInt8>);
 
 pub struct Blake2sCommitmentGadget;
 
-impl<E: PairingEngine> CommitmentGadget<Blake2sCommitment, E> for Blake2sCommitmentGadget {
+impl<ConstraintF: PrimeField> CommitmentGadget<Blake2sCommitment, ConstraintF> for Blake2sCommitmentGadget {
     type OutputGadget = Blake2sOutputGadget;
     type ParametersGadget = Blake2sParametersGadget;
     type RandomnessGadget = Blake2sRandomnessGadget;
 
-    fn check_commitment_gadget<CS: ConstraintSystem<E>>(
+    fn check_commitment_gadget<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
         _: &Self::ParametersGadget,
         input: &[UInt8],
@@ -47,8 +45,8 @@ impl<E: PairingEngine> CommitmentGadget<Blake2sCommitment, E> for Blake2sCommitm
     }
 }
 
-impl<E: PairingEngine> AllocGadget<(), E> for Blake2sParametersGadget {
-    fn alloc<F, T, CS: ConstraintSystem<E>>(_: CS, _: F) -> Result<Self, SynthesisError>
+impl<ConstraintF: Field> AllocGadget<(), ConstraintF> for Blake2sParametersGadget {
+    fn alloc<F, T, CS: ConstraintSystem<ConstraintF>>(_: CS, _: F) -> Result<Self, SynthesisError>
     where
         F: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<()>,
@@ -56,7 +54,7 @@ impl<E: PairingEngine> AllocGadget<(), E> for Blake2sParametersGadget {
         Ok(Blake2sParametersGadget)
     }
 
-    fn alloc_input<F, T, CS: ConstraintSystem<E>>(_: CS, _: F) -> Result<Self, SynthesisError>
+    fn alloc_input<F, T, CS: ConstraintSystem<ConstraintF>>(_: CS, _: F) -> Result<Self, SynthesisError>
     where
         F: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<()>,
@@ -65,9 +63,9 @@ impl<E: PairingEngine> AllocGadget<(), E> for Blake2sParametersGadget {
     }
 }
 
-impl<E: PairingEngine> AllocGadget<[u8; 32], E> for Blake2sRandomnessGadget {
+impl<ConstraintF: PrimeField> AllocGadget<[u8; 32], ConstraintF> for Blake2sRandomnessGadget {
     #[inline]
-    fn alloc<F, T, CS: ConstraintSystem<E>>(cs: CS, value_gen: F) -> Result<Self, SynthesisError>
+    fn alloc<F, T, CS: ConstraintSystem<ConstraintF>>(cs: CS, value_gen: F) -> Result<Self, SynthesisError>
     where
         F: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<[u8; 32]>,
@@ -83,7 +81,7 @@ impl<E: PairingEngine> AllocGadget<[u8; 32], E> for Blake2sRandomnessGadget {
     }
 
     #[inline]
-    fn alloc_input<F, T, CS: ConstraintSystem<E>>(
+    fn alloc_input<F, T, CS: ConstraintSystem<ConstraintF>>(
         cs: CS,
         value_gen: F,
     ) -> Result<Self, SynthesisError>
@@ -104,7 +102,7 @@ impl<E: PairingEngine> AllocGadget<[u8; 32], E> for Blake2sRandomnessGadget {
 
 #[cfg(test)]
 mod test {
-    use algebra::curves::bls12_381::Bls12_381;
+    use algebra::fields::bls12_381::Fr;
     use rand::{thread_rng, Rng};
 
     use crate::{
@@ -114,14 +112,13 @@ mod test {
             CommitmentGadget,
         },
     };
-    use snark::ConstraintSystem;
-    use snark_gadgets::{
-        test_constraint_system::TestConstraintSystem, uint8::UInt8, utils::AllocGadget,
-    };
+    use r1cs_core::ConstraintSystem;
+    use r1cs_std::prelude::*;
+    use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     #[test]
     fn commitment_gadget_test() {
-        let mut cs = TestConstraintSystem::<Bls12_381>::new();
+        let mut cs = TestConstraintSystem::<Fr>::new();
 
         let input = [1u8; 32];
 
@@ -131,7 +128,7 @@ mod test {
         type TestCOMMGadget = Blake2sCommitmentGadget;
 
         let mut randomness = [0u8; 32];
-        rng.fill_bytes(&mut randomness);
+        rng.fill(&mut randomness);
 
         let parameters = ();
         let primitive_result = Blake2sCommitment::commit(&parameters, &input, &randomness).unwrap();
@@ -150,13 +147,13 @@ mod test {
         let randomness_bytes = Blake2sRandomnessGadget(randomness_bytes);
 
         let gadget_parameters =
-            <TestCOMMGadget as CommitmentGadget<TestCOMM, Bls12_381>>::ParametersGadget::alloc(
+            <TestCOMMGadget as CommitmentGadget<TestCOMM, Fr>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "gadget_parameters"),
                 || Ok(&parameters),
             )
             .unwrap();
         let gadget_result =
-            <TestCOMMGadget as CommitmentGadget<TestCOMM, Bls12_381>>::check_commitment_gadget(
+            <TestCOMMGadget as CommitmentGadget<TestCOMM, Fr>>::check_commitment_gadget(
                 &mut cs.ns(|| "gadget_evaluation"),
                 &gadget_parameters,
                 &input_bytes,
