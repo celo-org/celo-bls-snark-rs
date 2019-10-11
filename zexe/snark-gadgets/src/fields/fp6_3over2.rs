@@ -19,6 +19,7 @@ use crate::{
     },
     ConstraintVar,
 };
+use crate::utils::ThreeBitCondNegLookupGadget;
 
 type Fp2Gadget<P, E> = super::fp2::Fp2Gadget<<P as Fp6Parameters>::Fp2Params, E>;
 
@@ -883,6 +884,32 @@ where
 
     fn cost() -> usize {
         3 * <Fp2Gadget<P, E> as TwoBitLookupGadget<E>>::cost()
+    }
+}
+
+impl<P, E: PairingEngine> ThreeBitCondNegLookupGadget<E> for Fp6Gadget<P, E>
+    where
+        P: Fp6Parameters,
+        P::Fp2Params: Fp2Parameters<Fp = E::Fr>,
+{
+    type TableConstant = Fp6<P>;
+
+    fn three_bit_cond_neg_lookup<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        b: &[Boolean],
+        c: &[Self::TableConstant],
+    ) -> Result<Self, SynthesisError> {
+        let c0s = c.iter().map(|f| f.c0).collect::<Vec<_>>();
+        let c1s = c.iter().map(|f| f.c1).collect::<Vec<_>>();
+        let c2s = c.iter().map(|f| f.c2).collect::<Vec<_>>();
+        let c0 = Fp2Gadget::<P, E>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c0"), b, &c0s)?;
+        let c1 = Fp2Gadget::<P, E>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c1"), b, &c1s)?;
+        let c2 = Fp2Gadget::<P, E>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c2"), b, &c2s)?;
+        Ok(Self::new(c0, c1, c2))
+    }
+
+    fn cost() -> usize {
+        3 * <Fp2Gadget<P, E> as ThreeBitCondNegLookupGadget<E>>::cost()
     }
 }
 

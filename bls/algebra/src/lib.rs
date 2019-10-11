@@ -149,7 +149,7 @@ pub extern "C" fn sign_message(
     should_use_composite: bool,
     out_signature: *mut *mut Signature,
 ) -> bool {
-    convert_result_to_bool::<_, Box<Error>, _>(|| {
+    convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
@@ -173,7 +173,7 @@ pub extern "C" fn sign_pop(
     in_message_len: c_int,
     out_signature: *mut *mut Signature,
 ) -> bool {
-    convert_result_to_bool::<_, Box<Error>, _>(|| {
+    convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let signature = private_key.sign_pop( message, &*DIRECT_HASH_TO_G2)?;

@@ -9,10 +9,7 @@ use crate::{
     uint8::UInt8,
 };
 
-use crate::utils::{
-    AllocGadget, CondSelectGadget, ConditionalEqGadget, EqGadget, NEqGadget, ToBitsGadget,
-    ToBytesGadget, TwoBitLookupGadget,
-};
+use crate::utils::{AllocGadget, CondSelectGadget, ConditionalEqGadget, EqGadget, NEqGadget, ToBitsGadget, ToBytesGadget, TwoBitLookupGadget, ThreeBitCondNegLookupGadget};
 
 use crate::{
     Assignment,
@@ -512,6 +509,52 @@ impl<E: PairingEngine> TwoBitLookupGadget<E> for FpGadget<E> {
 
     fn cost() -> usize {
         1
+    }
+}
+
+impl<E: PairingEngine> ThreeBitCondNegLookupGadget<E> for FpGadget<E> {
+    type TableConstant = E::Fr;
+
+    fn three_bit_cond_neg_lookup<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        b: &[Boolean],
+        c: &[Self::TableConstant],
+    ) -> Result<Self, SynthesisError> {
+        debug_assert!(b.len() == 3);
+        debug_assert!(c.len() == 4);
+
+        let result = Self::alloc(cs.ns(|| "Allocate lookup result"), || {
+            let y = match (b[0].get_value().get()?, b[1].get_value().get()?) {
+                (false, false) => c[0],
+                (false, true) => c[2],
+                (true, false) => c[1],
+                (true, true) => c[3],
+            };
+            if b[2].get_value().get()? {
+                Ok(-y)
+            } else {
+                Ok(y)
+            }
+        })?;
+        let precomp = Boolean::and(
+            cs.ns(|| "precomp"),
+            &b[0],
+            &b[1],
+        )?;
+        let one = CS::one();
+        let y_lc = precomp.lc(one, c[3] - &c[2] - &c[1] + &c[0]) + b[0].lc(one, c[1] - &c[0]) - b[1].lc(one, c[0] - &c[2]) + (c[0], one);
+        cs.enforce(
+            || "Enforce lookup",
+            |_| y_lc.clone() + y_lc.clone(),
+            |lc| lc + b[2].lc(one, E::Fr::one()),
+            |_| -result.get_variable() + y_lc.clone(),
+        );
+
+        Ok(result)
+    }
+
+    fn cost() -> usize {
+        2
     }
 }
 
