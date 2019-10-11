@@ -8,6 +8,7 @@ use r1cs_std::prelude::*;
 
 pub mod injective_map;
 pub mod pedersen;
+pub mod bowe_hopwood;
 
 pub trait FixedLengthCRHGadget<H: FixedLengthCRH, ConstraintF: Field>: Sized {
     type OutputGadget: ConditionalEqGadget<ConstraintF>
