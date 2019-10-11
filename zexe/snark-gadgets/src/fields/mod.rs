@@ -10,6 +10,7 @@ use crate::{
         ToBytesGadget, TwoBitLookupGadget,
     },
 };
+use crate::utils::ThreeBitCondNegLookupGadget;
 
 pub mod fp;
 pub mod fp12;
@@ -32,6 +33,7 @@ pub trait FieldGadget<F: Field, E: PairingEngine>:
     + ToBytesGadget<E>
     + CondSelectGadget<E>
     + TwoBitLookupGadget<E, TableConstant = F>
+    + ThreeBitCondNegLookupGadget<E, TableConstant = F>
     + Debug
 {
     type Variable: Clone + Debug;

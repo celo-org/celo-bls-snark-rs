@@ -168,6 +168,21 @@ where
     fn cost() -> usize;
 }
 
+/// Uses three bits to perform a lookup into a table, where the last bit performs negation
+pub trait ThreeBitCondNegLookupGadget<E: PairingEngine>
+    where
+        Self: Sized,
+{
+    type TableConstant;
+    fn three_bit_cond_neg_lookup<CS: ConstraintSystem<E>>(
+        cs: CS,
+        bits: &[Boolean],
+        constants: &[Self::TableConstant],
+    ) -> Result<Self, SynthesisError>;
+
+    fn cost() -> usize;
+}
+
 pub trait OrEqualsGadget<E: PairingEngine>
 where
     Self: Sized,

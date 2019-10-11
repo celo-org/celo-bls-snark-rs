@@ -71,36 +71,39 @@ mod montgomery_affine_impl {
             }
         }
 
-        pub fn from_edwards<CS: ConstraintSystem<E>>(mut cs: CS, p: &TEAffine<P>) -> Result<Self, SynthesisError> {
+        pub fn from_edwards_to_coords(p: &TEAffine<P>) -> Result<(P::BaseField, P::BaseField), SynthesisError> {
             let montgomery_point: GroupAffine<P> = if p.y == P::BaseField::one() {
                 GroupAffine::zero()
             } else {
                 if p.x == P::BaseField::zero() {
                     GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
                 } else {
-                    let montgomery_params = Self::params();
                     let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
                     let v = u * &p.x.inverse().unwrap();
                     GroupAffine::new(u, v)
                 }
             };
 
+            Ok((montgomery_point.x, montgomery_point.y))
+        }
+
+        pub fn from_edwards<CS: ConstraintSystem<E>>(mut cs: CS, p: &TEAffine<P>) -> Result<Self, SynthesisError> {
+            let montgomery_coords = Self::from_edwards_to_coords(p)?;
+
             let u = F::alloc(
                 cs.ns(|| "u"),
-                || Ok(montgomery_point.x),
+                || Ok(montgomery_coords.0),
             )?;
 
             let v = F::alloc(
                 cs.ns(|| "v"),
-                || Ok(montgomery_point.y),
+                || Ok(montgomery_coords.1),
             )?;
 
             Ok(Self::new(u, v))
         }
 
         pub fn into_edwards<CS: ConstraintSystem<E>>(&self, mut cs: CS) -> Result<AffineGadget<P, E, F>, SynthesisError> {
-            let montgomery_params = Self::params();
-
             // Compute u = x / y
             let u = F::alloc(cs.ns(|| "u"), || {
                 let mut t0 = self.x.get_value().get()?;
@@ -686,6 +689,8 @@ mod projective_impl {
         PrimeField, ProjectiveCurve,
     };
     use std::ops::Neg;
+    use crate::groups::BoweHopwoodCostError;
+    use crate::utils::{TwoBitLookupGadget, ThreeBitCondNegLookupGadget};
 
     impl<P, E, F> GroupGadget<TEProjective<P>, E> for AffineGadget<P, E, F>
     where
@@ -957,19 +962,111 @@ mod projective_impl {
             Ok(())
         }
 
-        fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, I, B>(
-            &mut self,
-            cs: CS,
-            scalar_bits_with_base_powers: I,
-        ) -> Result<(), SynthesisError>
+        fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, T, I, B>(
+            mut cs: CS,
+            bases: &[B],
+            scalars: I,
+            segment_size: usize,
+        ) -> Result<Self, SynthesisError>
             where
                 CS: ConstraintSystem<E>,
-                I: Iterator<Item = (&'a [B], &'a TEProjective<P>)>,
-                B: 'a + Borrow<Boolean>,
+                T: 'a + ToBitsGadget<E> + ?Sized,
+                I: Iterator<Item = &'a T>,
+                B: Borrow<TEProjective<P>>,
         {
-            Err(SynthesisError::AssignmentMissing)
-        }
+            const CHUNK_SIZE: usize = 3;
+            let mut edwards_result = None;
+            let mut result = None;
+            // Compute ∏(h_i^{m_i}) for all i.
+            for (i, (bits, base_power)) in scalars.zip(bases).enumerate() {
+                let base_power = base_power.borrow();
+                let mut acc_power = *base_power;
+                let mut coords = vec![];
+                for _ in 0..4 {
+                    coords.push(acc_power);
+                    acc_power = acc_power + base_power;
+                }
 
+                let bits = bits.to_bits(&mut cs.ns(|| format!("Convert Scalar {} to bits", i)))?;
+                if bits.len() != CHUNK_SIZE {
+                    return Err(SynthesisError::Unsatisfiable)
+                }
+
+                let coords = coords.iter().map(|p| {
+                    let p = p.into_affine();
+                    MontgomeryAffineGadget::<P, E, F>::from_edwards_to_coords(
+                        &p,
+                    ).unwrap()
+                }).collect::<Vec<_>>();
+
+                let x_coeffs = coords.iter().map(|p| p.0).collect::<Vec<_>>();
+                let y_coeffs = coords.iter().map(|p| p.1).collect::<Vec<_>>();
+                let x = F::two_bit_lookup(
+                    cs.ns(|| format!("x lookup in window {}", i)),
+                    &bits,
+                    &x_coeffs,
+                )?;
+
+                let y = F::three_bit_cond_neg_lookup(
+                    cs.ns(|| format!("y lookup in window {}", i)),
+                    &bits,
+                    &y_coeffs,
+                )?;
+
+                let tmp = MontgomeryAffineGadget::new(x, y);
+
+                match result {
+                    None => {
+                        result = Some(tmp);
+                    }
+                    Some(ref mut result) => {
+                        *result = tmp.add(
+                            cs.ns(|| format!("addition of window {}", i)),
+                            result,
+                        )?;
+                    }
+                }
+
+                if i > 0 && (i + 1) % segment_size == 0 {
+                    let segment_result = result.unwrap();
+                    let segment_result = segment_result.into_edwards(
+                        cs.ns(|| format!("segment result in window {}", i)),
+                    )?;
+                    match edwards_result {
+                        None => {
+                            edwards_result = Some(segment_result);
+                        }
+                        Some(ref mut edwards_result) => {
+                            *edwards_result = GroupGadget::<TEAffine<P>, E>::add(
+                                &segment_result,
+                                cs.ns(|| format!("edwards addition of window {}", i)),
+                                edwards_result,
+                            )?;
+                        }
+                    }
+                    result = None;
+                }
+            }
+            if result.is_some() {
+                let segment_result = result.unwrap();
+                let segment_result = segment_result.into_edwards(
+                    cs.ns(|| "segment result in leftover"),
+                )?;
+                match edwards_result {
+                    None => {
+                        edwards_result = Some(segment_result);
+                    }
+                    Some(ref mut edwards_result) => {
+                        *edwards_result = GroupGadget::<TEAffine<P>, E>::add(
+                            &segment_result,
+                            cs.ns(|| "edwards addition of leftover"),
+                            edwards_result,
+                        )?;
+                    }
+                }
+            }
+            Ok(edwards_result.unwrap())
+        }
 
         fn cost_of_add() -> usize {
             4 + 2 * F::cost_of_mul()
@@ -977,6 +1074,18 @@ mod projective_impl {
 
         fn cost_of_double() -> usize {
             4 + F::cost_of_mul()
+        }
+
+        fn cost_of_bowe_hopwood(num_windows: usize, window_size: usize, _chunk_size: usize) -> Result<usize, BoweHopwoodCostError> {
+            let montgomery_add_cost = 3 * F::cost_of_mul();
+            let into_edwards_cost = 2 * F::cost_of_mul();
+            Ok(num_windows * (
+                (window_size - 1)*montgomery_add_cost
+                + window_size * (
+                    <F as TwoBitLookupGadget<E>>::cost()
+                        + <F as ThreeBitCondNegLookupGadget<E>>::cost()
+                ) + into_edwards_cost
+            ) + (num_windows - 1)*<Self as GroupGadget<TEProjective<P>, E>>::cost_of_add())
         }
     }
 

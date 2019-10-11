@@ -11,6 +11,7 @@ use snark_gadgets::{
 
 pub mod injective_map;
 pub mod pedersen;
+pub mod bowe_hopwood;
 
 pub trait FixedLengthCRHGadget<H: FixedLengthCRH, E: PairingEngine>: Sized {
     type OutputGadget: ConditionalEqGadget<E>

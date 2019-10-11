@@ -5,7 +5,7 @@ use crate::{
 use algebra::{Group, PairingEngine};
 use snark::{ConstraintSystem, SynthesisError};
 
-use std::{borrow::Borrow, fmt::Debug};
+use std::{borrow::Borrow, fmt::{self, Debug}, error::Error};
 
 pub mod curves;
 
@@ -13,6 +13,25 @@ pub use self::curves::{
     short_weierstrass::bls12,
     twisted_edwards::{edwards_sw6, jubjub},
 };
+#[derive(Debug)]
+pub enum BoweHopwoodCostError {
+    // A montgomery curve equivalence is not available for this group
+    MontgomeryUnavailable,
+}
+
+impl Error for BoweHopwoodCostError {
+    fn description(&self) -> &str {
+        match *self {
+            BoweHopwoodCostError::MontgomeryUnavailable => "A montgomery curve equivalence is not available for this group"
+        }
+    }
+}
+
+impl fmt::Display for BoweHopwoodCostError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.description())
+    }
+}
 
 pub trait GroupGadget<G: Group, E: PairingEngine>:
     Sized
@@ -114,16 +133,17 @@ pub trait GroupGadget<G: Group, E: PairingEngine>:
         Ok(())
     }
 
-    fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, I, B>(
-        &mut self,
+    fn precomputed_base_scalar_mul_3_bit_with_conditional_negation<'a, CS, T, I, B>(
         _: CS,
+        _: &[B],
         _: I,
-    ) -> Result<(), SynthesisError>
+        _: usize,
+    ) -> Result<Self, SynthesisError>
         where
             CS: ConstraintSystem<E>,
-            I: Iterator<Item = (&'a [B], &'a G)>,
-            B: 'a + Borrow<Boolean>,
-            G: 'a,
+            T: 'a + ToBitsGadget<E> + ?Sized,
+            I: Iterator<Item = &'a T>,
+            B: Borrow<G>,
     {
         Err(SynthesisError::AssignmentMissing)
     }
@@ -153,6 +173,9 @@ pub trait GroupGadget<G: Group, E: PairingEngine>:
     }
 
     fn cost_of_add() -> usize;
+    fn cost_of_bowe_hopwood(_num_windows: usize, _window_size: usize, _chunk_size: usize) -> Result<usize, BoweHopwoodCostError> {
+        Err(BoweHopwoodCostError::MontgomeryUnavailable)
+    }
 
     fn cost_of_double() -> usize;
 }

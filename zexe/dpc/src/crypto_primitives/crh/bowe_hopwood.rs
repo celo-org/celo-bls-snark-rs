@@ -16,7 +16,7 @@ use algebra::{
     biginteger::BigInteger,
 };
 
-const CHUNK_SIZE: usize = 3;
+pub const CHUNK_SIZE: usize = 3;
 
 #[derive(Clone, Default)]
 pub struct BoweHopwoodPedersenParameters<G: Group> {
@@ -64,7 +64,7 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
 
         let maximum_num_chunks_in_segment = calculate_num_chunks_in_segment::<G>();
         if W::WINDOW_SIZE > maximum_num_chunks_in_segment {
-            return Err("Bowe-Hopwood hash must have a window size < (p-1)/2".into())
+            return Err(format!("Bowe-Hopwood hash must have a window size < (p-1)/2, maximum segment size is {}", maximum_num_chunks_in_segment).into())
         }
 
         let time = timer_start!(|| format!(
@@ -94,18 +94,17 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
         }
 
         let mut padded_input = Vec::with_capacity(input.len());
-        let mut input = input;
+        let input = bytes_to_bits(input);
         // Pad the input if it is not the current length.
-        if (input.len() * 8) % CHUNK_SIZE != 0 {
+        padded_input.extend_from_slice(&input);
+        if input.len() % CHUNK_SIZE != 0 {
             let current_length = input.len();
-            padded_input.extend_from_slice(input);
-            for _ in current_length..(input.len() + CHUNK_SIZE - 1)/CHUNK_SIZE {
-                padded_input.push(0u8);
+            for _ in 0..(CHUNK_SIZE - current_length % CHUNK_SIZE) {
+                padded_input.push(false);
             }
-            input = padded_input.as_slice();
         }
 
-        assert!(input.len() % CHUNK_SIZE == 0);
+        assert_eq!(padded_input.len() % CHUNK_SIZE, 0);
 
         assert_eq!(
             parameters.generators.len(),
@@ -119,28 +118,26 @@ impl<G: Group, W: PedersenWindow> FixedLengthCRH for BoweHopwoodPedersenCRH<G, W
         assert_eq!(CHUNK_SIZE, 3);
 
         // Compute sum of h_i^{m_i} for all i.
-        let result = bytes_to_bits(input)
-            .par_chunks(W::WINDOW_SIZE*CHUNK_SIZE)
-            .map(|segment| {
-                segment
-                    .par_chunks(CHUNK_SIZE)
-                    .zip(&parameters.generators)
-                    .map(|(chunk_bits, generator)| {
-                        let mut encoded = generator.clone();
-                        if chunk_bits[0] {
-                            encoded = encoded + &generator;
-                        }
-                        if chunk_bits[1] {
-                            encoded = encoded + &generator.double();
-                        }
-                        if chunk_bits[2] {
-                            encoded = encoded.neg();
-                        }
-                        encoded
-                    })
-                    .reduce(|| G::zero(), |a, b| a + &b)
+        let result = padded_input
+            .par_chunks(CHUNK_SIZE)
+            .zip(&parameters.generators)
+            .map(|(chunk_bits, generator)| {
+                let mut encoded = generator.clone();
+                if chunk_bits[0] {
+                    encoded = encoded + &generator;
+                }
+                if chunk_bits[1] {
+                    encoded = encoded + &generator.double();
+                }
+                if chunk_bits[2] {
+                    encoded = encoded.neg();
+                }
+                encoded
             })
-            .reduce(|| G::zero(), |a, b| a + &b);
+            .reduce(
+                || G::zero(),
+                |a, b| a + &b
+            );
         timer_end!(eval_time);
 
         Ok(result)
@@ -177,6 +174,6 @@ mod test {
 
         let rng = &mut thread_rng();
         let params = <BoweHopwoodPedersenCRH::<EdwardsProjective, TestWindow> as FixedLengthCRH>::setup(rng).unwrap();
-        let hash = <BoweHopwoodPedersenCRH::<EdwardsProjective, TestWindow> as FixedLengthCRH>::evaluate(&params, &[1,2,3]);
+        <BoweHopwoodPedersenCRH::<EdwardsProjective, TestWindow> as FixedLengthCRH>::evaluate(&params, &[1,2,3]).unwrap();
     }
 }
