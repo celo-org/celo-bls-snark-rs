@@ -42,6 +42,7 @@ pub trait ThreeBitCondNegLookupGadget<ConstraintF: Field>
     fn three_bit_cond_neg_lookup<CS: ConstraintSystem<ConstraintF>>(
         cs: CS,
         bits: &[Boolean],
+        b0b1: &Boolean,
         constants: &[Self::TableConstant],
     ) -> Result<Self, SynthesisError>;
 

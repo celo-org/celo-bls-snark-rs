@@ -994,15 +994,24 @@ mod projective_impl {
 
                 let x_coeffs = coords.iter().map(|p| p.0).collect::<Vec<_>>();
                 let y_coeffs = coords.iter().map(|p| p.1).collect::<Vec<_>>();
-                let x = F::two_bit_lookup(
-                    cs.ns(|| format!("x lookup in window {}", i)),
-                    &bits,
-                    &x_coeffs,
+
+                let precomp = Boolean::and(
+                    cs.ns(|| format!("precomp in window {}", i)),
+                    &bits[0],
+                    &bits[1],
                 )?;
+
+                let x = F::zero(cs.ns(|| format!("x in window {}", i)))?
+                    .add_bool_with_coeff(cs.ns(|| format!("add bool 00 in window {}", i)), &Boolean::constant(true), x_coeffs[0])?
+                    .add_bool_with_coeff(cs.ns(|| format!("add bool 01 in window {}", i)), &bits[0], x_coeffs[1] - &x_coeffs[0])?
+                    .add_bool_with_coeff(cs.ns(|| format!("add bool 10 in window {}", i)), &bits[1], x_coeffs[2] - &x_coeffs[0])?
+                    .add_bool_with_coeff(cs.ns(|| format!("add bool 11 in window {}", i)), &precomp, x_coeffs[3] - &x_coeffs[2] - &x_coeffs[1] + &x_coeffs[0])?;
+
 
                 let y = F::three_bit_cond_neg_lookup(
                     cs.ns(|| format!("y lookup in window {}", i)),
                     &bits,
+                    &precomp,
                     &y_coeffs,
                 )?;
 
