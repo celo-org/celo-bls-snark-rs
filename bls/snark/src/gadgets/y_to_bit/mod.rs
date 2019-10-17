@@ -36,11 +36,6 @@ use r1cs_std::{
         ToBitsGadget,
     },
 };
-use dpc::{
-    gadgets::{
-        crh::pedersen::{PedersenCRHGadget},
-    }
-};
 use std::{
     ops::Neg,
     marker::PhantomData

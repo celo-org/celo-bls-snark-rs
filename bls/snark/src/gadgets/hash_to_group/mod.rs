@@ -32,18 +32,16 @@ use r1cs_std::{
         ToBitsGadget,
     },
 };
-use dpc::{
-    gadgets::{
-        crh::bowe_hopwood::{BoweHopwoodPedersenCRHGadget},
-        prf::blake2s::blake2s_gadget
-    }
+use crypto_primitives::{
+    FixedLengthCRHGadget,
+    crh::bowe_hopwood::constraints::{BoweHopwoodPedersenCRHGadget},
+    prf::blake2s::constraints::blake2s_gadget,
 };
 
 use bls_zexe::{
     curve::hash::try_and_increment::get_point_from_x,
     hash::composite::{CompositeHasher, CRH},
 };
-use dpc::gadgets::FixedLengthCRHGadget;
 use r1cs_std::bits::uint8::UInt8;
 use crate::gadgets::y_to_bit::YToBitGadget;
 use algebra::curves::bls12_377::{

@@ -6,11 +6,11 @@ edition = "2018"
 
 [dependencies]
 r1cs-std = { path = "../../zexe/r1cs-std" }
-dpc = { path = "../../zexe/dpc" }
+crypto-primitives = { path = "../../zexe/crypto-primitives", features = [ "r1cs" ] }
 r1cs-core = { path = "../../zexe/r1cs-core" }
 algebra = { path = "../../zexe/algebra" }
 gm17 = { path = "../../zexe/gm17" }
-bls-zexe = {path = "../algebra"}
+bls-zexe = { path = "../algebra" }
 rand = { version = "0.7" }
 byteorder = "1.3.2"
 

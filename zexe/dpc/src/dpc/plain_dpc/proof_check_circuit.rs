@@ -2,14 +2,13 @@ use algebra::{bytes::ToBytes, to_bytes, ToConstraintField};
 use crate::Error;
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
-use crate::{
-    crypto_primitives::{CommitmentScheme, FixedLengthCRH},
-    gadgets::Assignment,
-};
+
+use crypto_primitives::{CommitmentScheme, FixedLengthCRH};
 
 use crate::{
+    constraints::Assignment,
     dpc::plain_dpc::{CommAndCRHPublicParameters, PlainDPCComponents, PrivatePredInput},
-    gadgets::dpc::plain_dpc::execute_proof_check_gadget,
+    constraints::plain_dpc::execute_proof_check_gadget,
 };
 
 

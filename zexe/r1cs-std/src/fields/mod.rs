@@ -27,7 +27,7 @@ pub trait FieldGadget<F: Field, ConstraintF: Field>:
     + CondSelectGadget<ConstraintF>
     + TwoBitLookupGadget<ConstraintF, TableConstant = F>
     + ThreeBitCondNegLookupGadget<ConstraintF, TableConstant = F>
-+ Debug
+    + Debug
 {
     type Variable: Clone + Debug;
 
@@ -38,6 +38,8 @@ pub trait FieldGadget<F: Field, ConstraintF: Field>:
     fn zero<CS: ConstraintSystem<ConstraintF>>(_: CS) -> Result<Self, SynthesisError>;
 
     fn one<CS: ConstraintSystem<ConstraintF>>(_: CS) -> Result<Self, SynthesisError>;
+
+    fn add_bool_with_coeff<CS: ConstraintSystem<ConstraintF>>(&self, _: CS, _: &Boolean, _: F) -> Result<Self, SynthesisError>;
 
     fn add<CS: ConstraintSystem<ConstraintF>>(&self, _: CS, _: &Self) -> Result<Self, SynthesisError>;
 
@@ -403,6 +405,11 @@ mod test {
         let n = F::alloc(&mut cs.ns(|| "alloc new var"), || Ok(negone)).unwrap();
         let _ = n.to_bytes(&mut cs.ns(|| "ToBytes")).unwrap();
         let _ = n.to_bytes_strict(&mut cs.ns(|| "ToBytes Strict")).unwrap();
+
+        let ab_false = a.add_bool_with_coeff(cs.ns(|| "Add bool with coeff false"), &Boolean::constant(false), b_native).unwrap();
+        assert_eq!(ab_false.get_value().unwrap(), a_native);
+        let ab_true = a.add_bool_with_coeff(cs.ns(|| "Add bool with coeff true"), &Boolean::constant(true), b_native).unwrap();
+        assert_eq!(ab_true.get_value().unwrap(), a_native + &b_native);
     }
 
     fn random_frobenius_tests<

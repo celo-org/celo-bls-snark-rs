@@ -5,7 +5,7 @@ use super::direct::DirectHasher;
 
 use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards};
 use blake2s_simd::Params;
-use dpc::crypto_primitives::crh::{
+use crypto_primitives::crh::{
     pedersen::PedersenWindow,
     bowe_hopwood::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenParameters},
     FixedLengthCRH,
