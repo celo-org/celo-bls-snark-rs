@@ -27,7 +27,7 @@ pub trait FieldGadget<F: Field, ConstraintF: Field>:
     + CondSelectGadget<ConstraintF>
     + TwoBitLookupGadget<ConstraintF, TableConstant = F>
     + ThreeBitCondNegLookupGadget<ConstraintF, TableConstant = F>
-+ Debug
+    + Debug
 {
     type Variable: Clone + Debug;
 

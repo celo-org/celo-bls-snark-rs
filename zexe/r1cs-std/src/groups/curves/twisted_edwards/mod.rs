@@ -17,11 +17,14 @@ mod test;
 
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
+#[derivative(Debug(bound = "P: TEModelParameters, ConstraintF: Field"))]
 #[must_use]
 pub struct MontgomeryAffineGadget<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>> {
     pub x:   F,
     pub y:   F,
+    #[derivative(Debug = "ignore")]
     _params: PhantomData<P>,
+    #[derivative(Debug = "ignore")]
     _engine: PhantomData<ConstraintF>,
 }
 

@@ -1,8 +1,8 @@
+use crypto_primitives::CommitmentScheme;
 use crate::{
-    crypto_primitives::CommitmentScheme,
     delegable_dpc::*,
     dpc::{delegable_dpc::DPCRecord, Record},
-    gadgets::Assignment,
+    constraints::Assignment,
 };
 use r1cs_std::prelude::*;
 use std::io::{Result as IoResult, Write};
