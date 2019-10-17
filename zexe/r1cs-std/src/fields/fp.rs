@@ -53,6 +53,18 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
     }
 
     #[inline]
+    fn add_bool_with_coeff<CS: ConstraintSystem<F>>(&self, mut _cs: CS, bit: &Boolean, coeff: F) -> Result<Self, SynthesisError> {
+        let value = match (self.value, bit.get_value()) {
+            (Some(v), Some(b)) => Some(if b { v + &coeff } else { v }),
+            (..) => None,
+        };
+        Ok(FpGadget {
+            value,
+            variable: LC(bit.lc(CS::one(), coeff)) + &self.variable,
+        })
+    }
+
+    #[inline]
     fn add<CS: ConstraintSystem<F>>(
         &self,
         mut _cs: CS,
@@ -509,6 +521,7 @@ impl<F: PrimeField> ThreeBitCondNegLookupGadget<F> for FpGadget<F> {
     fn three_bit_cond_neg_lookup<CS: ConstraintSystem<F>>(
         mut cs: CS,
         b: &[Boolean],
+        b0b1: &Boolean,
         c: &[Self::TableConstant],
     ) -> Result<Self, SynthesisError> {
         debug_assert!(b.len() == 3);
@@ -527,13 +540,9 @@ impl<F: PrimeField> ThreeBitCondNegLookupGadget<F> for FpGadget<F> {
                 Ok(y)
             }
         })?;
-        let precomp = Boolean::and(
-            cs.ns(|| "precomp"),
-            &b[0],
-            &b[1],
-        )?;
+
         let one = CS::one();
-        let y_lc = precomp.lc(one, c[3] - &c[2] - &c[1] + &c[0]) + b[0].lc(one, c[1] - &c[0]) - b[1].lc(one, c[0] - &c[2]) + (c[0], one);
+        let y_lc = b0b1.lc(one, c[3] - &c[2] - &c[1] + &c[0]) + b[0].lc(one, c[1] - &c[0]) + b[1].lc(one, c[2] - &c[0]) + (c[0], one);
         cs.enforce(
             || "Enforce lookup",
             |_| y_lc.clone() + y_lc.clone(),

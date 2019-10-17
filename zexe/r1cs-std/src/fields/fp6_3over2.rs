@@ -184,6 +184,14 @@ where
     }
 
     #[inline]
+    fn add_bool_with_coeff<CS: ConstraintSystem<ConstraintF>>(&self, mut cs: CS, bit: &Boolean, coeff: Fp6<P>) -> Result<Self, SynthesisError> {
+        let c0 = self.c0.add_bool_with_coeff(cs.ns(|| "c0"), bit, coeff.c0) ?;
+        let c1 = self.c1.add_bool_with_coeff(cs.ns(|| "c1"), bit, coeff.c1) ?;
+        let c2 = self.c2.add_bool_with_coeff(cs.ns(|| "c2"), bit, coeff.c2) ?;
+        Ok(Self::new(c0, c1, c2))
+    }
+
+    #[inline]
     fn add<CS: ConstraintSystem<ConstraintF>>(
         &self,
         mut cs: CS,
@@ -888,14 +896,15 @@ impl<P, ConstraintF: PrimeField> ThreeBitCondNegLookupGadget<ConstraintF> for Fp
     fn three_bit_cond_neg_lookup<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
         b: &[Boolean],
+        b0b1: &Boolean,
         c: &[Self::TableConstant],
     ) -> Result<Self, SynthesisError> {
         let c0s = c.iter().map(|f| f.c0).collect::<Vec<_>>();
         let c1s = c.iter().map(|f| f.c1).collect::<Vec<_>>();
         let c2s = c.iter().map(|f| f.c2).collect::<Vec<_>>();
-        let c0 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c0"), b, &c0s)?;
-        let c1 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c1"), b, &c1s)?;
-        let c2 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c2"), b, &c2s)?;
+        let c0 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c0"), b, b0b1, &c0s)?;
+        let c1 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c1"), b, b0b1, &c1s)?;
+        let c2 = Fp2Gadget::<P, ConstraintF>::three_bit_cond_neg_lookup(cs.ns(|| "Lookup c2"), b, b0b1, &c2s)?;
         Ok(Self::new(c0, c1, c2))
     }
 
