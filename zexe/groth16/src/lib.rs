@@ -84,22 +84,20 @@ impl<E: PairingEngine> Proof<E> {
 /// A verification key in the Groth16 SNARK.
 #[derive(Clone)]
 pub struct VerifyingKey<E: PairingEngine> {
-    pub h_g2:       E::G2Affine,
-    pub g_alpha_g1: E::G1Affine,
-    pub h_beta_g2:  E::G2Affine,
-    pub g_gamma_g1: E::G1Affine,
-    pub h_gamma_g2: E::G2Affine,
-    pub query:      Vec<E::G1Affine>,
+    pub alpha_g1:       E::G1Affine,
+    pub beta_g2:       E::G2Affine,
+    pub gamma_g2: E::G2Affine,
+    pub delta_g2:  E::G2Affine,
+    pub gamma_abc_g1:  Vec<E::G1Affine>,
 }
 
 impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.h_g2.write(&mut writer)?;
-        self.g_alpha_g1.write(&mut writer)?;
-        self.h_beta_g2.write(&mut writer)?;
-        self.g_gamma_g1.write(&mut writer)?;
-        self.h_gamma_g2.write(&mut writer)?;
-        for q in &self.query {
+        self.alpha_g1.write(&mut writer)?;
+        self.beta_g2.write(&mut writer)?;
+        self.gamma_g2.write(&mut writer)?;
+        self.delta_g2.write(&mut writer)?;
+        for q in &self.gamma_abc_g1 {
             q.write(&mut writer)?;
         }
         Ok(())
@@ -109,24 +107,22 @@ impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
 impl<E: PairingEngine> Default for VerifyingKey<E> {
     fn default() -> Self {
         Self {
-            h_g2:       E::G2Affine::default(),
-            g_alpha_g1: E::G1Affine::default(),
-            h_beta_g2:  E::G2Affine::default(),
-            g_gamma_g1: E::G1Affine::default(),
-            h_gamma_g2: E::G2Affine::default(),
-            query:      Vec::new(),
+            alpha_g1:       E::G1Affine::default(),
+            beta_g2:       E::G2Affine::default(),
+            gamma_g2: E::G2Affine::default(),
+            delta_g2:  E::G2Affine::default(),
+            gamma_abc_g1:      Vec::new(),
         }
     }
 }
 
 impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
     fn eq(&self, other: &Self) -> bool {
-        self.h_g2 == other.h_g2
-            && self.g_alpha_g1 == other.g_alpha_g1
-            && self.h_beta_g2 == other.h_beta_g2
-            && self.g_gamma_g1 == other.g_gamma_g1
-            && self.h_gamma_g2 == other.h_gamma_g2
-            && self.query == other.query
+        self.alpha_g1 == other.alpha_g1
+            && self.beta_g2 == other.beta_g2
+            && self.gamma_g2 == other.gamma_g2
+            && self.delta_g2 == other.delta_g2
+            && self.gamma_abc_g1 == other.gamma_abc_g1
     }
 }
 
@@ -149,29 +145,31 @@ impl<E: PairingEngine> VerifyingKey<E> {
 #[derive(Clone)]
 pub struct Parameters<E: PairingEngine> {
     pub vk:           VerifyingKey<E>,
+    pub alpha_g1:       E::G1Affine,
+    pub beta_g1:       E::G1Affine,
+    pub beta_g2:       E::G2Affine,
+    pub delta_g1: E::G1Affine,
+    pub delta_g2:  E::G2Affine,
     pub a_query:      Vec<E::G1Affine>,
-    pub b_query:      Vec<E::G2Affine>,
-    pub c_query_1:    Vec<E::G1Affine>,
-    pub c_query_2:    Vec<E::G1Affine>,
-    pub g_gamma_z:    E::G1Affine,
-    pub h_gamma_z:    E::G2Affine,
-    pub g_ab_gamma_z: E::G1Affine,
-    pub g_gamma2_z2:  E::G1Affine,
-    pub g_gamma2_z_t: Vec<E::G1Affine>,
+    pub b_g1_query:      Vec<E::G1Affine>,
+    pub b_g2_query:      Vec<E::G2Affine>,
+    pub h_query:    Vec<E::G1Affine>,
+    pub l_query:    Vec<E::G1Affine>,
 }
 
 impl<E: PairingEngine> PartialEq for Parameters<E> {
     fn eq(&self, other: &Self) -> bool {
         self.vk == other.vk
+            && self.alpha_g1 == other.alpha_g1
+            && self.beta_g1 == other.beta_g1
+            && self.beta_g2 == other.beta_g2
+            && self.delta_g1 == other.delta_g1
+            && self.delta_g2 == other.delta_g2
             && self.a_query == other.a_query
-            && self.b_query == other.b_query
-            && self.c_query_1 == other.c_query_1
-            && self.c_query_2 == other.c_query_2
-            && self.g_gamma_z == other.g_gamma_z
-            && self.h_gamma_z == other.h_gamma_z
-            && self.g_ab_gamma_z == other.g_ab_gamma_z
-            && self.g_gamma2_z2 == other.g_gamma2_z2
-            && self.g_gamma2_z_t == other.g_gamma2_z_t
+            && self.b_g1_query == other.b_g1_query
+            && self.b_g2_query == other.b_g2_query
+            && self.h_query == other.h_query
+            && self.l_query == other.l_query
     }
 }
 
@@ -194,13 +192,10 @@ impl<E: PairingEngine> Parameters<E> {
 #[derive(Clone)]
 pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub vk:                VerifyingKey<E>,
-    pub g_alpha:           E::G1Affine,
-    pub h_beta:            E::G2Affine,
-    pub g_alpha_h_beta_ml: E::Fqk,
-    pub g_gamma_pc:        <E::G1Affine as PairingCurve>::Prepared,
-    pub h_gamma_pc:        <E::G2Affine as PairingCurve>::Prepared,
-    pub h_pc:              <E::G2Affine as PairingCurve>::Prepared,
-    pub query:             Vec<E::G1Affine>,
+    pub alpha_g1_beta_g2:  E::Fqk,
+    pub gamma_g2_neg_pc:       <E::G2Affine as PairingCurve>::Prepared,
+    pub delta_g2_neg_pc:       <E::G2Affine as PairingCurve>::Prepared,
+    pub gamma_abc_g1:      Vec<E::G1Affine>,
 }
 
 impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
@@ -219,13 +214,10 @@ impl<E: PairingEngine> Default for PreparedVerifyingKey<E> {
     fn default() -> Self {
         Self {
             vk:                VerifyingKey::default(),
-            g_alpha:           E::G1Affine::default(),
-            h_beta:            E::G2Affine::default(),
-            g_alpha_h_beta_ml: E::Fqk::default(),
-            g_gamma_pc:        <E::G1Affine as PairingCurve>::Prepared::default(),
-            h_gamma_pc:        <E::G2Affine as PairingCurve>::Prepared::default(),
-            h_pc:              <E::G2Affine as PairingCurve>::Prepared::default(),
-            query:             Vec::new(),
+            alpha_g1_beta_g2:           E::Fqk::default(),
+            gamma_g2_neg_pc:        <E::G2Affine as PairingCurve>::Prepared::default(),
+            delta_g2_neg_pc:        <E::G2Affine as PairingCurve>::Prepared::default(),
+            gamma_abc_g1:             Vec::new(),
         }
     }
 }
@@ -233,13 +225,10 @@ impl<E: PairingEngine> Default for PreparedVerifyingKey<E> {
 impl<E: PairingEngine> ToBytes for PreparedVerifyingKey<E> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.vk.write(&mut writer)?;
-        self.g_alpha.write(&mut writer)?;
-        self.h_beta.write(&mut writer)?;
-        self.g_alpha_h_beta_ml.write(&mut writer)?;
-        self.g_gamma_pc.write(&mut writer)?;
-        self.h_gamma_pc.write(&mut writer)?;
-        self.h_pc.write(&mut writer)?;
-        for q in &self.query {
+        self.alpha_g1_beta_g2.write(&mut writer)?;
+        self.gamma_g2_neg_pc.write(&mut writer)?;
+        self.delta_g2_neg_pc.write(&mut writer)?;
+        for q in &self.gamma_abc_g1 {
             q.write(&mut writer)?;
         }
         Ok(())
@@ -258,76 +247,54 @@ impl<E: PairingEngine> Parameters<E> {
         Ok((&self.a_query[1..num_inputs], &self.a_query[num_inputs..]))
     }
 
-    pub fn get_b_query(
+    pub fn get_b_g1_query(
+        &self,
+        num_inputs: usize,
+    ) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+        Ok((&self.b_g1_query[1..num_inputs], &self.b_g1_query[num_inputs..]))
+    }
+
+    pub fn get_b_g2_query(
         &self,
         num_inputs: usize,
     ) -> Result<(&[E::G2Affine], &[E::G2Affine]), SynthesisError> {
-        Ok((&self.b_query[1..num_inputs], &self.b_query[num_inputs..]))
+        Ok((&self.b_g2_query[1..num_inputs], &self.b_g2_query[num_inputs..]))
     }
 
-    pub fn get_c_query_1(
+    pub fn get_h_query(
         &self,
         num_inputs: usize,
     ) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
         Ok((
-            &self.c_query_1[0..num_inputs],
-            &self.c_query_1[num_inputs..],
+            &self.h_query[0..num_inputs],
+            &self.h_query[num_inputs..],
         ))
     }
 
-    pub fn get_c_query_2(
+    pub fn get_l_query(
         &self,
         num_inputs: usize,
     ) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
-        Ok((
-            &self.c_query_2[1..num_inputs],
-            &self.c_query_2[num_inputs..],
-        ))
-    }
-
-    pub fn get_g_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
-        Ok(self.g_gamma_z)
-    }
-
-    pub fn get_h_gamma_z(&self) -> Result<E::G2Affine, SynthesisError> {
-        Ok(self.h_gamma_z)
-    }
-
-    pub fn get_g_ab_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
-        Ok(self.g_ab_gamma_z)
-    }
-
-    pub fn get_g_gamma2_z2(&self) -> Result<E::G1Affine, SynthesisError> {
-        Ok(self.g_gamma2_z2)
-    }
-
-    pub fn get_g_gamma2_z_t(
-        &self,
-        num_inputs: usize,
-    ) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
-        Ok((
-            &self.g_gamma2_z_t[0..num_inputs],
-            &self.g_gamma2_z_t[num_inputs..],
-        ))
+        Ok((&self.l_query[1..num_inputs], &self.l_query[num_inputs..]))
     }
 
     pub fn get_a_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
         Ok(&self.a_query)
     }
 
-    pub fn get_b_query_full(&self) -> Result<&[E::G2Affine], SynthesisError> {
-        Ok(&self.b_query)
+    pub fn get_b_g1_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+        Ok(&self.b_g1_query)
     }
 
-    pub fn get_c_query_1_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
-        Ok(&self.c_query_1)
+    pub fn get_b_g2_query_full(&self) -> Result<&[E::G2Affine], SynthesisError> {
+        Ok(&self.b_g2_query)
     }
 
-    pub fn get_c_query_2_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
-        Ok(&self.c_query_2)
+    pub fn get_h_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+        Ok(&self.h_query)
     }
 
-    pub fn get_g_gamma2_z_t_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
-        Ok(&self.g_gamma2_z_t)
+    pub fn get_l_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+        Ok(&self.l_query)
     }
 }
