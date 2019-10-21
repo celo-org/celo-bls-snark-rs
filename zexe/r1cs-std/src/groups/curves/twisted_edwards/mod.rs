@@ -947,8 +947,29 @@ mod projective_impl {
                 B: Borrow<TEProjective<P>>,
         {
             const CHUNK_SIZE: usize = 3;
-            let mut edwards_result = None;
-            let mut result = None;
+            let mut edwards_result: Option<AffineGadget<P, ConstraintF, F>> = None;
+            let mut result: Option<MontgomeryAffineGadget<P, ConstraintF, F>> = None;
+
+            let mut process_segment_result = |mut cs: r1cs_core::Namespace<_, _>, result: &MontgomeryAffineGadget<P, ConstraintF, F>| -> Result<(), SynthesisError> {
+                let segment_result = result.into_edwards(
+                    cs.ns(|| "segment result"),
+                )?;
+                match edwards_result {
+                    None => {
+                        edwards_result = Some(segment_result);
+                    }
+                    Some(ref mut edwards_result) => {
+                        *edwards_result = GroupGadget::<TEAffine<P>, ConstraintF>::add(
+                            &segment_result,
+                            cs.ns(|| "edwards addition"),
+                            edwards_result,
+                        )?;
+                    }
+                }
+
+                Ok(())
+            };
+
             // Compute ∏(h_i^{m_i}) for all i.
             for (i, (bits, base_power)) in scalars.zip(bases).enumerate() {
                 let base_power = base_power.borrow();
@@ -1009,42 +1030,12 @@ mod projective_impl {
                 }
 
                 if i > 0 && (i + 1) % segment_size == 0 {
-                    let segment_result = result.unwrap();
-                    let segment_result = segment_result.into_edwards(
-                        cs.ns(|| format!("segment result in window {}", i)),
-                    )?;
-                    match edwards_result {
-                        None => {
-                            edwards_result = Some(segment_result);
-                        }
-                        Some(ref mut edwards_result) => {
-                            *edwards_result = GroupGadget::<TEAffine<P>, ConstraintF>::add(
-                                &segment_result,
-                                cs.ns(|| format!("edwards addition of window {}", i)),
-                                edwards_result,
-                            )?;
-                        }
-                    }
+                    process_segment_result(cs.ns(|| format!("window {}", i)), &result.unwrap())?;
                     result = None;
                 }
             }
             if result.is_some() {
-                let segment_result = result.unwrap();
-                let segment_result = segment_result.into_edwards(
-                    cs.ns(|| "segment result in leftover"),
-                )?;
-                match edwards_result {
-                    None => {
-                        edwards_result = Some(segment_result);
-                    }
-                    Some(ref mut edwards_result) => {
-                        *edwards_result = GroupGadget::<TEAffine<P>, ConstraintF>::add(
-                            &segment_result,
-                            cs.ns(|| "edwards addition of leftover"),
-                            edwards_result,
-                        )?;
-                    }
-                }
+                process_segment_result(cs.ns(|| "leftover"), &result.unwrap())?;
             }
             Ok(edwards_result.unwrap())
         }
