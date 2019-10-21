@@ -110,3 +110,9 @@ pub trait TEModelParameters: ModelParameters {
         ret
     }
 }
+
+pub trait MontgomeryModelParameters: ModelParameters {
+    const COEFF_A: Self::BaseField;
+    const COEFF_B: Self::BaseField;
+}
+

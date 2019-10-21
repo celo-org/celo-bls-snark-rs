@@ -2,7 +2,7 @@ use crate::field_new;
 use crate::{
     biginteger::BigInteger384 as BigInteger,
     curves::{
-        models::{ModelParameters, TEModelParameters},
+        models::{ModelParameters, TEModelParameters, MontgomeryModelParameters},
         twisted_edwards_extended::{GroupAffine, GroupProjective},
     },
     fields::edwards_sw6::{fq::Fq, fr::Fr},
@@ -67,6 +67,27 @@ impl TEModelParameters for EdwardsParameters {
     fn mul_by_a(elem: &Self::BaseField) -> Self::BaseField {
         -*elem
     }
+}
+
+impl MontgomeryModelParameters for EdwardsParameters {
+    /// COEFF_A = -1
+    const COEFF_A: Fq = field_new!(Fq, BigInteger([
+        7594254284108454966u64,
+        14287343397973578077u64,
+        6490358977072726023u64,
+        8023375322051995268u64,
+        8242802613686040715u64,
+        100541941146122331u64,
+    ]));
+    /// COEFF_B = -1
+    const COEFF_B: Fq = field_new!(Fq, BigInteger([
+        11173793475516310780u64,
+        14217481814129454913u64,
+        11878518835804377107u64,
+        14866315431314324110u64,
+        9234787938768687129u64,
+        62053599622152261u64,
+    ]));
 }
 
 impl FromStr for EdwardsAffine {

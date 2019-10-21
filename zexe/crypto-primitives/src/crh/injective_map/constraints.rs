@@ -9,14 +9,10 @@ use crate::crh::{
     }
 };
 
-use algebra::{
-    curves::{
-        models::{ModelParameters, TEModelParameters},
-        twisted_edwards_extended::{GroupAffine as TEAffine, GroupProjective as TEProjective},
-    },
-    fields::{Field, PrimeField, SquareRootField},
-    groups::Group,
-};
+use algebra::{curves::{
+    models::{ModelParameters, TEModelParameters},
+    twisted_edwards_extended::{GroupAffine as TEAffine, GroupProjective as TEProjective},
+}, fields::{Field, PrimeField, SquareRootField}, groups::Group, MontgomeryModelParameters};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     fields::fp::FpGadget,
@@ -45,7 +41,7 @@ impl<ConstraintF, P> InjectiveMapGadget<TEAffine<P>, TECompressor, ConstraintF, 
     for TECompressorGadget
 where
     ConstraintF: PrimeField + SquareRootField,
-    P: TEModelParameters + ModelParameters<BaseField = ConstraintF>,
+    P: TEModelParameters + MontgomeryModelParameters + ModelParameters<BaseField = ConstraintF>,
 {
     type OutputGadget = FpGadget<ConstraintF>;
 
@@ -62,7 +58,7 @@ impl<ConstraintF, P>
     for TECompressorGadget
 where
     ConstraintF: PrimeField + SquareRootField,
-    P: TEModelParameters + ModelParameters<BaseField = ConstraintF>,
+    P: TEModelParameters + MontgomeryModelParameters + ModelParameters<BaseField = ConstraintF>,
 {
     type OutputGadget = FpGadget<ConstraintF>;
 

@@ -1,7 +1,4 @@
-use algebra::{
-    curves::{twisted_edwards_extended::GroupAffine as TEAffine, TEModelParameters},
-    BitIterator, Field
-};
+use algebra::{curves::{twisted_edwards_extended::GroupAffine as TEAffine, TEModelParameters, MontgomeryModelParameters}, BitIterator, Field};
 
 use r1cs_core::{ConstraintSystem, SynthesisError};
 
@@ -17,9 +14,9 @@ mod test;
 
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-#[derivative(Debug(bound = "P: TEModelParameters, ConstraintF: Field"))]
+#[derivative(Debug(bound = "P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field"))]
 #[must_use]
-pub struct MontgomeryAffineGadget<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>> {
+pub struct MontgomeryAffineGadget<P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>> {
     pub x:   F,
     pub y:   F,
     #[derivative(Debug = "ignore")]
@@ -28,22 +25,13 @@ pub struct MontgomeryAffineGadget<P: TEModelParameters, ConstraintF: Field, F: F
     _engine: PhantomData<ConstraintF>,
 }
 
-pub struct MontgomeryParams<P: TEModelParameters> {
-    a: P::BaseField,
-    b: P::BaseField,
-}
-
 mod montgomery_affine_impl {
     use super::*;
     use crate::Assignment;
-    use algebra::{
-        Field,
-        AffineCurve,
-        twisted_edwards_extended::GroupAffine,
-    };
+    use algebra::{Field, AffineCurve, twisted_edwards_extended::GroupAffine};
     use std::ops::{MulAssign, SubAssign, AddAssign};
 
-    impl<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>>
+    impl<P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>>
     MontgomeryAffineGadget<P, ConstraintF, F> {
         pub fn new(x: F, y: F) -> Self {
             Self {
@@ -51,17 +39,6 @@ mod montgomery_affine_impl {
                 y,
                 _params: PhantomData,
                 _engine: PhantomData,
-            }
-        }
-
-        pub fn params() -> MontgomeryParams<P> {
-            // A = 2 * (a + d) / (a - d)
-            let a = P::BaseField::one().double()*&(P::COEFF_A + &P::COEFF_D)*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap();
-            // B = 4 / (a - d)
-            let b = P::BaseField::one().double().double()*&(P::COEFF_A - &P::COEFF_D).inverse().unwrap();
-            MontgomeryParams {
-                a: a,
-                b: b,
             }
         }
 
@@ -173,10 +150,9 @@ mod montgomery_affine_impl {
                 &lambda_n
             )?;
 
-            let montgomery_params = Self::params();
             // Compute x'' = B*lambda^2 - A - x - x'
             let xprime = F::alloc(cs.ns(|| "xprime"), || {
-                Ok(lambda.get_value().get()?.square()*&montgomery_params.b- &montgomery_params.a - &self.x.get_value().get()? - &other.x.get_value().get()?)
+                Ok(lambda.get_value().get()?.square()*&<P as MontgomeryModelParameters>::COEFF_B- &<P as MontgomeryModelParameters>::COEFF_A - &self.x.get_value().get()? - &other.x.get_value().get()?)
             })?;
 
             let xprime_lc = self.x.add(
@@ -187,10 +163,10 @@ mod montgomery_affine_impl {
                 &xprime,
             )?.add_constant(
                 cs.ns(|| "+ A"),
-                &montgomery_params.a,
+                &<P as MontgomeryModelParameters>::COEFF_A,
             )?;
             // (lambda) * (lambda) = (A + x + x' + x'')
-            let lambda_b = lambda.mul_by_constant(cs.ns(|| "lambda * b"), &montgomery_params.b)?;
+            let lambda_b = lambda.mul_by_constant(cs.ns(|| "lambda * b"), &P::COEFF_B)?;
             lambda_b.mul_equals(
                 cs.ns(|| "xprime equals"),
                 &lambda,
@@ -217,9 +193,9 @@ mod montgomery_affine_impl {
 
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-#[derivative(Debug(bound = "P: TEModelParameters, ConstraintF: Field"))]
+#[derivative(Debug(bound = "P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field"))]
 #[must_use]
-pub struct AffineGadget<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>> {
+pub struct AffineGadget<P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>> {
     pub x:   F,
     pub y:   F,
     #[derivative(Debug = "ignore")]
@@ -228,7 +204,7 @@ pub struct AffineGadget<P: TEModelParameters, ConstraintF: Field, F: FieldGadget
     _engine: PhantomData<ConstraintF>,
 }
 
-impl<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>>
+impl<P: TEModelParameters + MontgomeryModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, ConstraintF>>
     AffineGadget<P, ConstraintF, F>
 {
     pub fn new(x: F, y: F) -> Self {
@@ -264,7 +240,7 @@ impl<P: TEModelParameters, ConstraintF: Field, F: FieldGadget<P::BaseField, Cons
 
 impl<P, ConstraintF, F> PartialEq for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -275,7 +251,7 @@ where
 
 impl<P, ConstraintF, F> Eq for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -289,7 +265,7 @@ mod affine_impl {
 
     impl<P, ConstraintF, F> GroupGadget<TEAffine<P>, ConstraintF> for AffineGadget<P, ConstraintF, F>
     where
-        P: TEModelParameters,
+        P: TEModelParameters + MontgomeryModelParameters,
         ConstraintF: Field,
         F: FieldGadget<P::BaseField, ConstraintF>,
     {
@@ -325,8 +301,8 @@ mod affine_impl {
             mut cs: CS,
             other: &Self,
         ) -> Result<Self, SynthesisError> {
-            let a = P::COEFF_A;
-            let d = P::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
 
             // Compute U = (x1 + y1) * (x2 + y2)
             let u1 = self
@@ -386,8 +362,8 @@ mod affine_impl {
             mut cs: CS,
             other: &TEAffine<P>,
         ) -> Result<Self, SynthesisError> {
-            let a = P::COEFF_A;
-            let d = P::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
             let other_x = other.x;
             let other_y = other.y;
 
@@ -448,7 +424,7 @@ mod affine_impl {
             &mut self,
             mut cs: CS,
         ) -> Result<(), SynthesisError> {
-            let a = P::COEFF_A;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             // xy
             let xy = self.x.mul(cs.ns(|| "x * y"), &self.y)?;
@@ -511,7 +487,7 @@ mod affine_impl {
 
     impl<P, ConstraintF, F> AllocGadget<TEAffine<P>, ConstraintF> for AffineGadget<P, ConstraintF, F>
     where
-        P: TEModelParameters,
+        P: TEModelParameters + MontgomeryModelParameters,
         ConstraintF: Field,
         F: FieldGadget<P::BaseField, ConstraintF>,
         Self: GroupGadget<TEAffine<P>, ConstraintF>,
@@ -535,8 +511,8 @@ mod affine_impl {
                 ),
             };
 
-            let d = P::COEFF_D;
-            let a = P::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             let x = F::alloc(&mut cs.ns(|| "x"), || x)?;
             let y = F::alloc(&mut cs.ns(|| "y"), || y)?;
@@ -652,8 +628,8 @@ mod affine_impl {
                 ),
             };
 
-            let d = P::COEFF_D;
-            let a = P::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             let x = F::alloc_input(&mut cs.ns(|| "x"), || x)?;
             let y = F::alloc_input(&mut cs.ns(|| "y"), || y)?;
@@ -689,7 +665,7 @@ mod projective_impl {
 
     impl<P, ConstraintF, F> GroupGadget<TEProjective<P>, ConstraintF> for AffineGadget<P, ConstraintF, F>
     where
-        P: TEModelParameters,
+        P: TEModelParameters + MontgomeryModelParameters,
         ConstraintF: Field,
         F: FieldGadget<P::BaseField, ConstraintF>,
     {
@@ -725,8 +701,8 @@ mod projective_impl {
             mut cs: CS,
             other: &Self,
         ) -> Result<Self, SynthesisError> {
-            let a = P::COEFF_A;
-            let d = P::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
 
             // Compute U = (x1 + y1) * (x2 + y2)
             let u1 = self
@@ -786,8 +762,8 @@ mod projective_impl {
             mut cs: CS,
             other: &TEProjective<P>,
         ) -> Result<Self, SynthesisError> {
-            let a = P::COEFF_A;
-            let d = P::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
             let other = other.into_affine();
             let other_x = other.x;
             let other_y = other.y;
@@ -849,7 +825,7 @@ mod projective_impl {
             &mut self,
             mut cs: CS,
         ) -> Result<(), SynthesisError> {
-            let a = P::COEFF_A;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             // xy
             let xy = self.x.mul(cs.ns(|| "x * y"), &self.y)?;
@@ -1084,7 +1060,7 @@ mod projective_impl {
 
     impl<P, ConstraintF, F> AllocGadget<TEProjective<P>, ConstraintF> for AffineGadget<P, ConstraintF, F>
     where
-        P: TEModelParameters,
+        P: TEModelParameters + MontgomeryModelParameters,
         ConstraintF: Field,
         F: FieldGadget<P::BaseField, ConstraintF>,
         Self: GroupGadget<TEProjective<P>, ConstraintF>,
@@ -1108,8 +1084,8 @@ mod projective_impl {
                 ),
             };
 
-            let d = P::COEFF_D;
-            let a = P::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             let x = F::alloc(&mut cs.ns(|| "x"), || x)?;
             let y = F::alloc(&mut cs.ns(|| "y"), || y)?;
@@ -1230,8 +1206,8 @@ mod projective_impl {
                 ),
             };
 
-            let d = P::COEFF_D;
-            let a = P::COEFF_A;
+            let d = <P as TEModelParameters>::COEFF_D;
+            let a = <P as TEModelParameters>::COEFF_A;
 
             let x = F::alloc_input(&mut cs.ns(|| "x"), || x)?;
             let y = F::alloc_input(&mut cs.ns(|| "y"), || y)?;
@@ -1258,7 +1234,7 @@ mod projective_impl {
 
 impl<P, ConstraintF, F> CondSelectGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -1282,7 +1258,7 @@ where
 
 impl<P, ConstraintF, F> EqGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -1290,7 +1266,7 @@ where
 
 impl<P, ConstraintF, F> ConditionalEqGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -1321,7 +1297,7 @@ where
 
 impl<P, ConstraintF, F> NEqGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -1345,7 +1321,7 @@ where
 
 impl<P, ConstraintF, F> ToBitsGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
@@ -1370,7 +1346,7 @@ where
 
 impl<P, ConstraintF, F> ToBytesGadget<ConstraintF> for AffineGadget<P, ConstraintF, F>
 where
-    P: TEModelParameters,
+    P: TEModelParameters + MontgomeryModelParameters,
     ConstraintF: Field,
     F: FieldGadget<P::BaseField, ConstraintF>,
 {
