@@ -7,15 +7,18 @@ use algebra::{BigInteger, Field, curves::{
         SWModelParameters,
     }
 }, fields::{
+    FpParameters,
     sw6::Fr as SW6Fr,
+    sw6::FrParameters as SW6FrParameters,
     bls12_377::Fr as Bls12_377Fr,
+    bls12_377::FrParameters as Bls12_377FrParameters,
     bls12_377::Fq as Bls12_377Fp,
     bls12_377::Fq2 as Bls12_377Fp2,
     bls12_377::Fq6 as Bls12_377Fp6,
     bls12_377::Fq12 as Bls12_377Fp12,
 }, BitIterator, PrimeField, AffineCurve, Group, Fp2Parameters};
 use r1cs_core::{SynthesisError, ConstraintSystem};
-use r1cs_std::{Assignment, groups::{
+use r1cs_std::{Assignment, eq::EqGadget, groups::{
     GroupGadget,
     curves::{
         short_weierstrass::bls12::{
@@ -27,6 +30,7 @@ use r1cs_std::{Assignment, groups::{
     },
 }, fields::{
     FieldGadget,
+    edwards_sw6::FqGadget as EdwardsFqGadget,
     bls12_377::{
         Fq2Gadget as Fp2Gadget,
         Fq6Gadget as Fp6Gadget,
@@ -57,6 +61,8 @@ use algebra::fields::models::fp12_2over3over2::Fp12Parameters;
 use algebra::curves::models::bls12::Bls12Parameters;
 use crypto_primitives::prf::blake2s::constraints::blake2s_gadget_with_parameters;
 use crypto_primitives::prf::Blake2sWithParameterBlock;
+use algebra::curves::sw6::SW6;
+use r1cs_std::fields::fp::FpGadget;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
@@ -67,7 +73,7 @@ impl HashToBitsGadget {
     pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
         message: &[Boolean],
-    ) -> Result<Vec<Boolean>, SynthesisError> {
+    ) -> Result<Vec<FpGadget<SW6Fr>>, SynthesisError> {
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "pedersen parameters"),
@@ -130,7 +136,33 @@ impl HashToBitsGadget {
             xof_bits.extend_from_slice(&xof_bits_i);
         }
 
-        Ok(xof_bits)
+        let mut packed = vec![];
+        let fp_chunks = xof_bits.chunks(SW6FrParameters::CAPACITY as usize);
+        for (i, chunk) in fp_chunks.enumerate() {
+            let fp = FpGadget::<SW6Fr>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
+                let fp_val = <SW6Fr as PrimeField>::BigInt::from_bits(
+                    &chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>()
+                );
+                Ok(SW6Fr::from_repr(fp_val))
+            })?;
+            let fp_bits = fp.to_bits(
+                cs.ns(|| format!("chunk bits {}", i)),
+            )?;
+            let chunk_len = chunk.len();
+            /*
+            println!("fp bits: {:#?}\n\n\n", fp_bits.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
+            println!("chunk: {:#?}\n\n\n", chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
+            */
+            for j in 0..chunk_len {
+                fp_bits[SW6FrParameters::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
+                    cs.ns(|| format!("fp bit {} for chunk {}", j, i)),
+                    &chunk[j],
+                )?;
+            }
+
+            packed.push(fp);
+        }
+        Ok(packed)
     }
 }
 
@@ -141,8 +173,23 @@ pub struct HashToGroupGadget {
 impl HashToGroupGadget {
     pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
-        xof_bits: &[Boolean],
+        xof_bits_packed: &[FpGadget<SW6Fr>],
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
+        let xof_bits_vecs = xof_bits_packed
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))).unwrap().to_vec())
+            .collect::<Vec<_>>();
+        let mut xof_bits = vec![];
+        let mut chunk = 0;
+        let mut current_index = 0;
+        let target_bits = 768;
+        while current_index < target_bits {
+            let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
+            xof_bits.extend_from_slice(&xof_bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
+            current_index += diff;
+            chunk += 1;
+        }
 
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
@@ -351,6 +398,7 @@ mod test {
     };
     use bls_zexe::bls::keys::SIG_DOMAIN;
     use crate::gadgets::hash_to_group::HashToBitsGadget;
+    use r1cs_std::fields::fp::FpGadget;
 
 
     #[test]
@@ -380,19 +428,32 @@ mod test {
             Boolean::constant(true),
         ];
 
-        let xof_bits = HashToBitsGadget::hash_to_bits(
+        let xof_bits_packed = HashToBitsGadget::hash_to_bits(
             cs.ns(|| "hash to bits"),
             &message,
         ).unwrap();
+
+        let packed_for_group = xof_bits_packed.iter().enumerate().map(|(i, x)| {
+            let big = x.get_value().unwrap().into_repr();
+
+            FpGadget::<SW6Fr>::alloc(
+                cs.ns(|| format!("alloc fp {}", i)),
+                || Ok(SW6Fr::from_repr(big))
+            ).unwrap()
+        }).collect::<Vec<_>>();
+
         let hash = HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
-            &xof_bits,
+            &xof_bits_packed,
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());
+        if (!cs.is_satisfied()) {
+            println!("{}", cs.which_is_unsatisfied().unwrap());
+        }
         assert!(cs.is_satisfied());
-
         assert_eq!(expected_hash, hash.get_value().unwrap().into_affine());
+
     }
 
     #[test]
