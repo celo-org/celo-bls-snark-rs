@@ -15,42 +15,35 @@ use algebra::{BigInteger, Field, curves::{
     bls12_377::Fq12 as Bls12_377Fp12,
 }, BitIterator, PrimeField, AffineCurve, Group, Fp2Parameters};
 use r1cs_core::{SynthesisError, ConstraintSystem};
-use r1cs_std::{
-    Assignment,
-    groups::{
-        GroupGadget,
-        curves::{
-            short_weierstrass::bls12::{
-                G2Gadget,
-            },
-            twisted_edwards::edwards_sw6::{
-                EdwardsSWGadget,
-            }
+use r1cs_std::{Assignment, groups::{
+    GroupGadget,
+    curves::{
+        short_weierstrass::bls12::{
+            G2Gadget,
         },
-    },
-    fields::{
-        FieldGadget,
-        bls12_377::{
-            Fq2Gadget as Fp2Gadget,
-            Fq6Gadget as Fp6Gadget,
-            Fq12Gadget as Fp12Gadget
+        twisted_edwards::edwards_sw6::{
+            EdwardsSWGadget,
         }
     },
-    alloc::AllocGadget,
-    boolean::Boolean,
-    bits::{
-        ToBitsGadget,
-    },
-};
+}, fields::{
+    FieldGadget,
+    bls12_377::{
+        Fq2Gadget as Fp2Gadget,
+        Fq6Gadget as Fp6Gadget,
+        Fq12Gadget as Fp12Gadget
+    }
+}, alloc::AllocGadget, boolean::Boolean, bits::{
+    ToBitsGadget,
+}, ToBytesGadget};
 use crypto_primitives::{
     FixedLengthCRHGadget,
     crh::bowe_hopwood::constraints::{BoweHopwoodPedersenCRHGadget},
-    prf::blake2s::constraints::blake2s_gadget,
 };
 
 use bls_zexe::{
     curve::hash::try_and_increment::get_point_from_x,
     hash::composite::{CompositeHasher, CRH},
+    bls::keys::SIG_DOMAIN,
 };
 use r1cs_std::bits::uint8::UInt8;
 use crate::gadgets::y_to_bit::YToBitGadget;
@@ -62,6 +55,8 @@ use algebra::curves::bls12_377::{
 use algebra::fields::models::fp6_3over2::Fp6Parameters;
 use algebra::fields::models::fp12_2over3over2::Fp12Parameters;
 use algebra::curves::models::bls12::Bls12Parameters;
+use crypto_primitives::prf::blake2s::constraints::blake2s_gadget_with_parameters;
+use crypto_primitives::prf::Blake2sWithParameterBlock;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
@@ -98,16 +93,46 @@ impl HashToGroupGadget {
             &crh_params,
             &input_bytes,
         )?;
-        let mut crh_bits = crh_result.x.to_bits(
+        let crh_bits = crh_result.x.to_bits(
             cs.ns(|| "crh bits"),
         )?;
-        let padded_len = (crh_bits.len() + 7)/8;
-        crh_bits.resize(padded_len, Boolean::constant(false));
+        let first_bit = crh_bits[0];
+        let mut crh_bits= crh_bits[1..].to_vec();
+        crh_bits.reverse();
+        crh_bits.push(first_bit);
+        for i in 0..7 {
+            crh_bits.push(Boolean::constant(false));
+        }
+
+        /*
+        let mut crh_bits_le = vec![];
+        for chunk in crh_bits.chunks(8).rev() {
+            crh_bits_le.extend_from_slice(chunk);
+        }
+        crh_bits_le.reverse();
+        */
+
         let mut xof_bits = vec![];
+        let mut personalization = [0; 8];
+        personalization.copy_from_slice(SIG_DOMAIN);
         for i in 0..3 {
-            let xof_result = blake2s_gadget(
+            let blake2s_parameters = Blake2sWithParameterBlock {
+                digest_length: 32,
+                key_length: 0,
+                fan_out: 0,
+                depth: 0,
+                leaf_length: 32,
+                node_offset: i,
+                xof_digest_length: 768/8,
+                node_depth: 0,
+                inner_length: 32,
+                salt: [0; 8],
+                personalization: personalization,
+            };
+            let xof_result = blake2s_gadget_with_parameters(
                 cs.ns(|| format!("xof result {}", i)),
                 &crh_bits,
+                &blake2s_parameters.parameters(),
             )?;
             let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
             xof_bits.extend_from_slice(&xof_bits_i);
@@ -116,25 +141,29 @@ impl HashToGroupGadget {
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {
-                let c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                c0_bits.reverse();
                 let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
                 let c0 = Bls12_377Fp::from_repr(c0_big);
-                let c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                let mut c1_bits = xof_bits[384..384+377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                c1_bits.reverse();
                 let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
                 let c1 = Bls12_377Fp::from_repr(c1_big);
                 let x = Bls12_377Fp2::new(c0, c1);
-                let greatest = xof_bits[377*2].get_value().get().unwrap();
+                let greatest = xof_bits[384+377].get_value().get().unwrap();
                 let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
                 Ok(p.into_projective())
             }
         )?;
 
-        let c0_bits: Vec<Boolean> = expected_point_before_cofactor.x.c0.to_bits(
+        let mut c0_bits: Vec<Boolean> = expected_point_before_cofactor.x.c0.to_bits(
             cs.ns(|| "c0 bits")
         )?;
-        let c1_bits: Vec<Boolean> = expected_point_before_cofactor.x.c1.to_bits(
+        c0_bits.reverse();
+        let mut c1_bits: Vec<Boolean> = expected_point_before_cofactor.x.c1.to_bits(
             cs.ns(|| "c1 bits")
         )?;
+        c1_bits.reverse();
         let greatest_bit = YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(
             cs.ns(|| "y to bit"),
             &expected_point_before_cofactor,
@@ -145,7 +174,8 @@ impl HashToGroupGadget {
         serialized_bits.extend_from_slice(&c1_bits);
         serialized_bits.push(greatest_bit);
 
-        serialized_bits.iter().zip(xof_bits[0..(377*2+1)].iter())
+        let calculated_bits = &[&xof_bits[..377], &xof_bits[384..384+377], &[xof_bits[384+377]][..]].concat().to_vec();
+        serialized_bits.iter().zip(calculated_bits.iter())
             .enumerate()
             .for_each(
                 |(i, (a,b))| {
@@ -308,20 +338,50 @@ mod test {
 
     use super::HashToGroupGadget;
     use bls_zexe::curve::cofactor::scale_by_cofactor_fuentes;
+    use bls_zexe::hash::composite::CompositeHasher;
+    use bls_zexe::curve::hash::{
+        HashToG2,
+        try_and_increment::TryAndIncrement
+    };
+    use bls_zexe::bls::keys::SIG_DOMAIN;
+
 
     #[test]
     fn test_hash_to_group() {
+        let composite_hasher = CompositeHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+        let expected_hash = try_and_increment.hash::<Bls12_377Parameters>( SIG_DOMAIN, &[0xFE], &[]).unwrap().into_affine();
+
         let mut cs = TestConstraintSystem::<SW6Fr>::new();
 
-        let message = [Boolean::constant(true)];
+        let message = [
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+        ];
 
-        HashToGroupGadget::hash_to_group(
+        let hash = HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
             &message,
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());
         assert!(cs.is_satisfied());
+
+        assert_eq!(expected_hash, hash.get_value().unwrap().into_affine());
     }
 
     #[test]

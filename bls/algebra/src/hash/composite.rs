@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards};
+use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
     pedersen::PedersenWindow,
@@ -60,7 +60,7 @@ impl CompositeHasher {
 
 impl XOF for CompositeHasher {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let h = CRH::evaluate(&self.parameters, message)?;
+        let h = CRH::evaluate(&self.parameters, message)?.into_affine();
         let mut res = vec![];
         h.x.write(&mut res)?;
 

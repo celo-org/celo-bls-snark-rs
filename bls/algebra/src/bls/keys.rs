@@ -24,8 +24,8 @@ use std::{
     error::Error,
 };
 
-static SIG_DOMAIN: &'static [u8] = b"ULforxof";
-static POP_DOMAIN: &'static [u8] = b"ULforpop";
+pub static SIG_DOMAIN: &'static [u8] = b"ULforxof";
+pub static POP_DOMAIN: &'static [u8] = b"ULforpop";
 
 /// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
 use std::{
@@ -421,5 +421,27 @@ mod test {
             assert_eq!(pk.get_pk().into_affine().x, pk2.get_pk().into_affine().x);
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
         }
+    }
+
+    #[test]
+    fn test_pop_single() {
+        init();
+
+        let direct_hasher = DirectHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&direct_hasher);
+
+        let sk_bytes = Fr::read(hex::decode("e3990a59d80a91429406be0000677a7eea8b96c5b429c70c71dabc3b7cf80d0a").unwrap().as_slice()).unwrap();
+        let sk = PrivateKey::from_sk(&sk_bytes);
+
+        let pk = sk.to_public();
+        let mut pk_bytes = vec![];
+        pk.write(&mut pk_bytes).unwrap();
+        println!("pk: {}", hex::encode(&pk_bytes));
+
+        let sig = sk.sign_pop(&hex::decode("a0Af2E71cECc248f4a7fD606F203467B500Dd53B").unwrap(), &try_and_increment).unwrap();
+        let mut sig_bytes = vec![];
+        sig.write(&mut sig_bytes).unwrap();
+
+        println!("sig: {}", hex::encode(&sig_bytes));
     }
 }

@@ -8,17 +8,13 @@ use crate::{
 use byteorder::WriteBytesExt;
 use hex;
 
-use algebra::{
-    curves::{
-        models::{
-            bls12::{Bls12Parameters, G2Affine, G2Projective},
-            ModelParameters, SWModelParameters,
-        },
-        AffineCurve,
+use algebra::{curves::{
+    models::{
+        bls12::{Bls12Parameters, G2Affine, G2Projective},
+        ModelParameters, SWModelParameters,
     },
-    fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField},
-    bytes::FromBytes,
-};
+    AffineCurve,
+}, fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField}, bytes::FromBytes, ProjectiveCurve};
 use std::error::Error;
 
 #[allow(dead_code)]
