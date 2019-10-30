@@ -60,14 +60,14 @@ use crypto_primitives::prf::Blake2sWithParameterBlock;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
-pub struct HashToGroupGadget {
+pub struct HashToBitsGadget {
 }
 
-impl HashToGroupGadget {
-    pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
+impl HashToBitsGadget {
+    pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
         message: &[Boolean],
-    ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
+    ) -> Result<Vec<Boolean>, SynthesisError> {
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "pedersen parameters"),
@@ -104,14 +104,6 @@ impl HashToGroupGadget {
             crh_bits.push(Boolean::constant(false));
         }
 
-        /*
-        let mut crh_bits_le = vec![];
-        for chunk in crh_bits.chunks(8).rev() {
-            crh_bits_le.extend_from_slice(chunk);
-        }
-        crh_bits_le.reverse();
-        */
-
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
@@ -137,6 +129,20 @@ impl HashToGroupGadget {
             let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
+
+        Ok(xof_bits)
+    }
+}
+
+pub struct HashToGroupGadget {
+
+}
+
+impl HashToGroupGadget {
+    pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
+        mut cs: CS,
+        xof_bits: &[Boolean],
+    ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
 
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
@@ -344,6 +350,7 @@ mod test {
         try_and_increment::TryAndIncrement
     };
     use bls_zexe::bls::keys::SIG_DOMAIN;
+    use crate::gadgets::hash_to_group::HashToBitsGadget;
 
 
     #[test]
@@ -373,9 +380,13 @@ mod test {
             Boolean::constant(true),
         ];
 
+        let xof_bits = HashToBitsGadget::hash_to_bits(
+            cs.ns(|| "hash to bits"),
+            &message,
+        ).unwrap();
         let hash = HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
-            &message,
+            &xof_bits,
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());
