@@ -70,6 +70,63 @@ pub struct MultipackGadget {
 
 }
 
+impl MultipackGadget {
+    pub fn pack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
+        mut cs: CS,
+        bits: &[Boolean],
+    ) ->  Result<Vec<FpGadget<F>>, SynthesisError> {
+        let mut packed = vec![];
+        let fp_chunks = bits.chunks(<F::Params as FpParameters>::CAPACITY as usize);
+        for (i, chunk) in fp_chunks.enumerate() {
+            let fp = FpGadget::<F>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
+                let fp_val = F::BigInt::from_bits(
+                    &chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>()
+                );
+                Ok(F::from_repr(fp_val))
+            })?;
+            let fp_bits = fp.to_bits(
+                cs.ns(|| format!("chunk bits {}", i)),
+            )?;
+            let chunk_len = chunk.len();
+            /*
+            println!("fp bits: {:#?}\n\n\n", fp_bits.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
+            println!("chunk: {:#?}\n\n\n", chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
+            */
+            for j in 0..chunk_len {
+                fp_bits[<F::Params as FpParameters>::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
+                    cs.ns(|| format!("fp bit {} for chunk {}", j, i)),
+                    &chunk[j],
+                )?;
+            }
+
+            packed.push(fp);
+        }
+        Ok(packed)
+    }
+
+    pub fn unpack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
+        mut cs: CS,
+        packed: &[FpGadget<F>],
+        target_bits: usize,
+    ) ->  Result<Vec<Boolean>, SynthesisError> {
+        let bits_vecs = packed
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))).unwrap().to_vec())
+            .collect::<Vec<_>>();
+        let mut bits = vec![];
+        let mut chunk = 0;
+        let mut current_index = 0;
+        while current_index < target_bits {
+            let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
+            bits.extend_from_slice(&bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
+            current_index += diff;
+            chunk += 1;
+        }
+        Ok(bits)
+    }
+}
+
 pub struct HashToBitsGadget {
 }
 
@@ -147,33 +204,10 @@ impl HashToBitsGadget {
             &[xof_bits[modulus_bit_rounded+SW6FrParameters::MODULUS_BITS as usize]][..],
         ].concat();
 
-        let mut packed = vec![];
-        let fp_chunks = xof_bits.chunks(SW6FrParameters::CAPACITY as usize);
-        for (i, chunk) in fp_chunks.enumerate() {
-            let fp = FpGadget::<SW6Fr>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
-                let fp_val = <SW6Fr as PrimeField>::BigInt::from_bits(
-                    &chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>()
-                );
-                Ok(SW6Fr::from_repr(fp_val))
-            })?;
-            let fp_bits = fp.to_bits(
-                cs.ns(|| format!("chunk bits {}", i)),
-            )?;
-            let chunk_len = chunk.len();
-            /*
-            println!("fp bits: {:#?}\n\n\n", fp_bits.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
-            println!("chunk: {:#?}\n\n\n", chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
-            */
-            for j in 0..chunk_len {
-                fp_bits[SW6FrParameters::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
-                    cs.ns(|| format!("fp bit {} for chunk {}", j, i)),
-                    &chunk[j],
-                )?;
-            }
-
-            packed.push(fp);
-        }
-        Ok(packed)
+        MultipackGadget::pack(
+            cs.ns(|| "pack xof bits"),
+            xof_bits,
+        )
     }
 }
 
@@ -186,22 +220,11 @@ impl HashToGroupGadget {
         mut cs: CS,
         xof_bits_packed: &[FpGadget<SW6Fr>],
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
-        let xof_bits_vecs = xof_bits_packed
-            .into_iter()
-            .enumerate()
-            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))).unwrap().to_vec())
-            .collect::<Vec<_>>();
-        let mut xof_bits = vec![];
-        let mut chunk = 0;
-        let mut current_index = 0;
-        let target_bits = 377*2 + 1;
-        while current_index < target_bits {
-            let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
-            xof_bits.extend_from_slice(&xof_bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
-            current_index += diff;
-            chunk += 1;
-        }
-
+        let xof_bits = MultipackGadget::unpack(
+            cs.ns(|| "unpack xof bits"),
+            xof_bits_packed,
+            377*2 + 1,
+        )?;
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {
