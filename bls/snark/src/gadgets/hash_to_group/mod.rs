@@ -66,6 +66,10 @@ use r1cs_std::fields::fp::FpGadget;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
+pub struct MultipackGadget {
+
+}
+
 pub struct HashToBitsGadget {
 }
 
@@ -190,7 +194,7 @@ impl HashToGroupGadget {
         let mut xof_bits = vec![];
         let mut chunk = 0;
         let mut current_index = 0;
-        let target_bits = 377*2;
+        let target_bits = 377*2 + 1;
         while current_index < target_bits {
             let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
             xof_bits.extend_from_slice(&xof_bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
