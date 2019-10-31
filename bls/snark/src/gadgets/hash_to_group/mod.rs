@@ -136,6 +136,13 @@ impl HashToBitsGadget {
             xof_bits.extend_from_slice(&xof_bits_i);
         }
 
+        let modulus_bit_rounded = (((SW6FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
+        let xof_bits = &[
+            &xof_bits[..SW6FrParameters::MODULUS_BITS as usize],
+            &xof_bits[modulus_bit_rounded..modulus_bit_rounded+SW6FrParameters::MODULUS_BITS as usize],
+            &[xof_bits[modulus_bit_rounded+SW6FrParameters::MODULUS_BITS as usize]][..],
+        ].concat();
+
         let mut packed = vec![];
         let fp_chunks = xof_bits.chunks(SW6FrParameters::CAPACITY as usize);
         for (i, chunk) in fp_chunks.enumerate() {
@@ -183,7 +190,7 @@ impl HashToGroupGadget {
         let mut xof_bits = vec![];
         let mut chunk = 0;
         let mut current_index = 0;
-        let target_bits = 768;
+        let target_bits = 377*2;
         while current_index < target_bits {
             let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
             xof_bits.extend_from_slice(&xof_bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
@@ -198,12 +205,12 @@ impl HashToGroupGadget {
                 c0_bits.reverse();
                 let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
                 let c0 = Bls12_377Fp::from_repr(c0_big);
-                let mut c1_bits = xof_bits[384..384+377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                let mut c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
                 c1_bits.reverse();
                 let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
                 let c1 = Bls12_377Fp::from_repr(c1_big);
                 let x = Bls12_377Fp2::new(c0, c1);
-                let greatest = xof_bits[384+377].get_value().get().unwrap();
+                let greatest = xof_bits[377*2].get_value().get().unwrap();
                 let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
                 Ok(p.into_projective())
             }
@@ -227,7 +234,7 @@ impl HashToGroupGadget {
         serialized_bits.extend_from_slice(&c1_bits);
         serialized_bits.push(greatest_bit);
 
-        let calculated_bits = &[&xof_bits[..377], &xof_bits[384..384+377], &[xof_bits[384+377]][..]].concat().to_vec();
+        let calculated_bits = &[&xof_bits[..377], &xof_bits[377..377*2], &[xof_bits[377*2]][..]].concat().to_vec();
         serialized_bits.iter().zip(calculated_bits.iter())
             .enumerate()
             .for_each(
