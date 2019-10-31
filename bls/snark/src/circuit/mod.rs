@@ -37,7 +37,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 for (j, maybe_pk) in update.new_pub_keys.iter().enumerate() {
                     let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
                         cs.ns(|| format!("{}: new pub key {}", i, j)),
-                        || Ok(maybe_pk.unwrap().clone())
+                        || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
                     )?;
                     new_pub_keys_vars.push(pk_var);
                 }
@@ -50,13 +50,14 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
 
 #[cfg(test)]
 mod test {
-    use gm17::{
+    use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use crate::circuit::{ValidatorSetUpdate, SingleUpdate};
     use algebra::curves::sw6::SW6;
     use rand::thread_rng;
 
+    #[test]
     fn test_circuit() {
         let num_validators = 10;
         let rng = &mut thread_rng();
@@ -71,7 +72,10 @@ mod test {
                 num_validators: num_validators,
                 updates: vec![update],
             };
-            generate_random_parameters::<SW6, _, _>(c, rng).unwrap()
+            println!("generating parameters");
+            let p = generate_random_parameters::<SW6, _, _>(c, rng).unwrap();
+            println!("generated parameters");
+            p
         };
     }
 }

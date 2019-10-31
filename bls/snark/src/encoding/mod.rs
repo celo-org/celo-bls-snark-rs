@@ -10,6 +10,7 @@ use algebra::{
     curves::ProjectiveCurve,
     bytes::ToBytes,
 };
+use byteorder::{LittleEndian, WriteBytesExt};
 use bls_zexe::bls::keys::PublicKey;
 use std::error::Error;
 
@@ -75,26 +76,22 @@ pub fn encode_zero_value_public_key() -> Result<Vec<bool>, Box<dyn Error>> {
 
 /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
 /// more easily processable in SNARKs
-fn encode_epoch_block_to_bits(removed_validators: &Vec<bool>, added_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
+fn encode_epoch_block_to_bits(maximum_non_signers: u64, new_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
+    let mut maximum_non_signers_bytes = vec![];
+    maximum_non_signers_bytes.write_u64::<LittleEndian>(maximum_non_signers)?;
+    let maximum_non_signers_bits = maximum_non_signers_bytes.into_iter().map(|x| (0..8).map(move |i| {
+        (((x as u32) & u32::pow(2, i)) >> i) == 1
+    })).flatten().collect::<Vec<_>>();
     let mut epoch_bits = vec![];
-    epoch_bits.extend_from_slice(&removed_validators);
-
-    let mut current_public_key_index = 0;
-    let encoded_zero_value_public_key = encode_zero_value_public_key()?;
-    for is_removed in removed_validators {
-        if *is_removed {
-            epoch_bits.extend_from_slice(&encoded_zero_value_public_key);
-        } else {
-            epoch_bits.extend_from_slice(&encode_public_key(&added_public_keys[current_public_key_index])?);
-        }
-        current_public_key_index += 1;
+    epoch_bits.extend_from_slice(&maximum_non_signers_bits);
+    for added_public_key in new_public_keys {
+        epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
     }
-
     Ok(epoch_bits)
 }
 
-fn encode_epoch_block_to_bytes(removed_validators: &Vec<bool>, added_public_keys: &Vec<PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(bits_to_bytes(&encode_epoch_block_to_bits(removed_validators, added_public_keys)?))
+fn encode_epoch_block_to_bytes(maximum_non_signers: u64, added_public_keys: &Vec<PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(bits_to_bytes(&encode_epoch_block_to_bits(maximum_non_signers, added_public_keys)?))
 }
 
 #[cfg(test)]

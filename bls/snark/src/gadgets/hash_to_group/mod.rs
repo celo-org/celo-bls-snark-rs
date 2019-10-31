@@ -79,19 +79,19 @@ impl MultipackGadget {
         let fp_chunks = bits.chunks(F::Params::CAPACITY as usize);
         for (i, chunk) in fp_chunks.enumerate() {
             let fp = FpGadget::<F>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
-                let fp_val = F::BigInt::from_bits(
-                    &chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>()
-                );
-                Ok(F::from_repr(fp_val))
+                if chunk.iter().any(|x| x.get_value().is_none()) {
+                    Err(SynthesisError::AssignmentMissing)
+                } else {
+                    let fp_val = F::BigInt::from_bits(
+                        &chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>()
+                    );
+                    Ok(F::from_repr(fp_val))
+                }
             })?;
             let fp_bits = fp.to_bits(
                 cs.ns(|| format!("chunk bits {}", i)),
             )?;
             let chunk_len = chunk.len();
-            /*
-            println!("fp bits: {:#?}\n\n\n", fp_bits.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
-            println!("chunk: {:#?}\n\n\n", chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
-            */
             for j in 0..chunk_len {
                 fp_bits[F::Params::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
                     cs.ns(|| format!("fp bit {} for chunk {}", j, i)),
@@ -112,8 +112,15 @@ impl MultipackGadget {
         let bits_vecs = packed
             .into_iter()
             .enumerate()
-            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))).unwrap().to_vec())
+            .map(|(i, x)| {
+                x.to_bits(cs.ns(|| format!("elem {} bits", i)))
+            })
             .collect::<Vec<_>>();
+        let bits_vecs = if bits_vecs.iter().any(|x| x.is_err()) {
+            Err(SynthesisError::AssignmentMissing)
+        } else {
+            Ok(bits_vecs.into_iter().map(|x| x.unwrap().to_vec()).collect::<Vec<_>>())
+        }?;
         let mut bits = vec![];
         let mut chunk = 0;
         let mut current_index = 0;
@@ -242,18 +249,22 @@ impl HashToGroupGadget {
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {
-                let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                c0_bits.reverse();
-                let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
-                let c0 = Bls12_377Fp::from_repr(c0_big);
-                let mut c1_bits = xof_bits[377..377*2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                c1_bits.reverse();
-                let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
-                let c1 = Bls12_377Fp::from_repr(c1_big);
-                let x = Bls12_377Fp2::new(c0, c1);
-                let greatest = xof_bits[377*2].get_value().get().unwrap();
-                let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
-                Ok(p.into_projective())
+                if xof_bits.iter().any(|x| x.get_value().is_none()) {
+                    Err(SynthesisError::AssignmentMissing)
+                } else {
+                    let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                    c0_bits.reverse();
+                    let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
+                    let c0 = Bls12_377Fp::from_repr(c0_big);
+                    let mut c1_bits = xof_bits[377..377 * 2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                    c1_bits.reverse();
+                    let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
+                    let c1 = Bls12_377Fp::from_repr(c1_big);
+                    let x = Bls12_377Fp2::new(c0, c1);
+                    let greatest = xof_bits[377 * 2].get_value().get().unwrap();
+                    let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
+                    Ok(p.into_projective())
+                }
             }
         )?;
 
