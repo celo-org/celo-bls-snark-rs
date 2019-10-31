@@ -140,8 +140,15 @@ pub struct HashToBitsGadget {
 impl HashToBitsGadget {
     pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<HashToBitsField>>(
         mut cs: CS,
-        message: &[Boolean],
+        message_packed: &[FpGadget<HashToBitsField>],
+        message_size_in_bits: usize,
     ) -> Result<Vec<FpGadget<HashToBitsField>>, SynthesisError> {
+        let message = MultipackGadget::unpack(
+            cs.ns(|| "unpack message"),
+            message_packed,
+            message_size_in_bits,
+        )?;
+
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "pedersen parameters"),
@@ -438,7 +445,7 @@ mod test {
         try_and_increment::TryAndIncrement
     };
     use bls_zexe::bls::keys::SIG_DOMAIN;
-    use crate::gadgets::hash_to_group::HashToBitsGadget;
+    use crate::gadgets::hash_to_group::{HashToBitsGadget, MultipackGadget};
     use r1cs_std::fields::fp::FpGadget;
 
 
@@ -469,9 +476,15 @@ mod test {
             Boolean::constant(true),
         ];
 
+        let message_packed = MultipackGadget::pack(
+            cs.ns(|| "pack message"),
+            &message,
+        ).unwrap();
+
         let xof_bits_packed = HashToBitsGadget::hash_to_bits(
             cs.ns(|| "hash to bits"),
-            &message,
+            &message_packed,
+            message.len(),
         ).unwrap();
 
         let packed_for_group = xof_bits_packed.iter().enumerate().map(|(i, x)| {
