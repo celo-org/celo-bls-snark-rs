@@ -76,7 +76,7 @@ impl MultipackGadget {
         bits: &[Boolean],
     ) ->  Result<Vec<FpGadget<F>>, SynthesisError> {
         let mut packed = vec![];
-        let fp_chunks = bits.chunks(<F::Params as FpParameters>::CAPACITY as usize);
+        let fp_chunks = bits.chunks(F::Params::CAPACITY as usize);
         for (i, chunk) in fp_chunks.enumerate() {
             let fp = FpGadget::<F>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
                 let fp_val = F::BigInt::from_bits(
@@ -93,7 +93,7 @@ impl MultipackGadget {
             println!("chunk: {:#?}\n\n\n", chunk.iter().map(|x| x.get_value().unwrap()).collect::<Vec<bool>>().as_slice());
             */
             for j in 0..chunk_len {
-                fp_bits[<F::Params as FpParameters>::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
+                fp_bits[F::Params::MODULUS_BITS as usize - chunk_len + j].enforce_equal(
                     cs.ns(|| format!("fp bit {} for chunk {}", j, i)),
                     &chunk[j],
                 )?;
@@ -118,8 +118,12 @@ impl MultipackGadget {
         let mut chunk = 0;
         let mut current_index = 0;
         while current_index < target_bits {
-            let diff = if (target_bits - current_index ) < SW6FrParameters::CAPACITY as usize { target_bits - current_index } else { SW6FrParameters::CAPACITY as usize };
-            bits.extend_from_slice(&bits_vecs[chunk][SW6FrParameters::MODULUS_BITS as usize - diff..]);
+            let diff = if (target_bits - current_index ) < F::Params::CAPACITY as usize {
+                target_bits - current_index
+            } else {
+                <F::Params as FpParameters>::CAPACITY as usize
+            };
+            bits.extend_from_slice(&bits_vecs[chunk][<F::Params as FpParameters>::MODULUS_BITS as usize - diff..]);
             current_index += diff;
             chunk += 1;
         }
@@ -127,16 +131,19 @@ impl MultipackGadget {
     }
 }
 
+type HashToBitsField = SW6Fr;
+type HashToBitsFieldParameters = SW6FrParameters;
+
 pub struct HashToBitsGadget {
 }
 
 impl HashToBitsGadget {
-    pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
+    pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<HashToBitsField>>(
         mut cs: CS,
         message: &[Boolean],
-    ) -> Result<Vec<FpGadget<SW6Fr>>, SynthesisError> {
+    ) -> Result<Vec<FpGadget<HashToBitsField>>, SynthesisError> {
         let crh_params =
-            <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::ParametersGadget::alloc(
+            <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::ParametersGadget::alloc(
                 &mut cs.ns(|| "pedersen parameters"),
                 || {
                     match CompositeHasher::setup_crh() {
@@ -155,7 +162,7 @@ impl HashToBitsGadget {
             }
             UInt8::from_bits_le(&chunk_padded)
         }).collect();
-        let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, SW6Fr>>::check_evaluation_gadget(
+        let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::check_evaluation_gadget(
             &mut cs.ns(|| "pedersen evaluation"),
             &crh_params,
             &input_bytes,
@@ -197,11 +204,11 @@ impl HashToBitsGadget {
             xof_bits.extend_from_slice(&xof_bits_i);
         }
 
-        let modulus_bit_rounded = (((SW6FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
+        let modulus_bit_rounded = (((HashToBitsFieldParameters::MODULUS_BITS + 7)/8)*8) as usize;
         let xof_bits = &[
-            &xof_bits[..SW6FrParameters::MODULUS_BITS as usize],
-            &xof_bits[modulus_bit_rounded..modulus_bit_rounded+SW6FrParameters::MODULUS_BITS as usize],
-            &[xof_bits[modulus_bit_rounded+SW6FrParameters::MODULUS_BITS as usize]][..],
+            &xof_bits[..HashToBitsFieldParameters::MODULUS_BITS as usize],
+            &xof_bits[modulus_bit_rounded..modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize],
+            &[xof_bits[modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize]][..],
         ].concat();
 
         MultipackGadget::pack(
