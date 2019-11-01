@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 r1cs-std = { path = "../../zexe/r1cs-std" }
-crypto-primitives = { path = "../../zexe/crypto-primitives", features = [ "r1cs" ] }
+crypto-primitives = { path = "../../zexe/crypto-primitives", features = [ "r1cs", "groth16" ] }
 r1cs-core = { path = "../../zexe/r1cs-core" }
 algebra = { path = "../../zexe/algebra" }
 groth16 = { path = "../../zexe/groth16" }

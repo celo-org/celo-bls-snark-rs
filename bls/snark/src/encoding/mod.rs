@@ -16,7 +16,7 @@ use std::error::Error;
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
 /// number in descending order
-fn bytes_to_bits(bytes: &Vec<u8>, bits_to_take: usize) -> Vec<bool> {
+pub fn bytes_to_bits(bytes: &Vec<u8>, bits_to_take: usize) -> Vec<bool> {
     let mut bits = vec![];
     for i in 0..bytes.len() {
         let mut byte = bytes[i];
@@ -31,7 +31,7 @@ fn bytes_to_bits(bytes: &Vec<u8>, bits_to_take: usize) -> Vec<bool> {
     bits_filtered
 }
 
-fn bits_to_bytes(bits: &Vec<bool>) -> Vec<u8> {
+pub fn bits_to_bytes(bits: &Vec<bool>) -> Vec<u8> {
     let mut bytes = vec![];
     let reversed_bits = {
         let mut tmp = bits.clone();
@@ -76,9 +76,9 @@ pub fn encode_zero_value_public_key() -> Result<Vec<bool>, Box<dyn Error>> {
 
 /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
 /// more easily processable in SNARKs
-fn encode_epoch_block_to_bits(maximum_non_signers: u64, new_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
+fn encode_epoch_block_to_bits(maximum_non_signers: u32, new_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
     let mut maximum_non_signers_bytes = vec![];
-    maximum_non_signers_bytes.write_u64::<LittleEndian>(maximum_non_signers)?;
+    maximum_non_signers_bytes.write_u32::<LittleEndian>(maximum_non_signers)?;
     let maximum_non_signers_bits = maximum_non_signers_bytes.into_iter().map(|x| (0..8).map(move |i| {
         (((x as u32) & u32::pow(2, i)) >> i) == 1
     })).flatten().collect::<Vec<_>>();
@@ -90,7 +90,7 @@ fn encode_epoch_block_to_bits(maximum_non_signers: u64, new_public_keys: &Vec<Pu
     Ok(epoch_bits)
 }
 
-fn encode_epoch_block_to_bytes(maximum_non_signers: u64, added_public_keys: &Vec<PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
+fn encode_epoch_block_to_bytes(maximum_non_signers: u32, added_public_keys: &Vec<PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(bits_to_bytes(&encode_epoch_block_to_bits(maximum_non_signers, added_public_keys)?))
 }
 

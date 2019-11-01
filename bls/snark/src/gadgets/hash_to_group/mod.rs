@@ -3,6 +3,9 @@ use algebra::{BigInteger, Field, curves::{
     edwards_sw6::{
         EdwardsProjective,
     },
+    edwards_bls12::{
+        EdwardsProjective as EdwardsBls,
+    },
     models::{
         SWModelParameters,
     }
@@ -26,7 +29,10 @@ use r1cs_std::{Assignment, eq::EqGadget, groups::{
         },
         twisted_edwards::edwards_sw6::{
             EdwardsSWGadget,
-        }
+        },
+        twisted_edwards::edwards_bls12::{
+            EdwardsBlsGadget,
+        },
     },
 }, fields::{
     FieldGadget,
@@ -64,7 +70,7 @@ use crypto_primitives::prf::Blake2sWithParameterBlock;
 use algebra::curves::sw6::SW6;
 use r1cs_std::fields::fp::FpGadget;
 
-type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
+type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsBls, Bls12_377Fr, EdwardsBlsGadget>;
 
 pub struct MultipackGadget {
 
@@ -74,9 +80,10 @@ impl MultipackGadget {
     pub fn pack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
         mut cs: CS,
         bits: &[Boolean],
+        target_capacity: usize,
     ) ->  Result<Vec<FpGadget<F>>, SynthesisError> {
         let mut packed = vec![];
-        let fp_chunks = bits.chunks(F::Params::CAPACITY as usize);
+        let fp_chunks = bits.chunks(target_capacity);
         for (i, chunk) in fp_chunks.enumerate() {
             let fp = FpGadget::<F>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
                 if chunk.iter().any(|x| x.get_value().is_none()) {
@@ -108,6 +115,7 @@ impl MultipackGadget {
         mut cs: CS,
         packed: &[FpGadget<F>],
         target_bits: usize,
+        source_capacity: usize,
     ) ->  Result<Vec<Boolean>, SynthesisError> {
         let bits_vecs = packed
             .into_iter()
@@ -125,10 +133,10 @@ impl MultipackGadget {
         let mut chunk = 0;
         let mut current_index = 0;
         while current_index < target_bits {
-            let diff = if (target_bits - current_index ) < F::Params::CAPACITY as usize {
+            let diff = if (target_bits - current_index ) < source_capacity as usize {
                 target_bits - current_index
             } else {
-                <F::Params as FpParameters>::CAPACITY as usize
+                source_capacity as usize
             };
             bits.extend_from_slice(&bits_vecs[chunk][<F::Params as FpParameters>::MODULUS_BITS as usize - diff..]);
             current_index += diff;
@@ -138,8 +146,8 @@ impl MultipackGadget {
     }
 }
 
-type HashToBitsField = SW6Fr;
-type HashToBitsFieldParameters = SW6FrParameters;
+type HashToBitsField = Bls12_377Fr;
+type HashToBitsFieldParameters = Bls12_377FrParameters;
 
 pub struct HashToBitsGadget {
 }
@@ -149,11 +157,14 @@ impl HashToBitsGadget {
         mut cs: CS,
         message_packed: &[FpGadget<HashToBitsField>],
         message_size_in_bits: usize,
+        source_capacity: usize,
+        target_capacity: usize,
     ) -> Result<Vec<FpGadget<HashToBitsField>>, SynthesisError> {
         let message = MultipackGadget::unpack(
             cs.ns(|| "unpack message"),
             message_packed,
             message_size_in_bits,
+            source_capacity,
         )?;
 
         let crh_params =
@@ -228,6 +239,7 @@ impl HashToBitsGadget {
         MultipackGadget::pack(
             cs.ns(|| "pack xof bits"),
             xof_bits,
+            target_capacity,
         )
     }
 }
@@ -240,11 +252,13 @@ impl HashToGroupGadget {
     pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
         xof_bits_packed: &[FpGadget<SW6Fr>],
+        source_capacity: usize,
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
         let xof_bits = MultipackGadget::unpack(
             cs.ns(|| "unpack xof bits"),
             xof_bits_packed,
             377*2 + 1,
+            source_capacity,
         )?;
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
@@ -409,32 +423,29 @@ impl HashToGroupGadget {
     }
 
 }
-
+/*
 #[cfg(test)]
 mod test {
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
-    use algebra::{
-        curves::{
-            bls12_377::{
-                G1Projective as Bls12_377G1Projective,
-                G2Projective as Bls12_377G2Projective,
-                Bls12_377Parameters,
-            },
-            models::bls12::Bls12Parameters,
-            ProjectiveCurve,
+    use algebra::{curves::{
+        bls12_377::{
+            G1Projective as Bls12_377G1Projective,
+            G2Projective as Bls12_377G2Projective,
+            Bls12_377Parameters,
         },
-        fields::{
-            bls12_377::{
-                Fq as Bls12_377Fp,
-                Fr as Bls12_377Fr,
-            },
-            sw6::Fr as SW6Fr,
-            PrimeField,
+        models::bls12::Bls12Parameters,
+        ProjectiveCurve,
+    }, fields::{
+        bls12_377::{
+            Fq as Bls12_377Fp,
+            Fr as Bls12_377Fr,
         },
-        UniformRand,
-    };
+        sw6::Fr as SW6Fr,
+        sw6::FrParameters as SW6FrParameters,
+        PrimeField,
+    }, UniformRand, FpParameters};
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         Assignment,
@@ -500,6 +511,9 @@ mod test {
 
         let packed_for_group = xof_bits_packed.iter().enumerate().map(|(i, x)| {
             let big = x.get_value().unwrap().into_repr();
+            let mut big_ints = [0; 6];
+            big_ints.copy_from_slice(&big.0);
+            let big = <SW6FrParameters as FpParameters>::BigInt::new(big_ints);
 
             FpGadget::<SW6Fr>::alloc(
                 cs.ns(|| format!("alloc fp {}", i)),
@@ -509,7 +523,7 @@ mod test {
 
         let hash = HashToGroupGadget::hash_to_group(
             cs.ns(|| "hash to group"),
-            &xof_bits_packed,
+            xof_bits_packed.as_slice(),
         ).unwrap();
 
         println!("number of constraints: {}", cs.num_constraints());
@@ -544,3 +558,4 @@ mod test {
         assert!(cs.is_satisfied());
     }
 }
+*/
