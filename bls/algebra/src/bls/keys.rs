@@ -106,6 +106,7 @@ impl Error for BLSError {
     }
 }
 
+#[derive(Clone)]
 pub struct PublicKey {
     pk: G1Projective,
 }

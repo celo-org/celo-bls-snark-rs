@@ -202,6 +202,8 @@ impl HashToBitsGadget {
         for i in 0..7 {
             crh_bits.push(Boolean::constant(false));
         }
+        let crh_bits_len = crh_bits.len();
+        crh_bits.resize(((crh_bits_len + 7)/8)*8, Boolean::constant(false));
 
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
