@@ -81,11 +81,13 @@ impl MultipackGadget {
         mut cs: CS,
         bits: &[Boolean],
         target_capacity: usize,
+        should_alloc_input: bool,
     ) ->  Result<Vec<FpGadget<F>>, SynthesisError> {
         let mut packed = vec![];
         let fp_chunks = bits.chunks(target_capacity);
         for (i, chunk) in fp_chunks.enumerate() {
-            let fp = FpGadget::<F>::alloc_input(cs.ns(|| format!("chunk {}", i)), || {
+            let alloc = if should_alloc_input { FpGadget::<F>::alloc_input } else { FpGadget::<F>::alloc };
+            let fp = alloc(cs.ns(|| format!("chunk {}", i)), || {
                 if chunk.iter().any(|x| x.get_value().is_none()) {
                     Err(SynthesisError::AssignmentMissing)
                 } else {
@@ -147,7 +149,7 @@ impl MultipackGadget {
 }
 
 type HashToBitsField = Bls12_377Fr;
-type HashToBitsFieldParameters = Bls12_377FrParameters;
+type HashToBitsFieldParameters = SW6FrParameters;
 
 pub struct HashToBitsGadget {
 }
@@ -166,6 +168,8 @@ impl HashToBitsGadget {
             message_size_in_bits,
             source_capacity,
         )?;
+
+        let message = message.into_iter().rev().collect::<Vec<_>>();
 
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::ParametersGadget::alloc(
@@ -187,6 +191,7 @@ impl HashToBitsGadget {
             }
             UInt8::from_bits_le(&chunk_padded)
         }).collect();
+
         let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::check_evaluation_gadget(
             &mut cs.ns(|| "pedersen evaluation"),
             &crh_params,
@@ -195,15 +200,18 @@ impl HashToBitsGadget {
         let crh_bits = crh_result.x.to_bits(
             cs.ns(|| "crh bits"),
         )?;
-        let first_bit = crh_bits[0];
-        let mut crh_bits= crh_bits[1..].to_vec();
+
+        let crh_bits_len = crh_bits.len();
+        let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
+
+        let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
+        first_bits.reverse();
+        let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
         crh_bits.reverse();
-        crh_bits.push(first_bit);
-        for i in 0..7 {
+        crh_bits.extend_from_slice(&first_bits);
+        for i in 0..(crh_bits_len_rounded - crh_bits_len) {
             crh_bits.push(Boolean::constant(false));
         }
-        let crh_bits_len = crh_bits.len();
-        crh_bits.resize(((crh_bits_len + 7)/8)*8, Boolean::constant(false));
 
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
@@ -242,6 +250,7 @@ impl HashToBitsGadget {
             cs.ns(|| "pack xof bits"),
             xof_bits,
             target_capacity,
+            true,
         )
     }
 }
@@ -253,15 +262,9 @@ pub struct HashToGroupGadget {
 impl HashToGroupGadget {
     pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
-        xof_bits_packed: &[FpGadget<SW6Fr>],
+        xof_bits: &[Boolean],
         source_capacity: usize,
     ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
-        let xof_bits = MultipackGadget::unpack(
-            cs.ns(|| "unpack xof bits"),
-            xof_bits_packed,
-            377*2 + 1,
-            source_capacity,
-        )?;
         let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {

@@ -72,8 +72,9 @@ pub fn get_point_from_x<P: Bls12Parameters>(
         G2Affine::<P>::new(x, y, false)
     })
 }
-impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
-    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
+
+impl<'a, H: XOF> TryAndIncrement<'a, H> {
+    pub fn hash_with_attempt<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<(G2Projective<P>, usize), Box<dyn Error>> {
         const NUM_TRIES: usize = 256;
         const EXPECTED_TOTAL_BITS: usize = 384*2;
         const LAST_BYTE_MASK: u8 = 1;
@@ -88,9 +89,10 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
+            let message_with_counter = &[&counter, extra_data, &message].concat();
             let hash = self
                 .hasher
-                .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
+                .hash(domain, message_with_counter, num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_0_bytes = (&hash[..hash.len()/2]).to_vec();
@@ -119,13 +121,22 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
                         c
                     );
                     end_timer!(hash_loop_time);
-                    return Ok(cofactor::scale_by_cofactor_fuentes::<P>(
+                    return Ok((cofactor::scale_by_cofactor_fuentes::<P>(
                         &x.into_projective(),
-                    ));
+                    ), c));
                 }
             }
         }
         Err(HashToCurveError::CannotFindPoint)?
+    }
+}
+
+impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
+    fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G2Projective<P>, Box<dyn Error>> {
+        match self.hash_with_attempt::<P>(domain, message, extra_data) {
+            Ok(x) => Ok(x.0),
+            Err(e) => Err(e),
+        }
     }
 }
 
