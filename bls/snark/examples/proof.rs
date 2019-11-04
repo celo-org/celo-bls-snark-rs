@@ -239,4 +239,6 @@ fn main() {
         //println!("public input: {}", x);
     });
     assert!(verify_proof(&prepared_verifying_key, &update_proof, public_inputs.as_slice()).unwrap())
+
+    println!("Done!");
 }
