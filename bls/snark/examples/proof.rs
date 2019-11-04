@@ -65,7 +65,7 @@ fn main() {
     let hash_params_time = start_timer!(|| "hash params");
     let hash_params = {
         let c = HashToBits {
-            message_bits: vec![vec![None; epoch_bits_len]],
+            message_bits: vec![vec![None; epoch_bits_len]; hash_batch_size],
             hash_batch_size: hash_batch_size,
         };
         println!("generating parameters for hash to bits");
@@ -133,6 +133,7 @@ fn main() {
         current_private_keys = new_private_keys.clone();
     }
 
+    println!("message bits len: {}", message_bits.len());
     let mut hash_proofs = vec![];
     for chunk in message_bits.chunks(hash_batch_size) {
         let hash_to_bits_time = start_timer!(|| "hash to bits");
