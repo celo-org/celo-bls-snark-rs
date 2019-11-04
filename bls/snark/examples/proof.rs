@@ -133,7 +133,6 @@ fn main() {
         current_private_keys = new_private_keys.clone();
     }
 
-    println!("message bits len: {}", message_bits.len());
     let mut hash_proofs = vec![];
     for chunk in message_bits.chunks(hash_batch_size) {
         let hash_to_bits_time = start_timer!(|| "hash to bits");
@@ -142,8 +141,7 @@ fn main() {
             hash_batch_size: hash_batch_size,
         };
 
-        let mut epoch_chunks_vec = vec![];
-        let mut fp_chunks_vec = vec![];
+        let mut public_inputs_for_hash = vec![];
         for j in 0..chunk.len() {
             let epoch_bits_with_attempt = &chunk[j];
             let epoch_bytes = bits_to_bytes(&epoch_bits_with_attempt);
@@ -165,8 +163,8 @@ fn main() {
                 BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
             }).collect::<Vec<_>>();
 
-            epoch_chunks_vec.extend_from_slice(&epoch_chunks);
-            fp_chunks_vec.extend_from_slice(&fp_chunks);
+            public_inputs_for_hash.extend_from_slice(&epoch_chunks);
+            public_inputs_for_hash.extend_from_slice(&fp_chunks);
         }
 
         let mut cs = TestConstraintSystem::<BlsFr>::new();
@@ -175,10 +173,6 @@ fn main() {
             println!("which: {}", cs.which_is_unsatisfied().unwrap());
         }
         assert!(cs.is_satisfied());
-        let public_inputs_for_hash = &[
-            epoch_chunks_vec,
-            fp_chunks_vec,
-        ].concat();
         let prepared_verifying_key = prepare_verifying_key(&hash_params.vk);
 
         let p = create_random_proof(c, &hash_params, rng).unwrap();
