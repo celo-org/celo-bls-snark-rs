@@ -33,6 +33,7 @@ use std::{
     ops::{Mul, Neg},
 };
 
+#[derive(Clone)]
 pub struct PrivateKey {
     sk: Fr,
 }
@@ -217,6 +218,7 @@ impl FromBytes for PublicKey {
     }
 }
 
+#[derive(Clone)]
 pub struct Signature {
     sig: G2Projective,
 }

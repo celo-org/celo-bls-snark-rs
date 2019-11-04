@@ -49,15 +49,15 @@ use r1cs_std::bits::uint8::UInt8;
 use bls_zexe::curve::hash::HashToG2;
 
 #[derive(Clone)]
-struct HashToBits {
-    message_bits: Vec<Option<bool>>,
-    hash_batch_size: usize,
+pub struct HashToBits {
+    pub message_bits: Vec<Vec<Option<bool>>>,
+    pub hash_batch_size: usize,
 }
 
 impl ConstraintSynthesizer<BlsFr> for HashToBits {
     fn generate_constraints<CS: ConstraintSystem<BlsFr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         for i in 0..self.hash_batch_size {
-            let bits = self.message_bits.iter().enumerate().map(|(j, b)| Boolean::alloc(
+            let bits = self.message_bits[i].iter().enumerate().map(|(j, b)| Boolean::alloc(
                 cs.ns(|| format!("{}: bit {}", i, j)),
                 || b.ok_or(SynthesisError::AssignmentMissing)
             )).collect::<Vec<_>>();
@@ -85,7 +85,7 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
             let hash = HashToBitsGadget::hash_to_bits(
                 cs.ns(|| format!("{}: hash to bits", i)),
                 &packed_message,
-                self.message_bits.len(),
+                bits.len(),
                 BlsFrParameters::CAPACITY as usize,
                 BlsFrParameters::CAPACITY as usize,
             )?;
@@ -95,33 +95,34 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
                 }
             });
         }
+        println!("num constraints: {}", cs.num_constraints());
         Ok(())
     }
 }
 
 #[derive(Clone)]
-struct SingleUpdate {
-    maximum_non_signers: Option<u32> ,
-    new_pub_keys: Vec<Option<G1Projective>>,
-    signed_bitmap: Vec<Option<bool>>,
-    signature: Option<G2Projective>,
+pub struct SingleUpdate {
+    pub maximum_non_signers: Option<u32> ,
+    pub new_pub_keys: Vec<Option<G1Projective>>,
+    pub signed_bitmap: Vec<Option<bool>>,
+    pub signature: Option<G2Projective>,
 }
 
 #[derive(Clone)]
-struct HashProof {
-    proof: Proof<Bls12_377>,
+pub struct HashProof {
+    pub proof: Proof<Bls12_377>,
 }
 
 #[derive(Clone)]
-struct ValidatorSetUpdate {
-    initial_public_keys: Vec<Option<G1Projective>>,
-    initial_maximum_non_signers: Option<u32> ,
-    num_validators: usize,
-    hash_batch_size: usize,
-    hash_proofs: Vec<HashProof>,
-    updates: Vec<SingleUpdate>,
-    packed_size: usize,
-    verifying_key: VerifyingKey<Bls12_377>,
+pub struct ValidatorSetUpdate {
+    pub initial_public_keys: Vec<Option<G1Projective>>,
+    pub initial_maximum_non_signers: Option<u32> ,
+    pub num_validators: usize,
+    pub hash_batch_size: usize,
+    pub hash_proofs: Vec<HashProof>,
+    pub updates: Vec<SingleUpdate>,
+    pub packed_size: usize,
+    pub verifying_key: VerifyingKey<Bls12_377>,
 }
 
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
@@ -380,7 +381,7 @@ mod test {
         let new_private_keys = (0..num_validators).map(|i| {
             PrivateKey::generate(rng)
         }).collect::<Vec<_>>();
-        let new_public_keys = private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
+        let new_public_keys = new_private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
         let maximum_non_signers = 6;
         let epoch_bits = encode_epoch_block_to_bits(maximum_non_signers, &new_public_keys).unwrap();
         let epoch_bytes = bits_to_bytes(&epoch_bits);
@@ -396,7 +397,7 @@ mod test {
         let (hash_params, hash_proof) = {
             let hash_params = {
                 let c = HashToBits {
-                    message_bits: vec![None; epoch_bits_len],
+                    message_bits: vec![vec![None; epoch_bits_len]],
                     hash_batch_size: hash_batch_size,
                 };
                 println!("generating parameters for hash to bits");
@@ -406,7 +407,7 @@ mod test {
             };
 
             let c = HashToBits {
-                message_bits: epoch_bits_with_attempt.into_iter().map(|b| Some(*b)).collect::<Vec<_>>(),
+                message_bits: vec![epoch_bits_with_attempt.into_iter().map(|b| Some(*b)).collect::<Vec<_>>()],
                 hash_batch_size: hash_batch_size,
             };
 
