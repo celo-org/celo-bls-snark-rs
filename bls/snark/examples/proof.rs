@@ -182,10 +182,6 @@ fn main() {
         assert!(cs.is_satisfied());
         let prepared_verifying_key = prepare_verifying_key(&hash_params.vk);
 
-        for pi in public_inputs_for_hash.iter() {
-            println!("public input for hash: {}", pi);
-        }
-
         let p = create_random_proof(c, &hash_params, rng).unwrap();
         assert!(verify_proof(&prepared_verifying_key, &p, public_inputs_for_hash.as_slice()).unwrap());
         //println!("verified public input len: {}", public_inputs_for_hash.len());

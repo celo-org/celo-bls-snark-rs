@@ -252,20 +252,14 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     UInt8::from_bits_le(&chunk_padded)
                 }).collect();
 
-                if input_bytes.iter().all(|x| x.get_value().is_some()) {
-                    println!("input bytes: {}", hex::encode(input_bytes.iter().map(|x| x.get_value().unwrap()).collect::<Vec<_>>().as_slice()));
-                }
-
                 let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
                     &mut cs.ns(|| format!("{}, {}: pedersen evaluation", c, i)),
                     &crh_params,
                     &input_bytes,
                 )?;
-                if crh_result.x.value.is_some() {
-                    println!("crh result: {}", crh_result.x.value.unwrap())
-                }
+
                 let mut crh_bits = crh_result.x.to_bits(
-                    cs.ns(|| "crh bits"),
+                    cs.ns(|| format!("{}, {}: crh bits", c, i)),
                 )?;
 
                 let crh_bits_len = crh_bits.len();
@@ -302,11 +296,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     hash_bits_vec
                 } else {
                     let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                    println!("epoch bytes: {}", hex::encode(&epoch_bytes));
-
                     let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
-                    println!("crh bytes: {}", hex::encode(&crh_bytes));
-
                     let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
                     let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
                     let hash_bits = &[
@@ -337,9 +327,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     if public_input.iter().all(|x| x.get_value().is_some()) {
                         let bools = public_input.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>();
                         let bytes = bits_to_bytes(&bools);
-                        println!("bytes: {}", hex::encode(&bytes));
                         let bytes_reverse = bits_to_bytes(&bools.into_iter().rev().collect::<Vec<_>>());
-                        println!("bytes reverse: {}", hex::encode(&bytes_reverse));
                     }
                 }
 

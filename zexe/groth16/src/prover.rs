@@ -237,10 +237,6 @@ where
     let (full_input_assignment, h, _) = R1CStoQAP::witness_map::<E>(&prover, &d1, &d2, &d3)?;
     end_timer!(witness_map_time);
 
-    for input in prover.input_assignment.iter() {
-        println!("input: {}", input);
-    }
-
     let input_assignment = Arc::new(
         full_input_assignment[1..prover.num_inputs]
             .into_iter()
