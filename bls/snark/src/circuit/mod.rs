@@ -1,4 +1,5 @@
 use algebra::{fields::{
+    Field,
     PrimeField,
     sw6::{Fr, FrParameters},
     bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
@@ -63,6 +64,8 @@ pub struct HashToBits {
 
 impl ConstraintSynthesizer<BlsFr> for HashToBits {
     fn generate_constraints<CS: ConstraintSystem<BlsFr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        let mut all_bits = vec![];
+        let mut xof_bits = vec![];
         for i in 0..self.hash_batch_size {
             let bits = self.message_bits[i].iter().enumerate().map(|(j, b)| Boolean::alloc(
                 cs.ns(|| format!("{}: bit {}", i, j)),
@@ -78,30 +81,30 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
                 }
                 Ok(bits_bools)
             }?;
-            let packed_message = MultipackGadget::pack(
-                cs.ns(|| format!("{}: pack message", i)),
-                &bits,
-                BlsFrParameters::CAPACITY as usize,
-                true,
-            )?;
-            packed_message.iter().for_each(|b| {
-                if b.value.is_some() {
-                    //println!("hash to bits message: {}", b.value.unwrap());
-                }
-            });
+            all_bits.extend_from_slice(&bits);
             let hash = HashToBitsGadget::hash_to_bits(
                 cs.ns(|| format!("{}: hash to bits", i)),
-                &packed_message,
-                bits.len(),
+                &bits,
                 BlsFrParameters::CAPACITY as usize,
                 BlsFrParameters::CAPACITY as usize,
             )?;
-            hash.iter().for_each(|b| {
-                if b.value.is_some() {
-                    //println!("hash to bits hash: {}", b.value.unwrap());
-                }
-            });
+            xof_bits.extend_from_slice(&hash);
         }
+
+        MultipackGadget::pack(
+            cs.ns(|| "pack messages"),
+            &all_bits,
+            BlsFrParameters::CAPACITY as usize,
+            true,
+        )?;
+
+        MultipackGadget::pack(
+            cs.ns(|| "pack xof bits"),
+            &xof_bits,
+            BlsFrParameters::CAPACITY as usize,
+            true,
+        )?;
+
         println!("num constraints: {}", cs.num_constraints());
         Ok(())
     }
@@ -109,10 +112,10 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
 
 #[derive(Clone)]
 pub struct SingleUpdate {
+    pub epoch_index: Option<u16> ,
     pub maximum_non_signers: Option<u32> ,
     pub new_pub_keys: Vec<Option<G1Projective>>,
     pub signed_bitmap: Vec<Option<bool>>,
-    pub signature: Option<G2Projective>,
 }
 
 #[derive(Clone)]
@@ -123,19 +126,25 @@ pub struct HashProof {
 #[derive(Clone)]
 pub struct ValidatorSetUpdate {
     pub initial_public_keys: Vec<Option<G1Projective>>,
+    pub initial_epoch_index: Option<u16> ,
     pub initial_maximum_non_signers: Option<u32> ,
     pub num_validators: usize,
     pub hash_batch_size: usize,
     pub hash_proofs: Vec<HashProof>,
     pub updates: Vec<SingleUpdate>,
-    pub packed_size: usize,
     pub verifying_key: VerifyingKey<Bls12_377>,
+    pub aggregated_signature: Option<G2Projective>,
 }
 
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
     fn generate_constraints<CS: ConstraintSystem<Fr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
+
+        let aggregated_signature = G2Gadget::<Bls12_377Parameters>::alloc(
+            cs.ns(|| "aggregated signature"),
+            || self.aggregated_signature.clone().ok_or(SynthesisError::AssignmentMissing)
+        )?;
 
         let crh_params =
             <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::ParametersGadget::alloc(
@@ -170,11 +179,19 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
             },
         )?;
+        let mut current_epoch_index = FpGadget::<Fr>::alloc_input(
+            cs.ns(|| "initial: epoch index"),
+            || {
+                let epoch_index = self.initial_epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
+                Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
+            },
+        )?;
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
-        let mut aggregated_signature = None;
         for (c, chunk) in self.updates.chunks(self.hash_batch_size).enumerate() {
             let mut public_inputs = vec![];
+            let mut all_crh_bits = vec![];
+            let mut all_xof_bits = vec![];
             for (i, update) in chunk.into_iter().enumerate() {
                 let mut new_pub_keys_vars = vec![];
                 {
@@ -194,6 +211,21 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                         Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
                     },
                 )?;
+                let mut epoch_index = FpGadget::<Fr>::alloc(
+                    cs.ns(|| format!("{}, {}: epoch index", c, i)),
+                    || {
+                        let epoch_index = update.epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
+                        Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
+                    },
+                )?;
+                let current_epoch_index_plus_one = current_epoch_index.add_constant(
+                    cs.ns(|| format!("{}, {}: add current epoch index 1", c, i)),
+                    &Fr::one(),
+                )?;
+                epoch_index.enforce_equal(
+                    cs.ns(|| format!("{}, {}: epoch index enforce equal", c, i)),
+                    &current_epoch_index_plus_one,
+                )?;
                 let signed_bitmap = update.signed_bitmap.iter().enumerate().map(|(j, b)| Boolean::alloc(
                     cs.ns(|| format!("{}, {}: signed bitmap {}", c, i, j)),
                     || b.ok_or(SynthesisError::AssignmentMissing)
@@ -203,13 +235,14 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 } else {
                     Ok(signed_bitmap.iter().map(|b| b.as_ref().unwrap().clone()).collect::<Vec<_>>())
                 }?;
-                let signature = G2Gadget::<Bls12_377Parameters>::alloc(
-                    cs.ns(|| format!("{}, {}: signature", c, i)),
-                    || update.signature.ok_or(SynthesisError::AssignmentMissing)
-                )?;
 
                 let mut epoch_bits = vec![];
 
+                let epoch_index_bits = epoch_index.to_bits(
+                    cs.ns(|| format!("{}: epoch index bits", i))
+                )?;
+                let epoch_index_bits = epoch_index_bits.into_iter().rev().take(16).collect::<Vec<_>>();
+                epoch_bits.extend_from_slice(&epoch_index_bits);
                 let maximum_non_signers_bits = maximum_non_signers.to_bits(
                     cs.ns(|| format!("{}, {}: maximum non signers bits", c, i))
                 )?;
@@ -282,66 +315,44 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
                 let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
 
-                let packed_message = crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
-                    b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
-                }).collect::<Vec<_>>();
-
-                public_inputs.extend_from_slice(&packed_message);
+                all_crh_bits.extend_from_slice(&crh_bits);
 
                 let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
-                let packed_xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
+                let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
                     let hash_bits = vec![false; xof_target_bits];
-                    let hash_bits_vec = [
+                    [
                         &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
                         &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
                         &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                    ].concat().chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|x| x.to_vec()).collect::<Vec<_>>();
-                    hash_bits_vec
+                    ].concat().to_vec()
                 } else {
                     let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
                     let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
                     let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
                     let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
-                    let hash_bits = &[
+                    [
                         &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
                         &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
                         &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                    ].concat().to_vec();
-                    let fp_chunks = hash_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|bs| {
-                        bs.iter().map(|z| z.clone()).collect::<Vec<_>>()
-                    }).collect::<Vec<_>>();
-                    fp_chunks
+                    ].concat().to_vec()
                 };
-                let xof_bits_results = packed_xof_bits.iter().enumerate().map(|(k, x)| {
-                    Vec::<Boolean>::alloc(
+                let xof_bits_results = xof_bits.iter().enumerate().map(|(k, x)| {
+                    Boolean::alloc(
                         cs.ns(|| format!("{}, {}: allocate xof bits {}", c, i, k)),
                         || Ok(x.clone()),
-                    )
+                    ).unwrap()
                 }).collect::<Vec<_>>();
-                let xof_bits_packed = if xof_bits_results.iter().any(|x| x.is_err()) {
-                    Err(SynthesisError::Unsatisfiable)
-                } else {
-                    Ok(xof_bits_results.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>())
-                }?;
-                public_inputs.extend_from_slice(&xof_bits_packed.iter().map(|x| {{
-                    x.iter().rev().map(|y| y.clone()).collect::<Vec<_>>()
-                }}).collect::<Vec<_>>());
-                for public_input in public_inputs.iter() {
-                    if public_input.iter().all(|x| x.get_value().is_some()) {
-                        let bools = public_input.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>();
-                        let bytes = bits_to_bytes(&bools);
-                        let bytes_reverse = bits_to_bytes(&bools.into_iter().rev().collect::<Vec<_>>());
-                    }
-                }
+                all_xof_bits.extend_from_slice(&xof_bits_results);
+
 
                 let message_hash = HashToGroupGadget::hash_to_group(
                     cs.ns(|| format!("{}, {}: hash to group", c, i)),
-                    &xof_bits_packed.into_iter().map(|b| b.clone()).flatten().collect::<Vec<_>>(),
+                    &xof_bits_results,
                     BlsFrParameters::CAPACITY as usize,
                 )?;
 
                 let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
-                    cs.ns(|| format!("{}, {}: verify signature", c, i)),
+                    cs.ns(|| format!("{}, {}: verify signature partial", c, i)),
                     &current_pub_keys_vars,
                     signed_bitmap.as_slice(),
                     message_hash,
@@ -349,18 +360,21 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 )?;
                 prepared_aggregated_public_keys.push(prepared_aggregated_public_key);
                 prepared_message_hashes.push(prepared_message_hash);
-                if aggregated_signature.is_none() {
-                    aggregated_signature = Some(signature);
-                } else {
-                    aggregated_signature = Some(aggregated_signature.unwrap().add(
-                        cs.ns(|| format!("{}, {}: add signature", c, i)),
-                        &signature,
-                    )?);
-                }
 
                 current_pub_keys_vars = new_pub_keys_vars;
                 current_maximum_non_signers = maximum_non_signers;
+                current_epoch_index = epoch_index;
             }
+            let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
+                b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
+            }).collect::<Vec<_>>();
+
+            public_inputs.extend_from_slice(&packed_messages);
+
+            public_inputs.extend_from_slice(all_xof_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|x| {{
+                x.iter().rev().map(|y| y.clone()).collect::<Vec<_>>()
+            }}).collect::<Vec<_>>().as_slice());
+
             let proof = ProofGadget::<_, _, PairingGadget>::alloc::<_, Proof<Bls12_377>, _>(
                 cs.ns(|| format!("alloc proof {}", c)),
                 || Ok(self.hash_proofs[c].proof.clone()),
@@ -384,7 +398,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             cs.ns(|| format!("batch verify BLS")),
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
-            aggregated_signature.unwrap(),
+            aggregated_signature,
         )?;
         for (j, pk) in current_pub_keys_vars.iter().enumerate() {
             let pk_var = G1Gadget::<Bls12_377Parameters>::alloc_input(

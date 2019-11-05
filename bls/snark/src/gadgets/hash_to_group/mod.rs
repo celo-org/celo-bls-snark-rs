@@ -153,19 +153,12 @@ pub struct HashToBitsGadget {
 impl HashToBitsGadget {
     pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<HashToBitsField>>(
         mut cs: CS,
-        message_packed: &[FpGadget<HashToBitsField>],
-        message_size_in_bits: usize,
+        message: &[Boolean],
         source_capacity: usize,
         target_capacity: usize,
-    ) -> Result<Vec<FpGadget<HashToBitsField>>, SynthesisError> {
-        let message = MultipackGadget::unpack(
-            cs.ns(|| "unpack message"),
-            message_packed,
-            message_size_in_bits,
-            source_capacity,
-        )?;
+    ) -> Result<Vec<Boolean>, SynthesisError> {
 
-        let message = message.into_iter().rev().collect::<Vec<_>>();
+        let message = message.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>();
 
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
@@ -194,18 +187,13 @@ impl HashToBitsGadget {
         }
 
         let modulus_bit_rounded = (((HashToBitsFieldParameters::MODULUS_BITS + 7)/8)*8) as usize;
-        let xof_bits = &[
+        let xof_bits = [
             &xof_bits[..HashToBitsFieldParameters::MODULUS_BITS as usize],
             &xof_bits[modulus_bit_rounded..modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize],
             &[xof_bits[modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize]][..],
         ].concat();
 
-        MultipackGadget::pack(
-            cs.ns(|| "pack xof bits"),
-            xof_bits,
-            target_capacity,
-            true,
-        )
+        Ok(xof_bits)
     }
 }
 

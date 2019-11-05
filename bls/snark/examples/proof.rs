@@ -18,7 +18,7 @@ use algebra::{
 use rand::thread_rng;
 use algebra::{
     biginteger::BigInteger,
-    curves::bls12_377::{Bls12_377, G1Projective, Bls12_377Parameters}
+    curves::bls12_377::{Bls12_377, G1Projective, G2Projective, Bls12_377Parameters}
 };
 use bls_snark::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits};
 use bls_zexe::bls::keys::{PublicKey, PrivateKey, Signature};
@@ -50,9 +50,8 @@ fn main() {
         panic!("hash_batch_size must divide num_epochs");
     }
     let num_proofs = num_epochs / hash_batch_size;
-    let packed_size = ((377*2+1 + BlsFrParameters::CAPACITY - 1)/BlsFrParameters::CAPACITY) as usize;
     let rng = &mut thread_rng();
-    let epoch_bits = encode_epoch_block_to_bits(0, &vec![
+    let epoch_bits = encode_epoch_block_to_bits(0, 0, &vec![
         PublicKey::from_pk(&G1Projective::prime_subgroup_generator()); num_validators
     ]).unwrap();
     let epoch_bits_len = epoch_bits.len() + 8;
@@ -79,23 +78,24 @@ fn main() {
     let params_time = start_timer!(|| "params");
     let params = {
         let empty_update = SingleUpdate {
+            epoch_index: None,
             maximum_non_signers: None,
             new_pub_keys: vec![None; num_validators],
             signed_bitmap: vec![None; num_validators],
-            signature: None,
         };
         let empty_hash_proof = HashProof {
             proof: Proof::<Bls12_377>::default(),
         };
         let c = ValidatorSetUpdate {
+            initial_epoch_index: None,
             initial_public_keys: vec![None; num_validators],
             initial_maximum_non_signers: None,
             num_validators: num_validators,
             hash_batch_size: hash_batch_size,
             hash_proofs: vec![empty_hash_proof; num_proofs],
             updates: vec![empty_update; num_epochs],
-            packed_size: packed_size,
             verifying_key: hash_params.vk.clone(),
+            aggregated_signature: None,
         };
         println!("generating parameters");
         let p = generate_random_parameters::<SW6, _, _>(c, rng).unwrap();
@@ -116,7 +116,7 @@ fn main() {
             PrivateKey::generate(rng)
         }).collect::<Vec<_>>();
         let new_public_keys = new_private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
-        let epoch_bits = encode_epoch_block_to_bits(maximum_non_signers, &new_public_keys).unwrap();
+        let epoch_bits = encode_epoch_block_to_bits(i as u16 + 1, maximum_non_signers, &new_public_keys).unwrap();
         let epoch_bytes = bits_to_bytes(&epoch_bits);
         let (message_g2, attempt) = try_and_increment.hash_with_attempt::<Bls12_377Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
         let epoch_bits_with_attempt = &[
@@ -148,14 +148,13 @@ fn main() {
         };
 
         let mut public_inputs_for_hash = vec![];
+        let mut all_crh_bits = vec![];
+        let mut all_xof_bits = vec![];
         for j in 0..chunk.len() {
             let crh_bits = &chunk[j];
             let crh_bytes = bits_to_bytes(crh_bits);
+            all_crh_bits.extend_from_slice(&crh_bits);
 
-            let epoch_chunks = crh_bits.chunks(BlsFrParameters::CAPACITY as usize);
-            let epoch_chunks = epoch_chunks.into_iter().map(|c| {
-                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
-            }).collect::<Vec<_>>();
             let xof_target_bits = 768;
             let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
             let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
@@ -165,14 +164,21 @@ fn main() {
                 &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
                 &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
             ].concat().to_vec();
-            let fp_chunks = hash_bits.chunks(BlsFrParameters::CAPACITY as usize);
-            let fp_chunks = fp_chunks.into_iter().map(|c| {
-                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
-            }).collect::<Vec<_>>();
 
-            public_inputs_for_hash.extend_from_slice(&epoch_chunks);
-            public_inputs_for_hash.extend_from_slice(&fp_chunks);
+            all_xof_bits.extend_from_slice(hash_bits);
         }
+        let epoch_chunks = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize);
+        let epoch_chunks = epoch_chunks.into_iter().map(|c| {
+            BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
+        }).collect::<Vec<_>>();
+
+        let fp_chunks = all_xof_bits.chunks(BlsFrParameters::CAPACITY as usize);
+        let fp_chunks = fp_chunks.into_iter().map(|c| {
+            BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
+        }).collect::<Vec<_>>();
+
+        public_inputs_for_hash.extend_from_slice(&epoch_chunks);
+        public_inputs_for_hash.extend_from_slice(&fp_chunks);
 
         let mut cs = TestConstraintSystem::<BlsFr>::new();
         c.clone().generate_constraints(&mut cs).unwrap();
@@ -197,25 +203,27 @@ fn main() {
         let mut updates = vec![];
         for i in 0..num_epochs {
             let update = SingleUpdate {
+                epoch_index: Some(i as u16 + 1),
                 maximum_non_signers: Some(maximum_non_signers),
                 new_pub_keys: new_public_keys_epochs[i].iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
                 signed_bitmap: [
                     &[Some(true), Some(true), Some(true), Some(true), Some(true)],
                     vec![Some(false); num_validators - 5].as_slice(),
                 ].concat(),
-                signature: Some(new_signatures_epochs[i].get_sig()),
             };
             updates.push(update);
         }
+        let aggregated_signature = new_signatures_epochs.iter().fold(G2Projective::zero(), |acc, s| acc + &s.get_sig());
         let c = ValidatorSetUpdate {
+            initial_epoch_index: Some(0),
             initial_public_keys: public_keys.iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
             initial_maximum_non_signers: Some(maximum_non_signers),
             num_validators: num_validators,
             hash_batch_size: hash_batch_size,
             hash_proofs: hash_proofs.iter().map(|p| HashProof { proof: p.clone() }).collect::<Vec<_>>(),
             updates: updates,
-            packed_size: packed_size,
             verifying_key: hash_params.vk.clone(),
+            aggregated_signature: Some(aggregated_signature),
         };
         let mut cs = TestConstraintSystem::<Fr>::new();
         c.clone().generate_constraints(&mut cs).unwrap();
@@ -237,6 +245,7 @@ fn main() {
             vec![affine.x, affine.y]
         }).flatten().collect::<Vec<_>>().as_slice(),
         &[Fr::from(maximum_non_signers as u64)],
+        &[Fr::from(0 as u64)],
         new_public_keys_epochs.last().unwrap().iter().map(|pk| {
             let affine = pk.get_pk().into_affine();
             vec![affine.x, affine.y]
