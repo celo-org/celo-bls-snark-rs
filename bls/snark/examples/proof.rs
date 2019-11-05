@@ -56,6 +56,7 @@ fn main() {
         PublicKey::from_pk(&G1Projective::prime_subgroup_generator()); num_validators
     ]).unwrap();
     let epoch_bits_len = epoch_bits.len() + 8;
+    let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
 
     let private_keys = (0..num_validators).map(|i| {
         PrivateKey::generate(rng)
@@ -65,7 +66,7 @@ fn main() {
     let hash_params_time = start_timer!(|| "hash params");
     let hash_params = {
         let c = HashToBits {
-            message_bits: vec![vec![None; epoch_bits_len]; hash_batch_size],
+            message_bits: vec![vec![None; modulus_bit_rounded]; hash_batch_size],
             hash_batch_size: hash_batch_size,
         };
         println!("generating parameters for hash to bits");
@@ -122,11 +123,16 @@ fn main() {
             epoch_bits.as_slice(),
             (0..8).map(|i| ((attempt as u8 & u8::pow(2, i)) >> i) == 1).into_iter().rev().collect::<Vec<_>>().as_slice(),
         ].concat().to_vec();
+        let epoch_bytes_with_attempt = bits_to_bytes(&epoch_bits_with_attempt);
         let signatures = current_private_keys[..5].iter().map(|p| p.sign(&epoch_bytes, &[], &try_and_increment).unwrap()).collect::<Vec<_>>();
         let signatures_refs = signatures.iter().map(|s| s).collect::<Vec<_>>();
         let aggregated_signature = Signature::aggregate(&signatures_refs);
 
-        message_bits.push(epoch_bits_with_attempt.clone());
+        let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes_with_attempt, num_bits_in_hash/8).unwrap();
+        let crh_bits = bytes_to_bits(&crh_bytes, modulus_bit_rounded);
+
+
+        message_bits.push(crh_bits.clone());
         new_public_keys_epochs.push(new_public_keys);
         new_signatures_epochs.push(aggregated_signature);
 
@@ -143,14 +149,15 @@ fn main() {
 
         let mut public_inputs_for_hash = vec![];
         for j in 0..chunk.len() {
-            let epoch_bits_with_attempt = &chunk[j];
-            let epoch_bytes = bits_to_bytes(&epoch_bits_with_attempt);
-            let epoch_chunks = epoch_bits_with_attempt.chunks(BlsFrParameters::CAPACITY as usize);
+            let crh_bits = &chunk[j];
+            let crh_bytes = bits_to_bytes(crh_bits);
+
+            let epoch_chunks = crh_bits.chunks(BlsFrParameters::CAPACITY as usize);
             let epoch_chunks = epoch_chunks.into_iter().map(|c| {
                 BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
             }).collect::<Vec<_>>();
             let xof_target_bits = 768;
-            let hash = composite_hasher.hash( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
+            let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
             let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
             let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
             let hash_bits = &[
@@ -174,6 +181,10 @@ fn main() {
         }
         assert!(cs.is_satisfied());
         let prepared_verifying_key = prepare_verifying_key(&hash_params.vk);
+
+        for pi in public_inputs_for_hash.iter() {
+            println!("public input for hash: {}", pi);
+        }
 
         let p = create_random_proof(c, &hash_params, rng).unwrap();
         assert!(verify_proof(&prepared_verifying_key, &p, public_inputs_for_hash.as_slice()).unwrap());

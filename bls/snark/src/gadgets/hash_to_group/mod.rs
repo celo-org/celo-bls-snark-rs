@@ -57,11 +57,7 @@ use bls_zexe::{
 };
 use r1cs_std::bits::uint8::UInt8;
 use crate::gadgets::y_to_bit::YToBitGadget;
-use algebra::curves::bls12_377::{
-    Bls12_377Parameters,
-    G2Projective as Bls12_377G2Projective,
-    g2::Bls12_377G2Parameters,
-};
+use algebra::curves::bls12_377::{Bls12_377Parameters, G2Projective as Bls12_377G2Projective, g2::Bls12_377G2Parameters, Bls12_377};
 use algebra::fields::models::fp6_3over2::Fp6Parameters;
 use algebra::fields::models::fp12_2over3over2::Fp12Parameters;
 use algebra::curves::models::bls12::Bls12Parameters;
@@ -70,7 +66,7 @@ use crypto_primitives::prf::Blake2sWithParameterBlock;
 use algebra::curves::sw6::SW6;
 use r1cs_std::fields::fp::FpGadget;
 
-type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsBls, Bls12_377Fr, EdwardsBlsGadget>;
+type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
 
 pub struct MultipackGadget {
 
@@ -148,8 +144,8 @@ impl MultipackGadget {
     }
 }
 
-type HashToBitsField = Bls12_377Fr;
-type HashToBitsFieldParameters = SW6FrParameters;
+pub type HashToBitsField = Bls12_377Fr;
+pub type HashToBitsFieldParameters = SW6FrParameters;
 
 pub struct HashToBitsGadget {
 }
@@ -171,48 +167,6 @@ impl HashToBitsGadget {
 
         let message = message.into_iter().rev().collect::<Vec<_>>();
 
-        let crh_params =
-            <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::ParametersGadget::alloc(
-                &mut cs.ns(|| "pedersen parameters"),
-                || {
-                    match CompositeHasher::setup_crh() {
-                        Ok(x) => Ok(x),
-                        Err(e) => {
-                            println!("error: {}", e);
-                            Err(SynthesisError::AssignmentMissing)
-                        },
-                    }
-                }
-            )?;
-        let input_bytes: Vec<UInt8> = message.chunks(8).map(|chunk| {
-            let mut chunk_padded = chunk.clone().to_vec();
-            if chunk_padded.len() < 8 {
-                chunk_padded.resize(8, Boolean::constant(false));
-            }
-            UInt8::from_bits_le(&chunk_padded)
-        }).collect();
-
-        let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, HashToBitsField>>::check_evaluation_gadget(
-            &mut cs.ns(|| "pedersen evaluation"),
-            &crh_params,
-            &input_bytes,
-        )?;
-        let crh_bits = crh_result.x.to_bits(
-            cs.ns(|| "crh bits"),
-        )?;
-
-        let crh_bits_len = crh_bits.len();
-        let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
-
-        let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
-        first_bits.reverse();
-        let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
-        crh_bits.reverse();
-        crh_bits.extend_from_slice(&first_bits);
-        for i in 0..(crh_bits_len_rounded - crh_bits_len) {
-            crh_bits.push(Boolean::constant(false));
-        }
-
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
@@ -232,7 +186,7 @@ impl HashToBitsGadget {
             };
             let xof_result = blake2s_gadget_with_parameters(
                 cs.ns(|| format!("xof result {}", i)),
-                &crh_bits,
+                &message,
                 &blake2s_parameters.parameters(),
             )?;
             let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();

@@ -47,6 +47,13 @@ use bls_zexe::{
 use bls_zexe::bls::keys::SIG_DOMAIN;
 use r1cs_std::bits::uint8::UInt8;
 use bls_zexe::curve::hash::HashToG2;
+use crypto_primitives::FixedLengthCRHGadget;
+use bls_zexe::hash::composite::CRH;
+use r1cs_std::groups::curves::twisted_edwards::edwards_sw6::EdwardsSWGadget;
+use algebra::curves::edwards_sw6::EdwardsProjective;
+use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
+
+type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsSWGadget>;
 
 #[derive(Clone)]
 pub struct HashToBits {
@@ -129,6 +136,21 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
     fn generate_constraints<CS: ConstraintSystem<Fr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
+
+        let crh_params =
+            <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::ParametersGadget::alloc(
+                &mut cs.ns(|| "pedersen parameters"),
+                || {
+                    match CompositeHasher::setup_crh() {
+                        Ok(x) => Ok(x),
+                        Err(e) => {
+                            println!("error: {}", e);
+                            Err(SynthesisError::AssignmentMissing)
+                        },
+                    }
+                }
+            )?;
+
         let verifying_key = VerifyingKeyGadget::<_, _, PairingGadget>::alloc(
             cs.ns(|| "allocate verifying key"),
             || Ok(self.verifying_key.clone()),
@@ -221,7 +243,49 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     epoch_bits.as_slice(),
                     attempt.into_bits_le().into_iter().rev().collect::<Vec<_>>().as_slice(),
                 ].concat().to_vec();
-                let packed_message = epoch_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
+
+                let input_bytes: Vec<UInt8> = epoch_bits.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
+                    let mut chunk_padded = chunk.clone().to_vec();
+                    if chunk_padded.len() < 8 {
+                        chunk_padded.resize(8, Boolean::constant(false));
+                    }
+                    UInt8::from_bits_le(&chunk_padded)
+                }).collect();
+
+                if input_bytes.iter().all(|x| x.get_value().is_some()) {
+                    println!("input bytes: {}", hex::encode(input_bytes.iter().map(|x| x.get_value().unwrap()).collect::<Vec<_>>().as_slice()));
+                }
+
+                let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
+                    &mut cs.ns(|| format!("{}, {}: pedersen evaluation", c, i)),
+                    &crh_params,
+                    &input_bytes,
+                )?;
+                if crh_result.x.value.is_some() {
+                    println!("crh result: {}", crh_result.x.value.unwrap())
+                }
+                let mut crh_bits = crh_result.x.to_bits(
+                    cs.ns(|| "crh bits"),
+                )?;
+
+                let crh_bits_len = crh_bits.len();
+                let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
+
+
+                let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
+                first_bits.reverse();
+                let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
+
+                crh_bits.reverse();
+                crh_bits.extend_from_slice(&first_bits);
+                for i in 0..(crh_bits_len_rounded - crh_bits_len) {
+                    crh_bits.push(Boolean::constant(false));
+                }
+
+                //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
+                let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
+
+                let packed_message = crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
                     b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
                 }).collect::<Vec<_>>();
 
@@ -238,7 +302,12 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     hash_bits_vec
                 } else {
                     let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                    let hash = composite_hasher.hash( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
+                    println!("epoch bytes: {}", hex::encode(&epoch_bytes));
+
+                    let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
+                    println!("crh bytes: {}", hex::encode(&crh_bytes));
+
+                    let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
                     let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
                     let hash_bits = &[
                         &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
@@ -264,6 +333,15 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 public_inputs.extend_from_slice(&xof_bits_packed.iter().map(|x| {{
                     x.iter().rev().map(|y| y.clone()).collect::<Vec<_>>()
                 }}).collect::<Vec<_>>());
+                for public_input in public_inputs.iter() {
+                    if public_input.iter().all(|x| x.get_value().is_some()) {
+                        let bools = public_input.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>();
+                        let bytes = bits_to_bytes(&bools);
+                        println!("bytes: {}", hex::encode(&bytes));
+                        let bytes_reverse = bits_to_bytes(&bools.into_iter().rev().collect::<Vec<_>>());
+                        println!("bytes reverse: {}", hex::encode(&bytes_reverse));
+                    }
+                }
 
                 let message_hash = HashToGroupGadget::hash_to_group(
                     cs.ns(|| format!("{}, {}: hash to group", c, i)),
@@ -317,209 +395,216 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey, Proof};
-    use crate::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits};
-    use algebra::{
-        PrimeField,
-        fields::{
-            FpParameters,
-            sw6::{Fr, FrParameters},
-            bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
-        },
-        curves::{
-            ProjectiveCurve,
-            sw6::SW6
-        }
-    };
-    use rand::thread_rng;
-    use algebra::{
-        biginteger::BigInteger,
-        curves::bls12_377::{Bls12_377, G1Projective, Bls12_377Parameters}
-    };
-    use crate::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits};
-    use bls_zexe::bls::keys::{PublicKey, PrivateKey, Signature};
-    use r1cs_std::bits::boolean::Boolean;
-    use bls_zexe::hash::{
-        XOF,
-        composite::CompositeHasher
-    };
-    use bls_zexe::curve::hash::{
-        HashToG2,
-        try_and_increment::TryAndIncrement
-    };
-    use bls_zexe::bls::keys::SIG_DOMAIN;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
-    use r1cs_core::{ConstraintSynthesizer, ConstraintSystem};
-
-    #[test]
-    fn test_circuit_proof() {
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
-
-        let num_validators = 10;
-        let num_bits_in_hash = 768;
-        let hash_batch_size = 1;
-        let num_epochs = 1 as usize;
-        if num_epochs % hash_batch_size != 0 {
-            panic!("hash_batch_size must divide num_epochs");
-        }
-        let num_proofs = num_epochs / hash_batch_size;
-        let packed_size = ((377*2+1 + BlsFrParameters::CAPACITY - 1)/BlsFrParameters::CAPACITY) as usize;
-        let rng = &mut thread_rng();
-        let epoch_bits = encode_epoch_block_to_bits(0, &vec![
-            PublicKey::from_pk(&G1Projective::prime_subgroup_generator()); num_validators
-        ]).unwrap();
-        let epoch_bits_len = epoch_bits.len() + 8;
-
-        let private_keys = (0..num_validators).map(|i| {
-            PrivateKey::generate(rng)
-        }).collect::<Vec<_>>();
-        let public_keys = private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
-
-        let new_private_keys = (0..num_validators).map(|i| {
-            PrivateKey::generate(rng)
-        }).collect::<Vec<_>>();
-        let new_public_keys = new_private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
-        let maximum_non_signers = 6;
-        let epoch_bits = encode_epoch_block_to_bits(maximum_non_signers, &new_public_keys).unwrap();
-        let epoch_bytes = bits_to_bytes(&epoch_bits);
-        let (message_g2, attempt) = try_and_increment.hash_with_attempt::<Bls12_377Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
-        let epoch_bits_with_attempt = &[
-            epoch_bits.as_slice(),
-            (0..8).map(|i| ((attempt as u8 & u8::pow(2, i)) >> i) == 1).into_iter().rev().collect::<Vec<_>>().as_slice(),
-        ].concat().to_vec();
-        let signatures = private_keys[..5].iter().map(|p| p.sign(&epoch_bytes, &[], &try_and_increment).unwrap()).collect::<Vec<_>>();
-        let signatures_refs = signatures.iter().map(|s| s).collect::<Vec<_>>();
-        let aggregated_signature = Signature::aggregate(&signatures_refs);
-
-        let (hash_params, hash_proof) = {
-            let hash_params = {
-                let c = HashToBits {
-                    message_bits: vec![vec![None; epoch_bits_len]],
-                    hash_batch_size: hash_batch_size,
-                };
-                println!("generating parameters for hash to bits");
-                let p = generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap();
-                println!("generated parameters for hash to bits");
-                p
-            };
-
-            let c = HashToBits {
-                message_bits: vec![epoch_bits_with_attempt.into_iter().map(|b| Some(*b)).collect::<Vec<_>>()],
-                hash_batch_size: hash_batch_size,
-            };
-
-            let epoch_bytes = bits_to_bytes(&epoch_bits_with_attempt);
-            let epoch_chunks = epoch_bits_with_attempt.chunks(BlsFrParameters::CAPACITY as usize);
-            let epoch_chunks = epoch_chunks.into_iter().map(|c| {
-                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
-            }).collect::<Vec<_>>();
-            let xof_target_bits = 768;
-            let hash = composite_hasher.hash( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
-            let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
-            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
-            let hash_bits = &[
-                &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
-                &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-            ].concat().to_vec();
-            let fp_chunks = hash_bits.chunks(BlsFrParameters::CAPACITY as usize);
-            let fp_chunks = fp_chunks.into_iter().map(|c| {
-                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
-            }).collect::<Vec<_>>();
-
-            let mut cs = TestConstraintSystem::<BlsFr>::new();
-            c.clone().generate_constraints(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("which: {}", cs.which_is_unsatisfied().unwrap());
-            }
-            assert!(cs.is_satisfied());
-            let public_inputs_for_hash = &[
-                epoch_chunks,
-                fp_chunks,
-            ].concat();
-            let prepared_verifying_key = prepare_verifying_key(&hash_params.vk);
-
-            let p = create_random_proof(c, &hash_params, rng).unwrap();
-            assert!(verify_proof(&prepared_verifying_key, &p, public_inputs_for_hash.as_slice()).unwrap());
-            //println!("verified public input len: {}", public_inputs_for_hash.len());
-            public_inputs_for_hash.iter().for_each(|p| {
-                //println!("verified public input: {}", p);
-            });
-            (hash_params, p)
-        };
-
-        let (params, update_proof) = {
-            let update = SingleUpdate {
-                maximum_non_signers: Some(maximum_non_signers),
-                new_pub_keys: new_public_keys.iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
-                signed_bitmap: vec![Some(true), Some(true), Some(true), Some(true), Some(true), Some(false), Some(false),Some(false),Some(false),Some(false)],
-                signature: Some(aggregated_signature.get_sig()),
-            };
-            let c = ValidatorSetUpdate {
-                initial_public_keys: public_keys.iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
-                initial_maximum_non_signers: Some(maximum_non_signers),
-                num_validators: num_validators,
-                hash_batch_size: hash_batch_size,
-                hash_proofs: vec![hash_proof].iter().map(|p| HashProof { proof: p.clone() }).collect::<Vec<_>>(),
-                updates: vec![update],
-                packed_size: packed_size,
-                verifying_key: hash_params.vk.clone(),
-            };
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            c.clone().generate_constraints(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("which: {}", cs.which_is_unsatisfied().unwrap());
-            }
-            assert!(cs.is_satisfied());
-
-            let params = {
-                let empty_update = SingleUpdate {
-                    maximum_non_signers: None,
-                    new_pub_keys: vec![None; num_validators],
-                    signed_bitmap: vec![None; num_validators],
-                    signature: None,
-                };
-                let empty_hash_proof = HashProof {
-                    proof: Proof::<Bls12_377>::default(),
-                };
-                let c = ValidatorSetUpdate {
-                    initial_public_keys: vec![None; num_validators],
-                    initial_maximum_non_signers: None,
-                    num_validators: num_validators,
-                    hash_batch_size: hash_batch_size,
-                    hash_proofs: vec![empty_hash_proof; num_proofs],
-                    updates: vec![empty_update; num_epochs],
-                    packed_size: packed_size,
-                    verifying_key: hash_params.vk.clone(),
-                };
-                println!("generating parameters");
-                let p = generate_random_parameters::<SW6, _, _>(c, rng).unwrap();
-                println!("generated parameters");
-                p
-            };
-
-            let p = create_random_proof(c, &params, rng).unwrap();
-            (params, p)
-        };
-
-        let prepared_verifying_key = prepare_verifying_key(&params.vk);
-        let public_inputs = [
-            public_keys.iter().map(|pk| {
-                let affine = pk.get_pk().into_affine();
-                vec![affine.x, affine.y]
-            }).flatten().collect::<Vec<_>>().as_slice(),
-            &[Fr::from(maximum_non_signers as u64)],
-            new_public_keys.iter().map(|pk| {
-                let affine = pk.get_pk().into_affine();
-                vec![affine.x, affine.y]
-            }).flatten().collect::<Vec<_>>().as_slice(),
-        ].concat().to_vec();
-        public_inputs.iter().for_each(|x| {
-            //println!("public input: {}", x);
-        });
-        assert!(verify_proof(&prepared_verifying_key, &update_proof, public_inputs.as_slice()).unwrap())
-    }
-}
+//#[cfg(test)]
+//mod test {
+//    use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey, Proof};
+//    use crate::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits};
+//    use algebra::{
+//        PrimeField,
+//        fields::{
+//            FpParameters,
+//            sw6::{Fr, FrParameters},
+//            bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
+//        },
+//        curves::{
+//            ProjectiveCurve,
+//            sw6::SW6
+//        }
+//    };
+//    use rand::thread_rng;
+//    use algebra::{
+//        biginteger::BigInteger,
+//        curves::bls12_377::{Bls12_377, G1Projective, Bls12_377Parameters}
+//    };
+//    use crate::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits};
+//    use bls_zexe::bls::keys::{PublicKey, PrivateKey, Signature};
+//    use r1cs_std::bits::boolean::Boolean;
+//    use bls_zexe::hash::{
+//        XOF,
+//        composite::CompositeHasher
+//    };
+//    use bls_zexe::curve::hash::{
+//        HashToG2,
+//        try_and_increment::TryAndIncrement
+//    };
+//    use bls_zexe::bls::keys::SIG_DOMAIN;
+//    use r1cs_std::test_constraint_system::TestConstraintSystem;
+//    use r1cs_core::{ConstraintSynthesizer, ConstraintSystem};
+//
+//    #[test]
+//    fn test_circuit_proof() {
+//        let composite_hasher = CompositeHasher::new().unwrap();
+//        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+//
+//        let num_validators = 10;
+//        let num_bits_in_hash = 768;
+//        let hash_batch_size = 1;
+//        let num_epochs = 1 as usize;
+//        if num_epochs % hash_batch_size != 0 {
+//            panic!("hash_batch_size must divide num_epochs");
+//        }
+//        let num_proofs = num_epochs / hash_batch_size;
+//        let packed_size = ((377*2+1 + BlsFrParameters::CAPACITY - 1)/BlsFrParameters::CAPACITY) as usize;
+//        let rng = &mut thread_rng();
+//        let epoch_bits = encode_epoch_block_to_bits(0, &vec![
+//            PublicKey::from_pk(&G1Projective::prime_subgroup_generator()); num_validators
+//        ]).unwrap();
+//        let epoch_bits_len = epoch_bits.len() + 8;
+//
+//        let private_keys = (0..num_validators).map(|i| {
+//            PrivateKey::generate(rng)
+//        }).collect::<Vec<_>>();
+//        let public_keys = private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
+//
+//        let new_private_keys = (0..num_validators).map(|i| {
+//            PrivateKey::generate(rng)
+//        }).collect::<Vec<_>>();
+//        let new_public_keys = new_private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
+//        let maximum_non_signers = 6;
+//        let epoch_bits = encode_epoch_block_to_bits(maximum_non_signers, &new_public_keys).unwrap();
+//        let epoch_bytes = bits_to_bytes(&epoch_bits);
+//        let (message_g2, attempt) = try_and_increment.hash_with_attempt::<Bls12_377Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
+//        let epoch_bits_with_attempt = &[
+//            epoch_bits.as_slice(),
+//            (0..8).map(|i| ((attempt as u8 & u8::pow(2, i)) >> i) == 1).into_iter().rev().collect::<Vec<_>>().as_slice(),
+//        ].concat().to_vec();
+//        let signatures = private_keys[..5].iter().map(|p| p.sign(&epoch_bytes, &[], &try_and_increment).unwrap()).collect::<Vec<_>>();
+//        let signatures_refs = signatures.iter().map(|s| s).collect::<Vec<_>>();
+//        let aggregated_signature = Signature::aggregate(&signatures_refs);
+//
+//        let epoch_bytes = bits_to_bytes(&epoch_bits_with_attempt);
+//        let xof_target_bits = 768;
+//        let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
+//        let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
+//        let crh_bits = bytes_to_bits(&crh_bytes, modulus_bit_rounded).into_iter().rev().collect::<Vec<_>>();
+//
+//        let (hash_params, hash_proof) = {
+//            let hash_params = {
+//                let c = HashToBits {
+//                    message_bits: vec![vec![None; epoch_bits_len]],
+//                    hash_batch_size: hash_batch_size,
+//                };
+//                println!("generating parameters for hash to bits");
+//                let p = generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap();
+//                println!("generated parameters for hash to bits");
+//                p
+//            };
+//
+//            let c = HashToBits {
+//                message_bits: vec![epoch_bits_with_attempt.into_iter().map(|b| Some(*b)).collect::<Vec<_>>()],
+//                hash_batch_size: hash_batch_size,
+//            };
+//
+//
+//            let epoch_chunks = crh_bits.chunks(BlsFrParameters::CAPACITY as usize);
+//            let epoch_chunks = epoch_chunks.into_iter().map(|c| {
+//                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
+//            }).collect::<Vec<_>>();
+//
+//            let hash = composite_hasher.xof(SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
+//
+//            let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
+//            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
+//            let hash_bits = &[
+//                &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
+//                &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
+//                &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
+//            ].concat().to_vec();
+//            let fp_chunks = hash_bits.chunks(BlsFrParameters::CAPACITY as usize);
+//            let fp_chunks = fp_chunks.into_iter().map(|c| {
+//                BlsFr::from_repr(<BlsFrParameters as FpParameters>::BigInt::from_bits(c))
+//            }).collect::<Vec<_>>();
+//
+//            let mut cs = TestConstraintSystem::<BlsFr>::new();
+//            c.clone().generate_constraints(&mut cs).unwrap();
+//            if !cs.is_satisfied() {
+//                println!("which: {}", cs.which_is_unsatisfied().unwrap());
+//            }
+//            assert!(cs.is_satisfied());
+//            let public_inputs_for_hash = &[
+//                epoch_chunks,
+//                fp_chunks,
+//            ].concat();
+//            let prepared_verifying_key = prepare_verifying_key(&hash_params.vk);
+//
+//            let p = create_random_proof(c, &hash_params, rng).unwrap();
+//            assert!(verify_proof(&prepared_verifying_key, &p, public_inputs_for_hash.as_slice()).unwrap());
+//            //println!("verified public input len: {}", public_inputs_for_hash.len());
+//            public_inputs_for_hash.iter().for_each(|p| {
+//                //println!("verified public input: {}", p);
+//            });
+//            (hash_params, p)
+//        };
+//
+//        let (params, update_proof) = {
+//            let update = SingleUpdate {
+//                maximum_non_signers: Some(maximum_non_signers),
+//                new_pub_keys: new_public_keys.iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
+//                signed_bitmap: vec![Some(true), Some(true), Some(true), Some(true), Some(true), Some(false), Some(false),Some(false),Some(false),Some(false)],
+//                signature: Some(aggregated_signature.get_sig()),
+//            };
+//            let c = ValidatorSetUpdate {
+//                initial_public_keys: public_keys.iter().map(|pk| Some(pk.get_pk())).collect::<Vec<_>>(),
+//                initial_maximum_non_signers: Some(maximum_non_signers),
+//                num_validators: num_validators,
+//                hash_batch_size: hash_batch_size,
+//                hash_proofs: vec![hash_proof].iter().map(|p| HashProof { proof: p.clone() }).collect::<Vec<_>>(),
+//                updates: vec![update],
+//                packed_size: packed_size,
+//                verifying_key: hash_params.vk.clone(),
+//            };
+//            let mut cs = TestConstraintSystem::<Fr>::new();
+//            c.clone().generate_constraints(&mut cs).unwrap();
+//            if !cs.is_satisfied() {
+//                println!("which: {}", cs.which_is_unsatisfied().unwrap());
+//            }
+//            assert!(cs.is_satisfied());
+//
+//            let params = {
+//                let empty_update = SingleUpdate {
+//                    maximum_non_signers: None,
+//                    new_pub_keys: vec![None; num_validators],
+//                    signed_bitmap: vec![None; num_validators],
+//                    signature: None,
+//                };
+//                let empty_hash_proof = HashProof {
+//                    proof: Proof::<Bls12_377>::default(),
+//                };
+//                let c = ValidatorSetUpdate {
+//                    initial_public_keys: vec![None; num_validators],
+//                    initial_maximum_non_signers: None,
+//                    num_validators: num_validators,
+//                    hash_batch_size: hash_batch_size,
+//                    hash_proofs: vec![empty_hash_proof; num_proofs],
+//                    updates: vec![empty_update; num_epochs],
+//                    packed_size: packed_size,
+//                    verifying_key: hash_params.vk.clone(),
+//                };
+//                println!("generating parameters");
+//                let p = generate_random_parameters::<SW6, _, _>(c, rng).unwrap();
+//                println!("generated parameters");
+//                p
+//            };
+//
+//            let p = create_random_proof(c, &params, rng).unwrap();
+//            (params, p)
+//        };
+//
+//        let prepared_verifying_key = prepare_verifying_key(&params.vk);
+//        let public_inputs = [
+//            public_keys.iter().map(|pk| {
+//                let affine = pk.get_pk().into_affine();
+//                vec![affine.x, affine.y]
+//            }).flatten().collect::<Vec<_>>().as_slice(),
+//            &[Fr::from(maximum_non_signers as u64)],
+//            new_public_keys.iter().map(|pk| {
+//                let affine = pk.get_pk().into_affine();
+//                vec![affine.x, affine.y]
+//            }).flatten().collect::<Vec<_>>().as_slice(),
+//        ].concat().to_vec();
+//        public_inputs.iter().for_each(|x| {
+//            //println!("public input: {}", x);
+//        });
+//        assert!(verify_proof(&prepared_verifying_key, &update_proof, public_inputs.as_slice()).unwrap())
+//    }
+//}
