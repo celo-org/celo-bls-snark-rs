@@ -40,6 +40,68 @@ impl<
         signature: P::G2Gadget,
         maximum_non_signers: FpGadget<ConstraintF>,
     ) -> Result<(), SynthesisError> {
+        let (prepared_aggregated_pk, prepared_message_hash) = Self::verify_partial(
+            cs.ns(|| "verify partial"),
+            pub_keys,
+            signed_bitmap,
+            message_hash,
+            maximum_non_signers,
+        )?;
+        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &signature)?;
+
+        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
+            Ok(PairingE::G1Projective::prime_subgroup_generator())
+        })?
+            .negate(cs.ns(|| "negate g1 generator"))?;
+        let prepared_g1_neg_generator =
+            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
+        let bls_equation = P::product_of_pairings(
+            cs.ns(|| "verify BLS signature"),
+            &[prepared_g1_neg_generator, prepared_aggregated_pk],
+            &[prepared_signature, prepared_message_hash],
+        )?;
+        let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
+        bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
+
+        Ok(())
+    }
+
+    pub fn batch_verify<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        prepared_aggregated_pub_keys: &[P::G1PreparedGadget],
+        prepared_message_hashes: &[P::G2PreparedGadget],
+        aggregated_signature: P::G2Gadget,
+    ) -> Result<(), SynthesisError> {
+        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &aggregated_signature)?;
+
+        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
+            Ok(PairingE::G1Projective::prime_subgroup_generator())
+        })?
+            .negate(cs.ns(|| "negate g1 generator"))?;
+        let prepared_g1_neg_generator =
+            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
+        let mut prepared_g1s = vec![prepared_g1_neg_generator];
+        prepared_g1s.extend_from_slice(prepared_aggregated_pub_keys);
+        let mut prepared_g2s = vec![prepared_signature];
+        prepared_g2s.extend_from_slice(prepared_message_hashes);
+        let bls_equation = P::product_of_pairings(
+            cs.ns(|| "verify BLS signature"),
+            &prepared_g1s,
+            &prepared_g2s,
+        )?;
+        let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
+        bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
+
+        Ok(())
+    }
+
+    pub fn verify_partial<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        pub_keys: &[P::G1Gadget],
+        signed_bitmap: &[Boolean],
+        message_hash: P::G2Gadget,
+        maximum_non_signers: FpGadget<ConstraintF>,
+    ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         let generator = PairingE::G1Projective::prime_subgroup_generator();
         let generator_var =
@@ -95,21 +157,8 @@ impl<
             P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
         let prepared_message_hash =
             P::prepare_g2(cs.ns(|| "prepared message hash"), &message_hash)?;
-        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &signature)?;
-        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
-            Ok(PairingE::G1Projective::prime_subgroup_generator())
-        })?
-            .negate(cs.ns(|| "negate g1 generator"))?;
-        let prepared_g1_neg_generator =
-            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
-        let bls_equation = P::product_of_pairings(
-            cs.ns(|| "verify BLS signature"),
-            &[prepared_g1_neg_generator, prepared_aggregated_pk],
-            &[prepared_signature, prepared_message_hash],
-        )?;
-        let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
-        bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
-        Ok(())
+
+        Ok((prepared_aggregated_pk, prepared_message_hash))
     }
 }
 

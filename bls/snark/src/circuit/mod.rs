@@ -170,6 +170,9 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
             },
         )?;
+        let mut prepared_aggregated_public_keys = vec![];
+        let mut prepared_message_hashes = vec![];
+        let mut aggregated_signature = None;
         for (c, chunk) in self.updates.chunks(self.hash_batch_size).enumerate() {
             let mut public_inputs = vec![];
             for (i, update) in chunk.into_iter().enumerate() {
@@ -337,14 +340,24 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     BlsFrParameters::CAPACITY as usize,
                 )?;
 
-                BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify(
+                let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
                     cs.ns(|| format!("{}, {}: verify signature", c, i)),
                     &current_pub_keys_vars,
                     signed_bitmap.as_slice(),
                     message_hash,
-                    signature,
                     current_maximum_non_signers.clone(),
                 )?;
+                prepared_aggregated_public_keys.push(prepared_aggregated_public_key);
+                prepared_message_hashes.push(prepared_message_hash);
+                if aggregated_signature.is_none() {
+                    aggregated_signature = Some(signature);
+                } else {
+                    aggregated_signature = Some(aggregated_signature.unwrap().add(
+                        cs.ns(|| format!("{}, {}: add signature", c, i)),
+                        &signature,
+                    )?);
+                }
+
                 current_pub_keys_vars = new_pub_keys_vars;
                 current_maximum_non_signers = maximum_non_signers;
             }
@@ -367,6 +380,12 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 &proof,
             )?;
         }
+        BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::batch_verify(
+            cs.ns(|| format!("batch verify BLS")),
+            &prepared_aggregated_public_keys,
+            &prepared_message_hashes,
+            aggregated_signature.unwrap(),
+        )?;
         for (j, pk) in current_pub_keys_vars.iter().enumerate() {
             let pk_var = G1Gadget::<Bls12_377Parameters>::alloc_input(
                 cs.ns(|| format!("final pub key {}", j)),

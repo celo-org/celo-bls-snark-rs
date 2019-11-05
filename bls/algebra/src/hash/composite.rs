@@ -22,8 +22,8 @@ pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
 pub struct Window;
 
 impl PedersenWindow for Window {
-    const WINDOW_SIZE: usize = 4;
-    const NUM_WINDOWS: usize = 9820; //(100*385+384*2+1)/4 ~ 9820 ~ 100*(Fq + sign bit) + Fq2 + sign bit
+    const WINDOW_SIZE: usize = 93;
+    const NUM_WINDOWS: usize = 136;
 }
 
 pub struct CompositeHasher {
