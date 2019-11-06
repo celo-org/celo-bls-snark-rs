@@ -74,24 +74,31 @@ pub fn encode_zero_value_public_key() -> Result<Vec<bool>, Box<dyn Error>> {
     Ok(std::iter::repeat(false).take(Fq::size_in_bits() + 1).collect::<Vec<_>>())
 }
 
+pub fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
+    let mut bytes = vec![];
+    bytes.write_u16::<LittleEndian>(num)?;
+    let bits = bytes.into_iter().map(|x| (0..8).map(move |i| {
+        (((x as u16) & u16::pow(2, i)) >> i) == 1
+    })).flatten().collect::<Vec<_>>();
+    Ok(bits)
+}
+
+pub fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
+    let mut bytes = vec![];
+    bytes.write_u32::<LittleEndian>(num)?;
+    let bits = bytes.into_iter().map(|x| (0..8).map(move |i| {
+        (((x as u32) & u32::pow(2, i)) >> i) == 1
+    })).flatten().collect::<Vec<_>>();
+    Ok(bits)
+}
+
 /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
 /// more easily processable in SNARKs
 pub fn encode_epoch_block_to_bits(epoch_index: u16, maximum_non_signers: u32, new_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
     let mut epoch_bits = vec![];
 
-    let mut epoch_index_bytes = vec![];
-    epoch_index_bytes.write_u16::<LittleEndian>(epoch_index)?;
-    let epoch_index_bits = epoch_index_bytes.into_iter().map(|x| (0..8).map(move |i| {
-        (((x as u16) & u16::pow(2, i)) >> i) == 1
-    })).flatten().collect::<Vec<_>>();
-    epoch_bits.extend_from_slice(&epoch_index_bits);
-
-    let mut maximum_non_signers_bytes = vec![];
-    maximum_non_signers_bytes.write_u32::<LittleEndian>(maximum_non_signers)?;
-    let maximum_non_signers_bits = maximum_non_signers_bytes.into_iter().map(|x| (0..8).map(move |i| {
-        (((x as u32) & u32::pow(2, i)) >> i) == 1
-    })).flatten().collect::<Vec<_>>();
-    epoch_bits.extend_from_slice(&maximum_non_signers_bits);
+    epoch_bits.extend_from_slice(&encode_u16(epoch_index)?);
+    epoch_bits.extend_from_slice(&encode_u32(maximum_non_signers)?);
     for added_public_key in new_public_keys {
         epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
     }

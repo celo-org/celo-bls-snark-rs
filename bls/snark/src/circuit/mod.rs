@@ -53,8 +53,12 @@ use bls_zexe::hash::composite::CRH;
 use r1cs_std::groups::curves::twisted_edwards::edwards_sw6::EdwardsSWGadget;
 use algebra::curves::edwards_sw6::EdwardsProjective;
 use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
+use crypto_primitives::prf::blake2s::constraints::{blake2s_gadget, blake2s_gadget_with_parameters};
+use crypto_primitives::prf::Blake2sWithParameterBlock;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsSWGadget>;
+
+pub static OUT_DOMAIN: &'static [u8] = b"ULforout";
 
 #[derive(Clone)]
 pub struct HashToBits {
@@ -141,6 +145,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
+        let mut first_and_last_epoch_bits = vec![];
+
         let aggregated_signature = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "aggregated signature"),
             || self.aggregated_signature.clone().ok_or(SynthesisError::AssignmentMissing)
@@ -166,26 +172,45 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         )?;
         let mut current_pub_keys_vars = vec![];
         for (j, maybe_pk) in self.initial_public_keys.iter().enumerate() {
-            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc_input(
+            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
                 cs.ns(|| format!("initial: pub key {}", j)),
                 || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
             )?;
+            first_and_last_epoch_bits.extend_from_slice(&pk_var.x.to_bits(
+                cs.ns(|| format!("initial: pub key bits {}", j))
+            )?);
+            first_and_last_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(
+                cs.ns(|| format!("initial: pub key y bit {}", j)),
+                &pk_var,
+            )?);
             current_pub_keys_vars.push(pk_var);
         }
-        let mut current_maximum_non_signers = FpGadget::<Fr>::alloc_input(
+        let mut current_maximum_non_signers = FpGadget::<Fr>::alloc(
             cs.ns(|| "initial: maximum non signers"),
             || {
                 let non_signers = self.initial_maximum_non_signers.ok_or(SynthesisError::AssignmentMissing)?;
                 Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
             },
         )?;
-        let mut current_epoch_index = FpGadget::<Fr>::alloc_input(
+        first_and_last_epoch_bits.extend_from_slice(
+            current_maximum_non_signers.to_bits(
+                cs.ns(|| "initial maximum non signers"),
+            )?.iter().rev().map(|b| b.clone()).take(32).collect::<Vec<_>>().as_slice()
+        );
+        let mut current_epoch_index = FpGadget::<Fr>::alloc(
             cs.ns(|| "initial: epoch index"),
             || {
                 let epoch_index = self.initial_epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
                 Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
             },
         )?;
+        first_and_last_epoch_bits.extend_from_slice(
+            &current_epoch_index.to_bits(
+                cs.ns(|| "initial epoch index"),
+            )?.iter().rev().map(|b| b.clone()).take(16).collect::<Vec<_>>().as_slice()
+        );
+
+        let mut current_validator_bits = vec![];
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         for (c, chunk) in self.updates.chunks(self.hash_batch_size).enumerate() {
@@ -253,7 +278,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     new_pub_keys_vars.clone(),
                 )?;
                 epoch_bits.extend_from_slice(&validator_set_bits);
-
+                current_validator_bits = validator_set_bits;
 
 //                println!("num constraints: {}", cs.num_constraints());
 //                let packed_message_xof_bits = HashToBitsGadget::hash_to_bits(
@@ -401,7 +426,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             aggregated_signature,
         )?;
         for (j, pk) in current_pub_keys_vars.iter().enumerate() {
-            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc_input(
+            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
                 cs.ns(|| format!("final pub key {}", j)),
                 || pk.get_value().get(),
             )?;
@@ -410,6 +435,36 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 &pk_var,
             )?;
         }
+        first_and_last_epoch_bits.extend_from_slice(&current_validator_bits);
+        let first_and_last_epoch_bits_rounded = 8*((first_and_last_epoch_bits.len() + 7)/8);
+        first_and_last_epoch_bits.resize(first_and_last_epoch_bits_rounded, Boolean::constant(false));
+        let mut personalization = [0; 8];
+        personalization.copy_from_slice(OUT_DOMAIN);
+        let blake2s_parameters = Blake2sWithParameterBlock {
+            digest_length: 32,
+            key_length: 0,
+            fan_out: 1,
+            depth: 1,
+            leaf_length: 0,
+            node_offset: 0,
+            xof_digest_length: 0,
+            node_depth: 0,
+            inner_length: 0,
+            salt: [0; 8],
+            personalization: personalization,
+        };
+        let xof_result = blake2s_gadget_with_parameters(
+            cs.ns(|| "output hash"),
+            &first_and_last_epoch_bits,
+            &blake2s_parameters.parameters(),
+        )?;
+        let xof_bits = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
+        MultipackGadget::pack(
+            cs.ns(|| "pack output hash"),
+            &xof_bits,
+            FrParameters::CAPACITY as usize,
+            true,
+        )?;
 
         println!("num constraints: {}", cs.num_constraints());
         Ok(())

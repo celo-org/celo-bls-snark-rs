@@ -2,7 +2,8 @@
 extern crate bench_utils;
 
 use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey, Proof};
-use bls_snark::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits};
+use bls_snark::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits, OUT_DOMAIN};
+use blake2s_simd::Params;
 use algebra::{
     PrimeField,
     fields::{
@@ -20,7 +21,7 @@ use algebra::{
     biginteger::BigInteger,
     curves::bls12_377::{Bls12_377, G1Projective, G2Projective, Bls12_377Parameters}
 };
-use bls_snark::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits};
+use bls_snark::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits, encode_public_key, encode_u32, encode_u16};
 use bls_zexe::bls::keys::{PublicKey, PrivateKey, Signature};
 use r1cs_std::bits::boolean::Boolean;
 use bls_zexe::hash::{
@@ -239,21 +240,31 @@ fn main() {
     end_timer!(update_proof_time);
 
     let prepared_verifying_key = prepare_verifying_key(&params.vk);
-    let public_inputs = [
+    let first_and_last_epoch_bits = [
         public_keys.iter().map(|pk| {
-            let affine = pk.get_pk().into_affine();
-            vec![affine.x, affine.y]
+            encode_public_key(pk)
         }).flatten().collect::<Vec<_>>().as_slice(),
-        &[Fr::from(maximum_non_signers as u64)],
-        &[Fr::from(0 as u64)],
+        &[encode_u32(maximum_non_signers).unwrap()],
+        &[encode_u16(0).unwrap()],
         new_public_keys_epochs.last().unwrap().iter().map(|pk| {
-            let affine = pk.get_pk().into_affine();
-            vec![affine.x, affine.y]
+            encode_public_key(pk)
         }).flatten().collect::<Vec<_>>().as_slice(),
-    ].concat().to_vec();
-    public_inputs.iter().for_each(|x| {
-        //println!("public input: {}", x);
-    });
+    ].concat().into_iter().flatten().collect::<Vec<_>>();
+    let first_and_last_epoch_bytes = bits_to_bytes(&first_and_last_epoch_bits.iter().rev().map(|x| *x).collect::<Vec<_>>());
+    let mut hash_result = Params::new()
+        .hash_length(32)
+        .personal(OUT_DOMAIN)
+        .to_state()
+        .update(&first_and_last_epoch_bytes)
+        .finalize()
+        .as_ref()
+        .to_vec();
+
+    let hash_result_bits = bytes_to_bits(&hash_result, 256).iter().rev().map(|x| *x).collect::<Vec<_>>();
+    let public_inputs = hash_result_bits.chunks(FrParameters::CAPACITY as usize);
+    let public_inputs = public_inputs.into_iter().map(|c| {
+        Fr::from_repr(<FrParameters as FpParameters>::BigInt::from_bits(c))
+    }).collect::<Vec<_>>();
     assert!(verify_proof(&prepared_verifying_key, &update_proof, public_inputs.as_slice()).unwrap());
 
     println!("Done!");
