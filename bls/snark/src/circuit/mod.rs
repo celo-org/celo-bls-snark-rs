@@ -62,6 +62,8 @@ pub static OUT_DOMAIN: &'static [u8] = b"ULforout";
 
 #[derive(Clone)]
 pub struct HashToBits {
+    pub first_epoch_bits: Vec<Option<bool>>,
+    pub last_epoch_bits: Vec<Option<bool>>,
     pub message_bits: Vec<Vec<Option<bool>>>,
 }
 
@@ -92,6 +94,51 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
                 BlsFrParameters::CAPACITY as usize,
             )?;
             xof_bits.extend_from_slice(&hash);
+        }
+
+        let first_and_last_bits = [self.first_epoch_bits, self.last_epoch_bits];
+        for (i, message_bits) in first_and_last_bits.iter().enumerate() {
+            let bits = message_bits.iter().enumerate().map(|(j, b)| Boolean::alloc(
+                cs.ns(|| format!("first and last {}: bit {}", i, j)),
+                || b.ok_or(SynthesisError::AssignmentMissing)
+            )).collect::<Vec<_>>();
+            let bits = if bits.iter().any(|x| x.is_err()) {
+                Err(SynthesisError::AssignmentMissing)
+            } else {
+                let bits_bools = bits.into_iter().map(|b| b.unwrap()).collect::<Vec<_>>();
+                if bits_bools.iter().all(|b| b.get_value().is_some()) {
+                    let epoch_bytes = bits_to_bytes(&bits_bools.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
+                    //println!("hash to bits bytes: {}", hex::encode(&epoch_bytes));
+                }
+                Ok(bits_bools)
+            }?;
+            all_bits.extend_from_slice(&bits);
+
+            let message = bits.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>();
+
+            let mut personalization = [0; 8];
+            personalization.copy_from_slice(OUT_DOMAIN);
+
+            let blake2s_parameters = Blake2sWithParameterBlock {
+                digest_length: 32,
+                key_length: 0,
+                fan_out: 0,
+                depth: 0,
+                leaf_length: 32,
+                node_offset: 0,
+                xof_digest_length: 256/8,
+                node_depth: 0,
+                inner_length: 32,
+                salt: [0; 8],
+                personalization: personalization,
+            };
+            let xof_result = blake2s_gadget_with_parameters(
+                cs.ns(|| format!("first and last xof result {}", i)),
+                &message,
+                &blake2s_parameters.parameters(),
+            )?;
+            let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
+            xof_bits.extend_from_slice(&xof_bits_i);
         }
 
         MultipackGadget::pack(
@@ -211,6 +258,89 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             current_pub_keys_vars.push(pk_var);
         }
 
+        let crh_xof = |mut cs: r1cs_core::Namespace<_, _>, epoch_bits: &[Boolean], is_first_last: bool| -> Result<(Vec<Boolean>, Vec<Boolean>), SynthesisError> {
+            let input_bytes: Vec<UInt8> = epoch_bits.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
+                let mut chunk_padded = chunk.clone().to_vec();
+                if chunk_padded.len() < 8 {
+                    chunk_padded.resize(8, Boolean::constant(false));
+                }
+                UInt8::from_bits_le(&chunk_padded)
+            }).collect();
+
+            let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
+                &mut cs.ns(|| "pedersen evaluation"),
+                &crh_params,
+                &input_bytes,
+            )?;
+
+            let mut crh_bits = crh_result.x.to_bits(
+                cs.ns(|| "crh bits"),
+            )?;
+
+            let crh_bits_len = crh_bits.len();
+            let crh_bits_len_rounded = ((crh_bits_len + 7) / 8) * 8;
+
+            let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
+            first_bits.reverse();
+            let mut crh_bits = crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
+
+            crh_bits.reverse();
+            crh_bits.extend_from_slice(&first_bits);
+            for i in 0..(crh_bits_len_rounded - crh_bits_len) {
+                crh_bits.push(Boolean::constant(false));
+            }
+
+            //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
+            let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
+
+
+            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7) / 8) * 8) as usize;
+            let xof_bits = if is_first_last {
+                let xof_target_bits = 256;
+                let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
+                    let hash_bits = vec![false; xof_target_bits];
+                    hash_bits
+                } else {
+                    let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
+                    let crh_bytes = composite_hasher.crh(OUT_DOMAIN, &epoch_bytes, xof_target_bits / 8).unwrap();
+                    let hash = composite_hasher.xof(OUT_DOMAIN, &crh_bytes, xof_target_bits / 8).unwrap();
+                    let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
+                    hash_bits
+                };
+                xof_bits
+            } else {
+                let xof_target_bits = 768;
+                let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
+                    let hash_bits = vec![false; xof_target_bits];
+                    [
+                        &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
+                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded + FrParameters::MODULUS_BITS as usize],
+                        &[hash_bits[modulus_bit_rounded + FrParameters::MODULUS_BITS as usize]][..],
+                    ].concat().to_vec()
+                } else {
+                    let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
+                    let crh_bytes = composite_hasher.crh(SIG_DOMAIN, &epoch_bytes, xof_target_bits / 8).unwrap();
+                    let hash = composite_hasher.xof(SIG_DOMAIN, &crh_bytes, xof_target_bits / 8).unwrap();
+                    let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
+                    [
+                        &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
+                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded + FrParameters::MODULUS_BITS as usize],
+                        &[hash_bits[modulus_bit_rounded + FrParameters::MODULUS_BITS as usize]][..],
+                    ].concat().to_vec()
+                };
+
+                xof_bits
+            };
+            let xof_bits_results = xof_bits.iter().enumerate().map(|(k, x)| {
+                Boolean::alloc(
+                    cs.ns(|| format!("allocate xof bits {}", k)),
+                    || Ok(x.clone()),
+                ).unwrap()
+            }).collect::<Vec<_>>();
+
+            Ok((crh_bits.to_vec(), xof_bits_results.to_vec()))
+        };
+
         let mut current_epoch_bits = vec![];
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
@@ -287,7 +417,6 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
 //                    &packed_message,
 //                    epoch_bits.len(),
 //                )?;
-            let xof_target_bits = 768;
             let attempt_val: u8 = {
                 if epoch_bits.iter().any(|x| x.get_value().is_none()) {
                     0
@@ -306,70 +435,14 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 attempt.into_bits_le().into_iter().rev().collect::<Vec<_>>().as_slice(),
             ].concat().to_vec();
 
-            let input_bytes: Vec<UInt8> = epoch_bits.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
-                let mut chunk_padded = chunk.clone().to_vec();
-                if chunk_padded.len() < 8 {
-                    chunk_padded.resize(8, Boolean::constant(false));
-                }
-                UInt8::from_bits_le(&chunk_padded)
-            }).collect();
-
-            let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
-                &mut cs.ns(|| format!("{}: pedersen evaluation", i)),
-                &crh_params,
-                &input_bytes,
+            let (crh_bits, xof_bits_results) = crh_xof(
+                cs.ns(|| format!("{}: crh xof", i)),
+                epoch_bits,
+                false,
             )?;
-
-            let mut crh_bits = crh_result.x.to_bits(
-                cs.ns(|| format!("{}: crh bits", i)),
-            )?;
-
-            let crh_bits_len = crh_bits.len();
-            let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
-
-
-            let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
-            first_bits.reverse();
-            let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
-
-            crh_bits.reverse();
-            crh_bits.extend_from_slice(&first_bits);
-            for i in 0..(crh_bits_len_rounded - crh_bits_len) {
-                crh_bits.push(Boolean::constant(false));
-            }
-
-            //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
-            let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
 
             all_crh_bits.extend_from_slice(&crh_bits);
-
-            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
-            let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
-                let hash_bits = vec![false; xof_target_bits];
-                [
-                    &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                    &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
-                    &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                ].concat().to_vec()
-            } else {
-                let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
-                let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
-                let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
-                [
-                    &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                    &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
-                    &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                ].concat().to_vec()
-            };
-            let xof_bits_results = xof_bits.iter().enumerate().map(|(k, x)| {
-                Boolean::alloc(
-                    cs.ns(|| format!("{}: allocate xof bits {}", i, k)),
-                    || Ok(x.clone()),
-                ).unwrap()
-            }).collect::<Vec<_>>();
             all_xof_bits.extend_from_slice(&xof_bits_results);
-
 
             let message_hash = HashToGroupGadget::hash_to_group(
                 cs.ns(|| format!("{}: hash to group", i)),
@@ -391,6 +464,26 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             current_maximum_non_signers = maximum_non_signers;
             current_epoch_index = epoch_index;
         }
+
+        let mut last_epoch_bits = current_epoch_bits;
+        assert_eq!(first_epoch_bits.len(), last_epoch_bits.len());
+
+        let (first_crh_result, first_xof_result) = crh_xof(
+            cs.ns(|| "first epoch crh xof"),
+            &first_epoch_bits,
+            true,
+        )?;
+        all_crh_bits.extend_from_slice(&first_crh_result);
+        all_xof_bits.extend_from_slice(&first_xof_result);
+
+        let (last_crh_result, last_xof_result) = crh_xof(
+            cs.ns(|| "last epoch crh xof"),
+            &last_epoch_bits,
+            true,
+        )?;
+        all_crh_bits.extend_from_slice(&last_crh_result);
+        all_xof_bits.extend_from_slice(&last_xof_result);
+
         let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
             b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
         }).collect::<Vec<_>>();
@@ -426,40 +519,11 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             &prepared_message_hashes,
             aggregated_signature,
         )?;
-        for (j, pk) in current_pub_keys_vars.iter().enumerate() {
-            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
-                cs.ns(|| format!("final pub key {}", j)),
-                || pk.get_value().get(),
-            )?;
-            pk.enforce_equal(
-                cs.ns(|| format!("final pub key equal {}", j)),
-                &pk_var,
-            )?;
-        }
-        first_epoch_bits.extend_from_slice(&current_epoch_bits);
-        let first_and_last_epoch_bits_rounded = 8*((first_epoch_bits.len() + 7)/8);
-        first_epoch_bits.resize(first_and_last_epoch_bits_rounded, Boolean::constant(false));
-        let mut personalization = [0; 8];
-        personalization.copy_from_slice(OUT_DOMAIN);
-        let blake2s_parameters = Blake2sWithParameterBlock {
-            digest_length: 32,
-            key_length: 0,
-            fan_out: 1,
-            depth: 1,
-            leaf_length: 0,
-            node_offset: 0,
-            xof_digest_length: 0,
-            node_depth: 0,
-            inner_length: 0,
-            salt: [0; 8],
-            personalization: personalization,
-        };
-        let xof_result = blake2s_gadget_with_parameters(
-            cs.ns(|| "output hash"),
-            &first_epoch_bits,
-            &blake2s_parameters.parameters(),
-        )?;
-        let xof_bits = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
+
+        let xof_bits = [
+            first_xof_result,
+            last_xof_result,
+        ].concat();
         MultipackGadget::pack(
             cs.ns(|| "pack output hash"),
             &xof_bits,

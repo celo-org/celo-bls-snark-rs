@@ -61,6 +61,8 @@ fn main() {
     let hash_params_time = start_timer!(|| "hash params");
     let hash_params = {
         let c = HashToBits {
+            first_epoch_bits: vec![None; modulus_bit_rounded],
+            last_epoch_bits: vec![None; modulus_bit_rounded],
             message_bits: vec![vec![None; modulus_bit_rounded]; num_epochs],
         };
         println!("generating parameters for hash to bits");
@@ -100,6 +102,8 @@ fn main() {
     end_timer!(params_time);
 
     let maximum_non_signers = num_validators as u32 - 4;
+    let mut first_crh_bits = vec![];
+    let mut last_crh_bits = vec![];
     let mut message_crh_bits = vec![];
     let mut new_public_keys_epochs = vec![];
     let mut new_signatures_epochs = vec![];
@@ -125,6 +129,19 @@ fn main() {
         let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes_with_attempt, num_bits_in_hash/8).unwrap();
         let crh_bits = bytes_to_bits(&crh_bytes, modulus_bit_rounded);
 
+        if i == 0 {
+            let epoch_bits = encode_epoch_block_to_bits(0 as u16, maximum_non_signers, &public_keys).unwrap();
+            let epoch_bytes = bits_to_bytes(&epoch_bits);
+            let crh_bytes = composite_hasher.crh( OUT_DOMAIN, &epoch_bytes, 256/8).unwrap();
+            let crh_bits = bytes_to_bits(&crh_bytes, modulus_bit_rounded);
+            first_crh_bits = crh_bits.clone();
+        }
+        if i == num_epochs - 1 {
+            let crh_bytes = composite_hasher.crh( OUT_DOMAIN, &epoch_bytes, 256/8).unwrap();
+            let crh_bits = bytes_to_bits(&crh_bytes, modulus_bit_rounded);
+            last_crh_bits = crh_bits.clone();
+        }
+
         message_crh_bits.push(crh_bits.clone());
         new_public_keys_epochs.push(new_public_keys);
         new_signatures_epochs.push(aggregated_signature);
@@ -134,6 +151,8 @@ fn main() {
 
     let hash_to_bits_time = start_timer!(|| "hash to bits");
     let c = HashToBits {
+        first_epoch_bits: first_crh_bits.iter().map(|y| Some(y.clone())).collect::<Vec<_>>(),
+        last_epoch_bits: last_crh_bits.iter().map(|y| Some(y.clone())).collect::<Vec<_>>(),
         message_bits: message_crh_bits.iter().map(|x| x.iter().map(|y| Some(y.clone())).collect::<Vec<_>>()).collect::<Vec<_>>(),
     };
 
@@ -155,6 +174,19 @@ fn main() {
         ].concat().to_vec();
 
         all_xof_bits.extend_from_slice(hash_bits);
+    }
+    let both_bits = [first_crh_bits.clone(), last_crh_bits.clone()];
+    let mut both_xof_bits = vec![];
+    for crh_bits in both_bits.iter() {
+        let crh_bytes = bits_to_bytes(crh_bits);
+        all_crh_bits.extend_from_slice(&crh_bits);
+
+        let xof_target_bits = 256;
+        let hash = composite_hasher.xof( OUT_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
+        let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
+
+        both_xof_bits.push(hash_bits.clone());
+        all_xof_bits.extend_from_slice(&hash_bits);
     }
     let epoch_chunks = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize);
     let epoch_chunks = epoch_chunks.into_iter().map(|c| {
@@ -225,30 +257,9 @@ fn main() {
     end_timer!(update_proof_time);
 
     let prepared_verifying_key = prepare_verifying_key(&params.vk);
-    let first_and_last_epoch_bits = [
-        &[encode_u16(0).unwrap()],
-        &[encode_u32(maximum_non_signers).unwrap()],
-        public_keys.iter().map(|pk| {
-            encode_public_key(pk)
-        }).flatten().collect::<Vec<_>>().as_slice(),
-        &[encode_u16(num_epochs as u16).unwrap()],
-        &[encode_u32(maximum_non_signers).unwrap()],
-        new_public_keys_epochs.last().unwrap().iter().map(|pk| {
-            encode_public_key(pk)
-        }).flatten().collect::<Vec<_>>().as_slice(),
-    ].concat().into_iter().flatten().collect::<Vec<_>>();
-    let first_and_last_epoch_bytes = bits_to_bytes(&first_and_last_epoch_bits.iter().rev().map(|x| *x).collect::<Vec<_>>());
-    let mut hash_result = Params::new()
-        .hash_length(32)
-        .personal(OUT_DOMAIN)
-        .to_state()
-        .update(&first_and_last_epoch_bytes)
-        .finalize()
-        .as_ref()
-        .to_vec();
 
-    let hash_result_bits = bytes_to_bits(&hash_result, 256).iter().rev().map(|x| *x).collect::<Vec<_>>();
-    let public_inputs = hash_result_bits.chunks(FrParameters::CAPACITY as usize);
+    let public_inputs = both_xof_bits.concat();
+    let public_inputs = public_inputs.chunks(FrParameters::CAPACITY as usize);
     let public_inputs = public_inputs.into_iter().map(|c| {
         Fr::from_repr(<FrParameters as FpParameters>::BigInt::from_bits(c))
     }).collect::<Vec<_>>();
