@@ -63,15 +63,14 @@ pub static OUT_DOMAIN: &'static [u8] = b"ULforout";
 #[derive(Clone)]
 pub struct HashToBits {
     pub message_bits: Vec<Vec<Option<bool>>>,
-    pub hash_batch_size: usize,
 }
 
 impl ConstraintSynthesizer<BlsFr> for HashToBits {
     fn generate_constraints<CS: ConstraintSystem<BlsFr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let mut all_bits = vec![];
         let mut xof_bits = vec![];
-        for i in 0..self.hash_batch_size {
-            let bits = self.message_bits[i].iter().enumerate().map(|(j, b)| Boolean::alloc(
+        for (i, message_bits) in self.message_bits.iter().enumerate() {
+            let bits = message_bits.iter().enumerate().map(|(j, b)| Boolean::alloc(
                 cs.ns(|| format!("{}: bit {}", i, j)),
                 || b.ok_or(SynthesisError::AssignmentMissing)
             )).collect::<Vec<_>>();
@@ -133,8 +132,7 @@ pub struct ValidatorSetUpdate {
     pub initial_epoch_index: Option<u16> ,
     pub initial_maximum_non_signers: Option<u32> ,
     pub num_validators: usize,
-    pub hash_batch_size: usize,
-    pub hash_proofs: Vec<HashProof>,
+    pub hash_proof: HashProof,
     pub updates: Vec<SingleUpdate>,
     pub verifying_key: VerifyingKey<Bls12_377>,
     pub aggregated_signature: Option<G2Projective>,
@@ -145,7 +143,6 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
-        let mut first_and_last_epoch_bits = vec![];
 
         let aggregated_signature = G2Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "aggregated signature"),
@@ -170,33 +167,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             cs.ns(|| "allocate verifying key"),
             || Ok(self.verifying_key.clone()),
         )?;
-        let mut current_pub_keys_vars = vec![];
-        for (j, maybe_pk) in self.initial_public_keys.iter().enumerate() {
-            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
-                cs.ns(|| format!("initial: pub key {}", j)),
-                || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
-            )?;
-            first_and_last_epoch_bits.extend_from_slice(&pk_var.x.to_bits(
-                cs.ns(|| format!("initial: pub key bits {}", j))
-            )?);
-            first_and_last_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(
-                cs.ns(|| format!("initial: pub key y bit {}", j)),
-                &pk_var,
-            )?);
-            current_pub_keys_vars.push(pk_var);
-        }
-        let mut current_maximum_non_signers = FpGadget::<Fr>::alloc(
-            cs.ns(|| "initial: maximum non signers"),
-            || {
-                let non_signers = self.initial_maximum_non_signers.ok_or(SynthesisError::AssignmentMissing)?;
-                Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
-            },
-        )?;
-        first_and_last_epoch_bits.extend_from_slice(
-            current_maximum_non_signers.to_bits(
-                cs.ns(|| "initial maximum non signers"),
-            )?.iter().rev().map(|b| b.clone()).take(32).collect::<Vec<_>>().as_slice()
-        );
+
+        let mut first_epoch_bits = vec![];
         let mut current_epoch_index = FpGadget::<Fr>::alloc(
             cs.ns(|| "initial: epoch index"),
             || {
@@ -204,81 +176,110 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
             },
         )?;
-        first_and_last_epoch_bits.extend_from_slice(
+        first_epoch_bits.extend_from_slice(
             &current_epoch_index.to_bits(
                 cs.ns(|| "initial epoch index"),
             )?.iter().rev().map(|b| b.clone()).take(16).collect::<Vec<_>>().as_slice()
         );
 
-        let mut current_validator_bits = vec![];
+        let mut current_maximum_non_signers = FpGadget::<Fr>::alloc(
+            cs.ns(|| "initial: maximum non signers"),
+            || {
+                let non_signers = self.initial_maximum_non_signers.ok_or(SynthesisError::AssignmentMissing)?;
+                Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
+            },
+        )?;
+        first_epoch_bits.extend_from_slice(
+            current_maximum_non_signers.to_bits(
+                cs.ns(|| "initial maximum non signers"),
+            )?.iter().rev().map(|b| b.clone()).take(32).collect::<Vec<_>>().as_slice()
+        );
+
+        let mut current_pub_keys_vars = vec![];
+        for (j, maybe_pk) in self.initial_public_keys.iter().enumerate() {
+            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
+                cs.ns(|| format!("initial: pub key {}", j)),
+                || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
+            )?;
+            first_epoch_bits.extend_from_slice(&pk_var.x.to_bits(
+                cs.ns(|| format!("initial: pub key bits {}", j))
+            )?);
+            first_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(
+                cs.ns(|| format!("initial: pub key y bit {}", j)),
+                &pk_var,
+            )?);
+            current_pub_keys_vars.push(pk_var);
+        }
+
+        let mut current_epoch_bits = vec![];
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
-        for (c, chunk) in self.updates.chunks(self.hash_batch_size).enumerate() {
-            let mut public_inputs = vec![];
-            let mut all_crh_bits = vec![];
-            let mut all_xof_bits = vec![];
-            for (i, update) in chunk.into_iter().enumerate() {
-                let mut new_pub_keys_vars = vec![];
-                {
-                    assert_eq!(self.num_validators, update.new_pub_keys.len());
-                    for (j, maybe_pk) in update.new_pub_keys.iter().enumerate() {
-                        let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
-                            cs.ns(|| format!("{}, {}: new pub key {}", c, i, j)),
-                            || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
-                        )?;
-                        new_pub_keys_vars.push(pk_var);
-                    }
+
+        let mut public_inputs = vec![];
+        let mut all_crh_bits = vec![];
+        let mut all_xof_bits = vec![];
+        for (i, update) in self.updates.iter().enumerate() {
+            let mut new_pub_keys_vars = vec![];
+            {
+                assert_eq!(self.num_validators, update.new_pub_keys.len());
+                for (j, maybe_pk) in update.new_pub_keys.iter().enumerate() {
+                    let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
+                        cs.ns(|| format!("{}: new pub key {}", i, j)),
+                        || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
+                    )?;
+                    new_pub_keys_vars.push(pk_var);
                 }
-                let maximum_non_signers = FpGadget::<Fr>::alloc(
-                    cs.ns(|| format!("{}, {}: maximum non signers", c, i)),
-                    || {
-                        let non_signers = update.maximum_non_signers.ok_or(SynthesisError::AssignmentMissing)?;
-                        Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
-                    },
-                )?;
-                let mut epoch_index = FpGadget::<Fr>::alloc(
-                    cs.ns(|| format!("{}, {}: epoch index", c, i)),
-                    || {
-                        let epoch_index = update.epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
-                        Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
-                    },
-                )?;
-                let current_epoch_index_plus_one = current_epoch_index.add_constant(
-                    cs.ns(|| format!("{}, {}: add current epoch index 1", c, i)),
-                    &Fr::one(),
-                )?;
-                epoch_index.enforce_equal(
-                    cs.ns(|| format!("{}, {}: epoch index enforce equal", c, i)),
-                    &current_epoch_index_plus_one,
-                )?;
-                let signed_bitmap = update.signed_bitmap.iter().enumerate().map(|(j, b)| Boolean::alloc(
-                    cs.ns(|| format!("{}, {}: signed bitmap {}", c, i, j)),
-                    || b.ok_or(SynthesisError::AssignmentMissing)
-                )).collect::<Vec<_>>();
-                let signed_bitmap = if signed_bitmap.iter().any(|b| b.is_err()) {
-                    Err(SynthesisError::Unsatisfiable)
-                } else {
-                    Ok(signed_bitmap.iter().map(|b| b.as_ref().unwrap().clone()).collect::<Vec<_>>())
-                }?;
+            }
+            let maximum_non_signers = FpGadget::<Fr>::alloc(
+                cs.ns(|| format!("{}: maximum non signers", i)),
+                || {
+                    let non_signers = update.maximum_non_signers.ok_or(SynthesisError::AssignmentMissing)?;
+                    Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
+                },
+            )?;
+            let mut epoch_index = FpGadget::<Fr>::alloc(
+                cs.ns(|| format!("{}: epoch index", i)),
+                || {
+                    let epoch_index = update.epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
+                    Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(epoch_index as u64)))
+                },
+            )?;
+            let current_epoch_index_plus_one = current_epoch_index.add_constant(
+                cs.ns(|| format!("{}: add current epoch index 1", i)),
+                &Fr::one(),
+            )?;
+            epoch_index.enforce_equal(
+                cs.ns(|| format!("{}: epoch index enforce equal", i)),
+                &current_epoch_index_plus_one,
+            )?;
+            let signed_bitmap = update.signed_bitmap.iter().enumerate().map(|(j, b)| Boolean::alloc(
+                cs.ns(|| format!("{}: signed bitmap {}", i, j)),
+                || b.ok_or(SynthesisError::AssignmentMissing)
+            )).collect::<Vec<_>>();
+            let signed_bitmap = if signed_bitmap.iter().any(|b| b.is_err()) {
+                Err(SynthesisError::Unsatisfiable)
+            } else {
+                Ok(signed_bitmap.iter().map(|b| b.as_ref().unwrap().clone()).collect::<Vec<_>>())
+            }?;
 
-                let mut epoch_bits = vec![];
+            let mut epoch_bits = vec![];
 
-                let epoch_index_bits = epoch_index.to_bits(
-                    cs.ns(|| format!("{}: epoch index bits", i))
-                )?;
-                let epoch_index_bits = epoch_index_bits.into_iter().rev().take(16).collect::<Vec<_>>();
-                epoch_bits.extend_from_slice(&epoch_index_bits);
-                let maximum_non_signers_bits = maximum_non_signers.to_bits(
-                    cs.ns(|| format!("{}, {}: maximum non signers bits", c, i))
-                )?;
-                let maximum_non_signers_bits = maximum_non_signers_bits.into_iter().rev().take(32).collect::<Vec<_>>();
-                epoch_bits.extend_from_slice(&maximum_non_signers_bits);
-                let validator_set_bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
-                    cs.ns(|| format!("{}, {}: validator set to bits", c, i)),
-                    new_pub_keys_vars.clone(),
-                )?;
-                epoch_bits.extend_from_slice(&validator_set_bits);
-                current_validator_bits = validator_set_bits;
+            let epoch_index_bits = epoch_index.to_bits(
+                cs.ns(|| format!("{}: epoch index bits", i))
+            )?;
+            let epoch_index_bits = epoch_index_bits.into_iter().rev().take(16).collect::<Vec<_>>();
+            epoch_bits.extend_from_slice(&epoch_index_bits);
+            let maximum_non_signers_bits = maximum_non_signers.to_bits(
+                cs.ns(|| format!("{}: maximum non signers bits", i))
+            )?;
+            let maximum_non_signers_bits = maximum_non_signers_bits.into_iter().rev().take(32).collect::<Vec<_>>();
+            epoch_bits.extend_from_slice(&maximum_non_signers_bits);
+            let validator_set_bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
+                cs.ns(|| format!("{}: validator set to bits", i)),
+                new_pub_keys_vars.clone(),
+            )?;
+            epoch_bits.extend_from_slice(&validator_set_bits);
+            current_epoch_bits = epoch_bits.clone();
 
 //                println!("num constraints: {}", cs.num_constraints());
 //                let packed_message_xof_bits = HashToBitsGadget::hash_to_bits(
@@ -286,139 +287,139 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
 //                    &packed_message,
 //                    epoch_bits.len(),
 //                )?;
-                let xof_target_bits = 768;
-                let attempt_val: u8 = {
-                    if epoch_bits.iter().any(|x| x.get_value().is_none()) {
-                        0
-                    } else {
-                        let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                        let (_, attempt_val) = try_and_increment.hash_with_attempt::<Bls12_377Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
-                        attempt_val as u8
-                    }
-                };
-                let attempt = UInt8::alloc(
-                    cs.ns(|| format!("{}, {}: attempt", c, i)),
-                    || Ok(attempt_val),
-                )?;
-                let epoch_bits = &[
-                    epoch_bits.as_slice(),
-                    attempt.into_bits_le().into_iter().rev().collect::<Vec<_>>().as_slice(),
-                ].concat().to_vec();
-
-                let input_bytes: Vec<UInt8> = epoch_bits.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
-                    let mut chunk_padded = chunk.clone().to_vec();
-                    if chunk_padded.len() < 8 {
-                        chunk_padded.resize(8, Boolean::constant(false));
-                    }
-                    UInt8::from_bits_le(&chunk_padded)
-                }).collect();
-
-                let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
-                    &mut cs.ns(|| format!("{}, {}: pedersen evaluation", c, i)),
-                    &crh_params,
-                    &input_bytes,
-                )?;
-
-                let mut crh_bits = crh_result.x.to_bits(
-                    cs.ns(|| format!("{}, {}: crh bits", c, i)),
-                )?;
-
-                let crh_bits_len = crh_bits.len();
-                let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
-
-
-                let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
-                first_bits.reverse();
-                let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
-
-                crh_bits.reverse();
-                crh_bits.extend_from_slice(&first_bits);
-                for i in 0..(crh_bits_len_rounded - crh_bits_len) {
-                    crh_bits.push(Boolean::constant(false));
-                }
-
-                //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
-                let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
-
-                all_crh_bits.extend_from_slice(&crh_bits);
-
-                let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
-                let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
-                    let hash_bits = vec![false; xof_target_bits];
-                    [
-                        &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
-                        &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                    ].concat().to_vec()
+            let xof_target_bits = 768;
+            let attempt_val: u8 = {
+                if epoch_bits.iter().any(|x| x.get_value().is_none()) {
+                    0
                 } else {
                     let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                    let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
-                    let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
-                    let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
-                    [
-                        &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
-                        &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
-                    ].concat().to_vec()
-                };
-                let xof_bits_results = xof_bits.iter().enumerate().map(|(k, x)| {
-                    Boolean::alloc(
-                        cs.ns(|| format!("{}, {}: allocate xof bits {}", c, i, k)),
-                        || Ok(x.clone()),
-                    ).unwrap()
-                }).collect::<Vec<_>>();
-                all_xof_bits.extend_from_slice(&xof_bits_results);
+                    let (_, attempt_val) = try_and_increment.hash_with_attempt::<Bls12_377Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
+                    attempt_val as u8
+                }
+            };
+            let attempt = UInt8::alloc(
+                cs.ns(|| format!("{}: attempt", i)),
+                || Ok(attempt_val),
+            )?;
+            let epoch_bits = &[
+                epoch_bits.as_slice(),
+                attempt.into_bits_le().into_iter().rev().collect::<Vec<_>>().as_slice(),
+            ].concat().to_vec();
+
+            let input_bytes: Vec<UInt8> = epoch_bits.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
+                let mut chunk_padded = chunk.clone().to_vec();
+                if chunk_padded.len() < 8 {
+                    chunk_padded.resize(8, Boolean::constant(false));
+                }
+                UInt8::from_bits_le(&chunk_padded)
+            }).collect();
+
+            let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
+                &mut cs.ns(|| format!("{}: pedersen evaluation", i)),
+                &crh_params,
+                &input_bytes,
+            )?;
+
+            let mut crh_bits = crh_result.x.to_bits(
+                cs.ns(|| format!("{}: crh bits", i)),
+            )?;
+
+            let crh_bits_len = crh_bits.len();
+            let crh_bits_len_rounded = ((crh_bits_len + 7)/8)*8;
 
 
-                let message_hash = HashToGroupGadget::hash_to_group(
-                    cs.ns(|| format!("{}, {}: hash to group", c, i)),
-                    &xof_bits_results,
-                    BlsFrParameters::CAPACITY as usize,
-                )?;
+            let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
+            first_bits.reverse();
+            let mut crh_bits= crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
 
-                let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
-                    cs.ns(|| format!("{}, {}: verify signature partial", c, i)),
-                    &current_pub_keys_vars,
-                    signed_bitmap.as_slice(),
-                    message_hash,
-                    current_maximum_non_signers.clone(),
-                )?;
-                prepared_aggregated_public_keys.push(prepared_aggregated_public_key);
-                prepared_message_hashes.push(prepared_message_hash);
-
-                current_pub_keys_vars = new_pub_keys_vars;
-                current_maximum_non_signers = maximum_non_signers;
-                current_epoch_index = epoch_index;
+            crh_bits.reverse();
+            crh_bits.extend_from_slice(&first_bits);
+            for i in 0..(crh_bits_len_rounded - crh_bits_len) {
+                crh_bits.push(Boolean::constant(false));
             }
-            let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
-                b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
+
+            //let crh_bits = crh_bits.chunks(8).rev().flatten().map(|b| b.clone()).collect::<Vec<_>>();
+            let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
+
+            all_crh_bits.extend_from_slice(&crh_bits);
+
+            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
+            let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
+                let hash_bits = vec![false; xof_target_bits];
+                [
+                    &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
+                    &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
+                    &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
+                ].concat().to_vec()
+            } else {
+                let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
+                let crh_bytes = composite_hasher.crh( SIG_DOMAIN, &epoch_bytes, xof_target_bits/8).unwrap();
+                let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
+                let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
+                [
+                    &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
+                    &hash_bits[modulus_bit_rounded..modulus_bit_rounded+FrParameters::MODULUS_BITS as usize],
+                    &[hash_bits[modulus_bit_rounded+FrParameters::MODULUS_BITS as usize]][..],
+                ].concat().to_vec()
+            };
+            let xof_bits_results = xof_bits.iter().enumerate().map(|(k, x)| {
+                Boolean::alloc(
+                    cs.ns(|| format!("{}: allocate xof bits {}", i, k)),
+                    || Ok(x.clone()),
+                ).unwrap()
             }).collect::<Vec<_>>();
+            all_xof_bits.extend_from_slice(&xof_bits_results);
 
-            public_inputs.extend_from_slice(&packed_messages);
 
-            public_inputs.extend_from_slice(all_xof_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|x| {{
-                x.iter().rev().map(|y| y.clone()).collect::<Vec<_>>()
-            }}).collect::<Vec<_>>().as_slice());
-
-            let proof = ProofGadget::<_, _, PairingGadget>::alloc::<_, Proof<Bls12_377>, _>(
-                cs.ns(|| format!("alloc proof {}", c)),
-                || Ok(self.hash_proofs[c].proof.clone()),
+            let message_hash = HashToGroupGadget::hash_to_group(
+                cs.ns(|| format!("{}: hash to group", i)),
+                &xof_bits_results,
+                BlsFrParameters::CAPACITY as usize,
             )?;
-            /*
-            if public_inputs.iter().all(|p| p.get_value().is_some()) {
-                public_inputs.iter().for_each(|p| {
-                    println!("attempt public input: {}", p.get_value().unwrap());
-                });
-            }
-            */
-            //println!("public input len: {}", public_inputs.len());
-            <Groth16VerifierGadget::<_, _, PairingGadget> as NIZKVerifierGadget<Groth16<Bls12_377, HashToBits, BlsFr>, Fr>>::check_verify(
-                cs.ns(|| format!("verify proof for chunk {}", c)),
-                &verifying_key,
-                public_inputs.iter(),
-                &proof,
+
+            let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
+                cs.ns(|| format!("{}: verify signature partial", i)),
+                &current_pub_keys_vars,
+                signed_bitmap.as_slice(),
+                message_hash,
+                current_maximum_non_signers.clone(),
             )?;
+            prepared_aggregated_public_keys.push(prepared_aggregated_public_key);
+            prepared_message_hashes.push(prepared_message_hash);
+
+            current_pub_keys_vars = new_pub_keys_vars;
+            current_maximum_non_signers = maximum_non_signers;
+            current_epoch_index = epoch_index;
         }
+        let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
+            b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
+        }).collect::<Vec<_>>();
+
+        public_inputs.extend_from_slice(&packed_messages);
+
+        public_inputs.extend_from_slice(all_xof_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|x| {{
+            x.iter().rev().map(|y| y.clone()).collect::<Vec<_>>()
+        }}).collect::<Vec<_>>().as_slice());
+
+        let proof = ProofGadget::<_, _, PairingGadget>::alloc::<_, Proof<Bls12_377>, _>(
+            cs.ns(|| "alloc proof"),
+            || Ok(self.hash_proof.proof.clone()),
+        )?;
+        /*
+        if public_inputs.iter().all(|p| p.get_value().is_some()) {
+            public_inputs.iter().for_each(|p| {
+                println!("attempt public input: {}", p.get_value().unwrap());
+            });
+        }
+        */
+        //println!("public input len: {}", public_inputs.len());
+        <Groth16VerifierGadget::<_, _, PairingGadget> as NIZKVerifierGadget<Groth16<Bls12_377, HashToBits, BlsFr>, Fr>>::check_verify(
+            cs.ns(|| "verify hash proof"),
+            &verifying_key,
+            public_inputs.iter(),
+            &proof,
+        )?;
+
         BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::batch_verify(
             cs.ns(|| format!("batch verify BLS")),
             &prepared_aggregated_public_keys,
@@ -435,9 +436,9 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 &pk_var,
             )?;
         }
-        first_and_last_epoch_bits.extend_from_slice(&current_validator_bits);
-        let first_and_last_epoch_bits_rounded = 8*((first_and_last_epoch_bits.len() + 7)/8);
-        first_and_last_epoch_bits.resize(first_and_last_epoch_bits_rounded, Boolean::constant(false));
+        first_epoch_bits.extend_from_slice(&current_epoch_bits);
+        let first_and_last_epoch_bits_rounded = 8*((first_epoch_bits.len() + 7)/8);
+        first_epoch_bits.resize(first_and_last_epoch_bits_rounded, Boolean::constant(false));
         let mut personalization = [0; 8];
         personalization.copy_from_slice(OUT_DOMAIN);
         let blake2s_parameters = Blake2sWithParameterBlock {
@@ -455,7 +456,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         };
         let xof_result = blake2s_gadget_with_parameters(
             cs.ns(|| "output hash"),
-            &first_and_last_epoch_bits,
+            &first_epoch_bits,
             &blake2s_parameters.parameters(),
         )?;
         let xof_bits = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
