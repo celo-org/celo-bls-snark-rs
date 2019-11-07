@@ -62,8 +62,6 @@ pub static OUT_DOMAIN: &'static [u8] = b"ULforout";
 
 #[derive(Clone)]
 pub struct HashToBits {
-    pub first_epoch_bits: Vec<Option<bool>>,
-    pub last_epoch_bits: Vec<Option<bool>>,
     pub message_bits: Vec<Vec<Option<bool>>>,
 }
 
@@ -94,51 +92,6 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
                 BlsFrParameters::CAPACITY as usize,
             )?;
             xof_bits.extend_from_slice(&hash);
-        }
-
-        let first_and_last_bits = [self.first_epoch_bits, self.last_epoch_bits];
-        for (i, message_bits) in first_and_last_bits.iter().enumerate() {
-            let bits = message_bits.iter().enumerate().map(|(j, b)| Boolean::alloc(
-                cs.ns(|| format!("first and last {}: bit {}", i, j)),
-                || b.ok_or(SynthesisError::AssignmentMissing)
-            )).collect::<Vec<_>>();
-            let bits = if bits.iter().any(|x| x.is_err()) {
-                Err(SynthesisError::AssignmentMissing)
-            } else {
-                let bits_bools = bits.into_iter().map(|b| b.unwrap()).collect::<Vec<_>>();
-                if bits_bools.iter().all(|b| b.get_value().is_some()) {
-                    let epoch_bytes = bits_to_bytes(&bits_bools.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
-                    //println!("hash to bits bytes: {}", hex::encode(&epoch_bytes));
-                }
-                Ok(bits_bools)
-            }?;
-            all_bits.extend_from_slice(&bits);
-
-            let message = bits.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>();
-
-            let mut personalization = [0; 8];
-            personalization.copy_from_slice(OUT_DOMAIN);
-
-            let blake2s_parameters = Blake2sWithParameterBlock {
-                digest_length: 32,
-                key_length: 0,
-                fan_out: 0,
-                depth: 0,
-                leaf_length: 32,
-                node_offset: 0,
-                xof_digest_length: 256/8,
-                node_depth: 0,
-                inner_length: 32,
-                salt: [0; 8],
-                personalization: personalization,
-            };
-            let xof_result = blake2s_gadget_with_parameters(
-                cs.ns(|| format!("first and last xof result {}", i)),
-                &message,
-                &blake2s_parameters.parameters(),
-            )?;
-            let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
-            xof_bits.extend_from_slice(&xof_bits_i);
         }
 
         MultipackGadget::pack(
@@ -468,22 +421,6 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         let mut last_epoch_bits = current_epoch_bits;
         assert_eq!(first_epoch_bits.len(), last_epoch_bits.len());
 
-        let (first_crh_result, first_xof_result) = crh_xof(
-            cs.ns(|| "first epoch crh xof"),
-            &first_epoch_bits,
-            true,
-        )?;
-        all_crh_bits.extend_from_slice(&first_crh_result);
-        all_xof_bits.extend_from_slice(&first_xof_result);
-
-        let (last_crh_result, last_xof_result) = crh_xof(
-            cs.ns(|| "last epoch crh xof"),
-            &last_epoch_bits,
-            true,
-        )?;
-        all_crh_bits.extend_from_slice(&last_crh_result);
-        all_xof_bits.extend_from_slice(&last_xof_result);
-
         let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {
             b.iter().rev().map(|z| z.clone()).collect::<Vec<_>>()
         }).collect::<Vec<_>>();
@@ -520,10 +457,38 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             aggregated_signature,
         )?;
 
-        let xof_bits = [
-            first_xof_result,
-            last_xof_result,
-        ].concat();
+        let mut xof_bits = vec![];
+        let first_and_last_bits = [first_epoch_bits, last_epoch_bits];
+        for (i, bits) in first_and_last_bits.iter().enumerate() {
+            let mut message = bits.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>();
+            let message_rounded_len = 8*((message.len() + 7)/8);
+            message.resize(message_rounded_len, Boolean::constant(false));
+
+            let mut personalization = [0; 8];
+            personalization.copy_from_slice(OUT_DOMAIN);
+
+            let blake2s_parameters = Blake2sWithParameterBlock {
+                digest_length: 32,
+                key_length: 0,
+                fan_out: 1,
+                depth: 1,
+                leaf_length: 0,
+                node_offset: 0,
+                xof_digest_length: 0,
+                node_depth: 0,
+                inner_length: 0,
+                salt: [0; 8],
+                personalization: personalization,
+            };
+            let xof_result = blake2s_gadget_with_parameters(
+                cs.ns(|| format!("first and last xof result {}", i)),
+                &message,
+                &blake2s_parameters.parameters(),
+            )?;
+            let xof_bits_i = xof_result.into_iter().map(|n| n.to_bits_le()).flatten().collect::<Vec<Boolean>>();
+            xof_bits.extend_from_slice(&xof_bits_i);
+        }
+
         MultipackGadget::pack(
             cs.ns(|| "pack output hash"),
             &xof_bits,
