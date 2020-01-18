@@ -23,7 +23,7 @@ pub struct Window;
 
 impl PedersenWindow for Window {
     const WINDOW_SIZE: usize = 93;
-    const NUM_WINDOWS: usize = 136;
+    const NUM_WINDOWS: usize = 280;
 }
 
 pub struct CompositeHasher {
