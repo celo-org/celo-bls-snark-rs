@@ -25,6 +25,7 @@ use r1cs_std::{Assignment, eq::EqGadget, groups::{
     GroupGadget,
     curves::{
         short_weierstrass::bls12::{
+            G1Gadget,
             G2Gadget,
         },
         twisted_edwards::edwards_sw6::{
@@ -51,13 +52,13 @@ use crypto_primitives::{
 };
 
 use bls_zexe::{
-    curve::hash::try_and_increment::get_point_from_x,
+    curve::hash::try_and_increment::get_point_from_x_g1,
     hash::composite::{CompositeHasher, CRH},
     bls::keys::SIG_DOMAIN,
 };
 use r1cs_std::bits::uint8::UInt8;
 use crate::gadgets::y_to_bit::YToBitGadget;
-use algebra::curves::bls12_377::{Bls12_377Parameters, G2Projective as Bls12_377G2Projective, g2::Bls12_377G2Parameters, Bls12_377};
+use algebra::curves::bls12_377::{Bls12_377Parameters, G1Projective as Bls12_377G1Projective, G2Projective as Bls12_377G2Projective, g1::Bls12_377G1Parameters, Bls12_377};
 use algebra::fields::models::fp6_3over2::Fp6Parameters;
 use algebra::fields::models::fp12_2over3over2::Fp12Parameters;
 use algebra::curves::models::bls12::Bls12Parameters;
@@ -163,7 +164,7 @@ impl HashToBitsGadget {
         let mut xof_bits = vec![];
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
-        for i in 0..3 {
+        for i in 0..2 {
             let blake2s_parameters = Blake2sWithParameterBlock {
                 digest_length: 32,
                 key_length: 0,
@@ -171,7 +172,7 @@ impl HashToBitsGadget {
                 depth: 0,
                 leaf_length: 32,
                 node_offset: i,
-                xof_digest_length: 768/8,
+                xof_digest_length: 512/8,
                 node_depth: 0,
                 inner_length: 32,
                 salt: [0; 8],
@@ -189,8 +190,7 @@ impl HashToBitsGadget {
         let modulus_bit_rounded = (((HashToBitsFieldParameters::MODULUS_BITS + 7)/8)*8) as usize;
         let xof_bits = [
             &xof_bits[..HashToBitsFieldParameters::MODULUS_BITS as usize],
-            &xof_bits[modulus_bit_rounded..modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize],
-            &[xof_bits[modulus_bit_rounded+HashToBitsFieldParameters::MODULUS_BITS as usize]][..],
+            &[xof_bits[HashToBitsFieldParameters::MODULUS_BITS as usize]][..],
         ].concat();
 
         Ok(xof_bits)
@@ -206,48 +206,38 @@ impl HashToGroupGadget {
         mut cs: CS,
         xof_bits: &[Boolean],
         source_capacity: usize,
-    ) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
-        let expected_point_before_cofactor = G2Gadget::<Bls12_377Parameters>::alloc(
+    ) -> Result<G1Gadget<Bls12_377Parameters>, SynthesisError> {
+        let expected_point_before_cofactor = G1Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "expected point before cofactor"),
             || {
                 if xof_bits.iter().any(|x| x.get_value().is_none()) {
                     Err(SynthesisError::AssignmentMissing)
                 } else {
-                    let mut c0_bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                    c0_bits.reverse();
-                    let c0_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c0_bits);
-                    let c0 = Bls12_377Fp::from_repr(c0_big);
-                    let mut c1_bits = xof_bits[377..377 * 2].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
-                    c1_bits.reverse();
-                    let c1_big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&c1_bits);
-                    let c1 = Bls12_377Fp::from_repr(c1_big);
-                    let x = Bls12_377Fp2::new(c0, c1);
-                    let greatest = xof_bits[377 * 2].get_value().get().unwrap();
-                    let p = get_point_from_x::<Bls12_377Parameters>(x, greatest).unwrap();
+                    let mut bits = xof_bits[..377].iter().map(|x| x.get_value().get().unwrap()).collect::<Vec<bool>>();
+                    bits.reverse();
+                    let big = <Bls12_377Fp as PrimeField>::BigInt::from_bits(&bits);
+                    let x = Bls12_377Fp::from_repr(big);
+                    let greatest = xof_bits[377].get_value().get().unwrap();
+                    let p = get_point_from_x_g1::<Bls12_377Parameters>(x, greatest).unwrap();
                     Ok(p.into_projective())
                 }
             }
         )?;
 
-        let mut c0_bits: Vec<Boolean> = expected_point_before_cofactor.x.c0.to_bits(
-            cs.ns(|| "c0 bits")
+        let mut bits: Vec<Boolean> = expected_point_before_cofactor.x.to_bits(
+            cs.ns(|| "bits")
         )?;
-        c0_bits.reverse();
-        let mut c1_bits: Vec<Boolean> = expected_point_before_cofactor.x.c1.to_bits(
-            cs.ns(|| "c1 bits")
-        )?;
-        c1_bits.reverse();
-        let greatest_bit = YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(
+        bits.reverse();
+        let greatest_bit = YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(
             cs.ns(|| "y to bit"),
             &expected_point_before_cofactor,
         )?;
 
         let mut serialized_bits = vec![];
-        serialized_bits.extend_from_slice(&c0_bits);
-        serialized_bits.extend_from_slice(&c1_bits);
+        serialized_bits.extend_from_slice(&bits);
         serialized_bits.push(greatest_bit);
 
-        let calculated_bits = &[&xof_bits[..377], &xof_bits[377..377*2], &[xof_bits[377*2]][..]].concat().to_vec();
+        let calculated_bits = &[&xof_bits[..377], &[xof_bits[377]][..]].concat().to_vec();
         serialized_bits.iter().zip(calculated_bits.iter())
             .enumerate()
             .for_each(
@@ -261,7 +251,7 @@ impl HashToGroupGadget {
                 }
             );
 
-        let scaled_point = Self::scale_by_cofactor_fuentes(cs.ns(|| "scale by cofactor"), &expected_point_before_cofactor)?;
+        let scaled_point = Self::scale_by_cofactor_g1(cs.ns(|| "scale by cofactor"), &expected_point_before_cofactor)?;
 
         Ok(scaled_point)
     }
@@ -339,6 +329,18 @@ impl HashToGroupGadget {
             twisted_y.c0.c0,
         );
         Ok(processed_p)
+    }
+
+    fn scale_by_cofactor_g1<CS: r1cs_core::ConstraintSystem<SW6Fr>>(mut cs: CS, p: &G1Gadget<Bls12_377Parameters>) -> Result<G1Gadget<Bls12_377Parameters>, SynthesisError> {
+        let generator = Bls12_377G1Projective::prime_subgroup_generator();
+        let generator_var =
+            G1Gadget::<Bls12_377Parameters>::alloc(cs.ns(|| "generator"), || Ok(generator))?;
+        let mut x_bits = BitIterator::new(Bls12_377G1Parameters::COFACTOR).map(|b| Boolean::constant(b)).collect::<Vec<Boolean>>();
+        x_bits.reverse();
+        let scaled = p
+            .mul_bits(cs.ns(|| "scaled"), &generator_var, x_bits.iter()).unwrap()
+            .sub(cs.ns(|| "scaled finalize"), &generator_var).unwrap(); //x
+        Ok(scaled)
     }
 
     fn scale_by_cofactor_fuentes<CS: r1cs_core::ConstraintSystem<SW6Fr>>(mut cs: CS, p: &G2Gadget<Bls12_377Parameters>) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {

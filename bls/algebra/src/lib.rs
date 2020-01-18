@@ -36,11 +36,11 @@ lazy_static! {
         let direct_hasher = DirectHasher::new().unwrap();
         direct_hasher
     };
-    static ref COMPOSITE_HASH_TO_G2: TryAndIncrement<'static, CompositeHasher> = {
+    static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> = {
         let try_and_increment = TryAndIncrement::new(&*COMPOSITE_HASHER);
         try_and_increment
     };
-    static ref DIRECT_HASH_TO_G2: TryAndIncrement<'static, DirectHasher> = {
+    static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> = {
         let try_and_increment = TryAndIncrement::new(&*DIRECT_HASHER);
         try_and_increment
     };
@@ -58,8 +58,8 @@ fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool 
 
 #[no_mangle]
 pub extern "C" fn init() {
-    &*COMPOSITE_HASH_TO_G2;
-    &*DIRECT_HASH_TO_G2;
+    &*COMPOSITE_HASH_TO_G1;
+    &*DIRECT_HASH_TO_G1;
 }
 
 #[no_mangle]
@@ -154,9 +154,9 @@ pub extern "C" fn sign_message(
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
         let signature = if should_use_composite {
-            private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G2)?
+            private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G1)?
         } else {
-            private_key.sign(message, extra_data, &*DIRECT_HASH_TO_G2)?
+            private_key.sign(message, extra_data, &*DIRECT_HASH_TO_G1)?
         };
         unsafe {
             *out_signature = Box::into_raw(Box::new(signature));
@@ -176,7 +176,7 @@ pub extern "C" fn sign_pop(
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let signature = private_key.sign_pop( message, &*DIRECT_HASH_TO_G2)?;
+        let signature = private_key.sign_pop( message, &*DIRECT_HASH_TO_G1)?;
         unsafe {
             *out_signature = Box::into_raw(Box::new(signature));
         }
@@ -264,9 +264,9 @@ pub extern "C" fn verify_signature(
         let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
         let signature = unsafe { &*in_signature };
         let verified = if should_use_composite {
-            public_key.verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G2).is_ok()
+            public_key.verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G1).is_ok()
         } else {
-            public_key.verify(message, extra_data, signature, &*DIRECT_HASH_TO_G2).is_ok()
+            public_key.verify(message, extra_data, signature, &*DIRECT_HASH_TO_G1).is_ok()
         };
         unsafe { *out_verified = verified };
 
@@ -286,7 +286,7 @@ pub extern "C" fn verify_pop(
         let public_key = unsafe { &*in_public_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let signature = unsafe { &*in_signature };
-        let verified = public_key.verify_pop(message, signature, &*DIRECT_HASH_TO_G2).is_ok();
+        let verified = public_key.verify_pop(message, signature, &*DIRECT_HASH_TO_G1).is_ok();
         unsafe { *out_verified = verified };
 
         Ok(())

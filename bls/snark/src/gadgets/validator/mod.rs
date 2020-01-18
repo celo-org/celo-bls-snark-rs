@@ -15,7 +15,7 @@ use r1cs_std::{
     groups::{
         curves::{
             short_weierstrass::bls12::{
-                G1Gadget,
+                G2Gadget,
             },
         },
     },
@@ -45,11 +45,11 @@ impl<
     // this will be much better when we can bound removed_validators_bitmap
     pub fn update<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
-        old_pub_keys: Vec<G1Gadget<P>>,
-        new_pub_keys: Vec<G1Gadget<P>>,
+        old_pub_keys: Vec<G2Gadget<P>>,
+        new_pub_keys: Vec<G2Gadget<P>>,
         removed_validators_bitmap: Vec<Boolean>,
         maximum_removed_validators: u64,
-    ) -> Result<Vec<G1Gadget<P>>, SynthesisError> {
+    ) -> Result<Vec<G2Gadget<P>>, SynthesisError> {
         assert_eq!(old_pub_keys.len(), removed_validators_bitmap.len());
 
         let mut num_removed_validators_num = Some(0);
@@ -57,7 +57,7 @@ impl<
 
         let mut new_validator_set = vec![];
         for (i, pk) in old_pub_keys.iter().enumerate() {
-            let new_pub_key = G1Gadget::<P>::conditionally_select(
+            let new_pub_key = G2Gadget::<P>::conditionally_select(
                 cs.ns(|| format!("cond_select {}", i)),
                 &removed_validators_bitmap[i],
                 &new_pub_keys[i],
@@ -94,13 +94,15 @@ impl<
 
     pub fn to_bits<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
-        validator_set: Vec<G1Gadget<P>>,
+        validator_set: Vec<G2Gadget<P>>,
     ) -> Result<Vec<Boolean>, SynthesisError> {
         let mut bits = vec![];
         for (i, pk) in validator_set.iter().enumerate() {
-            let x_bits = pk.x.to_bits(cs.ns(|| format!("unpack x {}", i)))?;
-            bits.extend_from_slice(&x_bits);
-            let y_bit = YToBitGadget::<P>::y_to_bit_g1(
+            let x_c0_bits = pk.x.c0.to_bits(cs.ns(|| format!("unpack x c0 {}", i)))?;
+            bits.extend_from_slice(&x_c0_bits);
+            let x_c1_bits = pk.x.c1.to_bits(cs.ns(|| format!("unpack x c1 {}", i)))?;
+            bits.extend_from_slice(&x_c1_bits);
+            let y_bit = YToBitGadget::<P>::y_to_bit_g2(
                 cs.ns(|| format!("y to bit {}", i)),
                 pk,
             )?;

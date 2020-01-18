@@ -58,12 +58,27 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Er
     let x = pk_affine.x;
     let y = pk_affine.y;
 
-    let half = Fq::modulus_minus_one_div_two();
-    let is_over_half = y.into_repr() > half;
+    let y_c0_big = y.c0.into_repr();
+    let y_c1_big = y.c1.into_repr();
 
-    let mut x_bytes = vec![];
-    x.write(&mut x_bytes)?;
-    let mut bits = bytes_to_bits(&x_bytes, FqParameters::MODULUS_BITS as usize);
+    let half = Fq::modulus_minus_one_div_two();
+    let is_over_half = if y_c1_big > half {
+        true
+    } else if y_c1_big == half && y_c0_big > half {
+        true
+    } else {
+        false
+    };
+
+    let mut bits = vec![];
+    let mut x_bytes_c0 = vec![];
+    x.c0.write(&mut x_bytes_c0)?;
+    let bits_c0 = bytes_to_bits(&x_bytes_c0, FqParameters::MODULUS_BITS as usize);
+    bits.extend_from_slice(&bits_c0);
+    let mut x_bytes_c1 = vec![];
+    x.c1.write(&mut x_bytes_c1)?;
+    let bits_c1 = bytes_to_bits(&x_bytes_c1, FqParameters::MODULUS_BITS as usize);
+    bits.extend_from_slice(&bits_c1);
     bits.push(is_over_half);
 
     Ok(bits)
@@ -94,19 +109,20 @@ pub fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
 
 /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
 /// more easily processable in SNARKs
-pub fn encode_epoch_block_to_bits(epoch_index: u16, maximum_non_signers: u32, new_public_keys: &Vec<PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
+pub fn encode_epoch_block_to_bits(epoch_index: u16, maximum_non_signers: u32, aggregated_public_key: &PublicKey, new_public_keys: &Vec<&PublicKey>) -> Result<Vec<bool>, Box<dyn Error>> {
     let mut epoch_bits = vec![];
 
     epoch_bits.extend_from_slice(&encode_u16(epoch_index)?);
     epoch_bits.extend_from_slice(&encode_u32(maximum_non_signers)?);
+    epoch_bits.extend_from_slice(encode_public_key(&aggregated_public_key)?.as_slice());
     for added_public_key in new_public_keys {
         epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
     }
     Ok(epoch_bits)
 }
 
-pub fn encode_epoch_block_to_bytes(epoch_index: u16, maximum_non_signers: u32, added_public_keys: &Vec<PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(bits_to_bytes(&encode_epoch_block_to_bits(epoch_index, maximum_non_signers, added_public_keys)?))
+pub fn encode_epoch_block_to_bytes(epoch_index: u16, maximum_non_signers: u32, aggregated_public_key: &PublicKey, added_public_keys: &Vec<&PublicKey>) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(bits_to_bytes(&encode_epoch_block_to_bits(epoch_index, maximum_non_signers, aggregated_public_key, added_public_keys)?))
 }
 
 #[cfg(test)]

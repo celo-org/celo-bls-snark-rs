@@ -2,6 +2,7 @@ package bls
 
 import (
 	"testing"
+  "encoding/hex"
 )
 
 func TestAggregatedSig(t *testing.T) {
@@ -99,5 +100,23 @@ func TestNonCompositeSig(t *testing.T) {
 	if err == nil {
 		t.Fatalf("succeeded verifying signature for wrong pk, shouldn't have!")
 	}
+}
 
+func TestEncoding(t *testing.T) {
+	InitBLSCrypto()
+	privateKey, _ := GeneratePrivateKey()
+	defer privateKey.Destroy()
+	publicKey, _ := privateKey.ToPublic()
+
+	privateKey2, _ := GeneratePrivateKey()
+	defer privateKey2.Destroy()
+	publicKey2, _ := privateKey2.ToPublic()
+
+	aggergatedPublicKey, _ := AggregatePublicKeys([]*PublicKey{publicKey, publicKey2})
+
+  bytes, err := EncodeEpochToBytes(10, 20, aggergatedPublicKey, []*PublicKey{publicKey, publicKey2})
+	if err != nil {
+		t.Fatalf("failed encoding epoch bytes")
+	}
+  t.Logf("encoding: %s\n", hex.EncodeToString(bytes))
 }

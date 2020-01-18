@@ -34,10 +34,10 @@ impl<
 {
     pub fn verify<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
-        pub_keys: &[P::G1Gadget],
+        pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
-        message_hash: P::G2Gadget,
-        signature: P::G2Gadget,
+        message_hash: P::G1Gadget,
+        signature: P::G1Gadget,
         maximum_non_signers: FpGadget<ConstraintF>,
     ) -> Result<(), SynthesisError> {
         let (prepared_aggregated_pk, prepared_message_hash) = Self::verify_partial(
@@ -47,18 +47,18 @@ impl<
             message_hash,
             maximum_non_signers,
         )?;
-        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &signature)?;
+        let prepared_signature = P::prepare_g1(cs.ns(|| "prepared signature"), &signature)?;
 
-        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
-            Ok(PairingE::G1Projective::prime_subgroup_generator())
+        let g2_neg_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
+            Ok(PairingE::G2Projective::prime_subgroup_generator())
         })?
-            .negate(cs.ns(|| "negate g1 generator"))?;
-        let prepared_g1_neg_generator =
-            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
+            .negate(cs.ns(|| "negate g2 generator"))?;
+        let prepared_g2_neg_generator =
+            P::prepare_g2(cs.ns(|| "prepared g2 neg generator"), &g2_neg_generator)?;
         let bls_equation = P::product_of_pairings(
             cs.ns(|| "verify BLS signature"),
-            &[prepared_g1_neg_generator, prepared_aggregated_pk],
             &[prepared_signature, prepared_message_hash],
+            &[prepared_g2_neg_generator, prepared_aggregated_pk],
         )?;
         let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
         bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
@@ -68,22 +68,22 @@ impl<
 
     pub fn batch_verify<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
-        prepared_aggregated_pub_keys: &[P::G1PreparedGadget],
-        prepared_message_hashes: &[P::G2PreparedGadget],
-        aggregated_signature: P::G2Gadget,
+        prepared_aggregated_pub_keys: &[P::G2PreparedGadget],
+        prepared_message_hashes: &[P::G1PreparedGadget],
+        aggregated_signature: P::G1Gadget,
     ) -> Result<(), SynthesisError> {
-        let prepared_signature = P::prepare_g2(cs.ns(|| "prepared signature"), &aggregated_signature)?;
+        let prepared_signature = P::prepare_g1(cs.ns(|| "prepared signature"), &aggregated_signature)?;
 
-        let g1_neg_generator = P::G1Gadget::alloc(cs.ns(|| "G1 generator"), || {
-            Ok(PairingE::G1Projective::prime_subgroup_generator())
+        let g2_neg_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
+            Ok(PairingE::G2Projective::prime_subgroup_generator())
         })?
-            .negate(cs.ns(|| "negate g1 generator"))?;
-        let prepared_g1_neg_generator =
-            P::prepare_g1(cs.ns(|| "prepared g1 neg generator"), &g1_neg_generator)?;
-        let mut prepared_g1s = vec![prepared_g1_neg_generator];
-        prepared_g1s.extend_from_slice(prepared_aggregated_pub_keys);
-        let mut prepared_g2s = vec![prepared_signature];
-        prepared_g2s.extend_from_slice(prepared_message_hashes);
+            .negate(cs.ns(|| "negate g2 generator"))?;
+        let prepared_g2_neg_generator =
+            P::prepare_g2(cs.ns(|| "prepared g2 neg generator"), &g2_neg_generator)?;
+        let mut prepared_g2s = vec![prepared_g2_neg_generator];
+        prepared_g2s.extend_from_slice(prepared_aggregated_pub_keys);
+        let mut prepared_g1s = vec![prepared_signature];
+        prepared_g1s.extend_from_slice(prepared_message_hashes);
         let bls_equation = P::product_of_pairings(
             cs.ns(|| "verify BLS signature"),
             &prepared_g1s,
@@ -97,15 +97,15 @@ impl<
 
     pub fn verify_partial<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
-        pub_keys: &[P::G1Gadget],
+        pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
-        message_hash: P::G2Gadget,
+        message_hash: P::G1Gadget,
         maximum_non_signers: FpGadget<ConstraintF>,
-    ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
+    ) -> Result<(P::G2PreparedGadget, P::G1PreparedGadget), SynthesisError> {
         assert_eq!(signed_bitmap.len(), pub_keys.len());
-        let generator = PairingE::G1Projective::prime_subgroup_generator();
+        let generator = PairingE::G2Projective::prime_subgroup_generator();
         let generator_var =
-            P::G1Gadget::alloc(cs.ns(|| "generator"), || Ok(generator))?;
+            P::G2Gadget::alloc(cs.ns(|| "generator"), || Ok(generator))?;
 
         let mut aggregated_pk = generator_var.clone();
 
@@ -114,10 +114,10 @@ impl<
         for (i, pk) in pub_keys.iter().enumerate() {
             let added = aggregated_pk.add(
                 cs.ns(|| format!("add pk {}", i)),
-                &pk,
+                pk,
             )?;
 
-            aggregated_pk = P::G1Gadget::conditionally_select(
+            aggregated_pk = P::G2Gadget::conditionally_select(
                 &mut cs.ns(|| format!("cond_select {}", i)),
                 &signed_bitmap[i],
                 &added,
@@ -154,9 +154,9 @@ impl<
         )?;
 
         let prepared_aggregated_pk =
-            P::prepare_g1(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
+            P::prepare_g2(cs.ns(|| "prepared aggregaed pk"), &aggregated_pk)?;
         let prepared_message_hash =
-            P::prepare_g2(cs.ns(|| "prepared message hash"), &message_hash)?;
+            P::prepare_g1(cs.ns(|| "prepared message hash"), &message_hash)?;
 
         Ok((prepared_aggregated_pk, prepared_message_hash))
     }

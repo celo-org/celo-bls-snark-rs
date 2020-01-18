@@ -117,7 +117,8 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
 pub struct SingleUpdate {
     pub epoch_index: Option<u16> ,
     pub maximum_non_signers: Option<u32> ,
-    pub new_pub_keys: Vec<Option<G1Projective>>,
+    pub new_pub_keys: Vec<Option<G2Projective>>,
+    pub new_aggregated_pub_key: Option<G2Projective>,
     pub signed_bitmap: Vec<Option<bool>>,
 }
 
@@ -128,14 +129,15 @@ pub struct HashProof {
 
 #[derive(Clone)]
 pub struct ValidatorSetUpdate {
-    pub initial_public_keys: Vec<Option<G1Projective>>,
+    pub initial_aggregated_pub_key: Option<G2Projective>,
+    pub initial_public_keys: Vec<Option<G2Projective>>,
     pub initial_epoch_index: Option<u16> ,
     pub initial_maximum_non_signers: Option<u32> ,
     pub num_validators: usize,
     pub hash_proof: HashProof,
     pub updates: Vec<SingleUpdate>,
     pub verifying_key: VerifyingKey<Bls12_377>,
-    pub aggregated_signature: Option<G2Projective>,
+    pub aggregated_signature: Option<G1Projective>,
 }
 
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
@@ -143,8 +145,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
-
-        let aggregated_signature = G2Gadget::<Bls12_377Parameters>::alloc(
+        let aggregated_signature = G1Gadget::<Bls12_377Parameters>::alloc(
             cs.ns(|| "aggregated signature"),
             || self.aggregated_signature.clone().ok_or(SynthesisError::AssignmentMissing)
         )?;
@@ -195,16 +196,35 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             )?.iter().rev().map(|b| b.clone()).take(32).collect::<Vec<_>>().as_slice()
         );
 
+        let initial_aggregated_key = G2Gadget::<Bls12_377Parameters>::alloc(
+            cs.ns(|| "initial: aggregated pub key"),
+            || self.initial_aggregated_pub_key.clone().ok_or(SynthesisError::AssignmentMissing)
+        )?;
+
+        first_epoch_bits.extend_from_slice(&initial_aggregated_key.x.c0.to_bits(
+            cs.ns(|| "initial: aggregated pub key c0 bits")
+        )?);
+        first_epoch_bits.extend_from_slice(&initial_aggregated_key.x.c1.to_bits(
+            cs.ns(|| "initial: aggregated pub key c1 bits")
+        )?);
+        first_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(
+            cs.ns(|| "initial: aggregated pub key y bit"),
+            &initial_aggregated_key,
+        )?);
+
         let mut current_pub_keys_vars = vec![];
         for (j, maybe_pk) in self.initial_public_keys.iter().enumerate() {
-            let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
+            let pk_var = G2Gadget::<Bls12_377Parameters>::alloc(
                 cs.ns(|| format!("initial: pub key {}", j)),
                 || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
             )?;
-            first_epoch_bits.extend_from_slice(&pk_var.x.to_bits(
-                cs.ns(|| format!("initial: pub key bits {}", j))
+            first_epoch_bits.extend_from_slice(&pk_var.x.c0.to_bits(
+                cs.ns(|| format!("initial: pub key c0 bits {}", j))
             )?);
-            first_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(
+            first_epoch_bits.extend_from_slice(&pk_var.x.c1.to_bits(
+                cs.ns(|| format!("initial: pub key c1 bits {}", j))
+            )?);
+            first_epoch_bits.push(YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(
                 cs.ns(|| format!("initial: pub key y bit {}", j)),
                 &pk_var,
             )?);
@@ -262,13 +282,12 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 };
                 xof_bits
             } else {
-                let xof_target_bits = 768;
+                let xof_target_bits = 512;
                 let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
                     let hash_bits = vec![false; xof_target_bits];
                     [
                         &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded + FrParameters::MODULUS_BITS as usize],
-                        &[hash_bits[modulus_bit_rounded + FrParameters::MODULUS_BITS as usize]][..],
+                        &[hash_bits[FrParameters::MODULUS_BITS as usize]][..],
                     ].concat().to_vec()
                 } else {
                     let epoch_bytes = bits_to_bytes(&epoch_bits.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
@@ -277,8 +296,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
                     [
                         &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
-                        &hash_bits[modulus_bit_rounded..modulus_bit_rounded + FrParameters::MODULUS_BITS as usize],
-                        &[hash_bits[modulus_bit_rounded + FrParameters::MODULUS_BITS as usize]][..],
+                        &[hash_bits[FrParameters::MODULUS_BITS as usize]][..],
                     ].concat().to_vec()
                 };
 
@@ -302,11 +320,15 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
         for (i, update) in self.updates.iter().enumerate() {
+            let new_aggregated_pub_key_var = G2Gadget::<Bls12_377Parameters>::alloc(
+                cs.ns(|| format!("{}: new aggregated pub key", i)),
+                || update.new_aggregated_pub_key.clone().ok_or(SynthesisError::AssignmentMissing)
+            )?;
             let mut new_pub_keys_vars = vec![];
             {
                 assert_eq!(self.num_validators, update.new_pub_keys.len());
                 for (j, maybe_pk) in update.new_pub_keys.iter().enumerate() {
-                    let pk_var = G1Gadget::<Bls12_377Parameters>::alloc(
+                    let pk_var = G2Gadget::<Bls12_377Parameters>::alloc(
                         cs.ns(|| format!("{}: new pub key {}", i, j)),
                         || maybe_pk.clone().ok_or(SynthesisError::AssignmentMissing)
                     )?;
@@ -357,9 +379,12 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             )?;
             let maximum_non_signers_bits = maximum_non_signers_bits.into_iter().rev().take(32).collect::<Vec<_>>();
             epoch_bits.extend_from_slice(&maximum_non_signers_bits);
+            let mut all_keys = vec![];
+            all_keys.push(new_aggregated_pub_key_var.clone());
+            all_keys.extend_from_slice(&new_pub_keys_vars);
             let validator_set_bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
                 cs.ns(|| format!("{}: validator set to bits", i)),
-                new_pub_keys_vars.clone(),
+                all_keys,
             )?;
             epoch_bits.extend_from_slice(&validator_set_bits);
             current_epoch_bits = epoch_bits.clone();
@@ -402,10 +427,15 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 &xof_bits_results,
                 BlsFrParameters::CAPACITY as usize,
             )?;
+            /*
+            if message_hash.get_value().is_some() {
+                println!("message hash: {}", message_hash.get_value().unwrap());
+            }
+            */
 
             let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
                 cs.ns(|| format!("{}: verify signature partial", i)),
-                &current_pub_keys_vars,
+                current_pub_keys_vars.as_slice(),
                 signed_bitmap.as_slice(),
                 message_hash,
                 current_maximum_non_signers.clone(),
