@@ -141,6 +141,15 @@ func (self *PrivateKey) SignPoP(message []byte, ) (*Signature, error) {
 	return signature, nil
 }
 
+func HashMessage(message []byte) (hash []byte, error) {
+	hash := &Hash{}
+	success := C.hash(message, &hash.ptr)
+	if !success {
+		return nil, GeneralError
+	}
+	return hash, nil
+}
+
 func (self *PrivateKey) Destroy() {
 	C.destroy_private_key(self.ptr)
 }
