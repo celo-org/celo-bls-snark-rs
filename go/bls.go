@@ -141,14 +141,17 @@ func (self *PrivateKey) SignPoP(message []byte, ) (*Signature, error) {
 	return signature, nil
 }
 
-func HashMessage(message []byte) (hash []byte, error) {
-	hash := &Hash{}
-	success := C.hash(message, &hash.ptr)
+/*func HashDirect(message []byte) (hash []byte, error) {
+	hash := []byte
+	messagePtr, messageLen := sliceToPtr(message)
+	var hashLen C.c_int
+	var hashPtr C.uchar
+	success := C.hash_direct(messagePtr, messageLen, &hashPtr, &hashLen)
 	if !success {
 		return nil, GeneralError
 	}
 	return hash, nil
-}
+}*/
 
 func (self *PrivateKey) Destroy() {
 	C.destroy_private_key(self.ptr)
