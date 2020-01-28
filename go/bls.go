@@ -141,17 +141,31 @@ func (self *PrivateKey) SignPoP(message []byte, ) (*Signature, error) {
 	return signature, nil
 }
 
-/*func HashDirect(message []byte) (hash []byte, error) {
-	hash := []byte
+func HashDirect(message []byte, usePoP bool) ([]byte, error) {
 	messagePtr, messageLen := sliceToPtr(message)
-	var hashLen C.c_int
-	var hashPtr C.uchar
-	success := C.hash_direct(messagePtr, messageLen, &hashPtr, &hashLen)
+	var hashLen C.int
+	var hashPtr *C.uchar
+	success := C.hash_direct(messagePtr, messageLen, &hashPtr, &hashLen, C.bool(usePoP))
 	if !success {
 		return nil, GeneralError
 	}
+	hash := C.GoBytes(unsafe.Pointer(hashPtr), hashLen)
 	return hash, nil
-}*/
+}
+
+func HashComposite(message []byte, extraData []byte) ([]byte, error) {
+	messagePtr, messageLen := sliceToPtr(message)
+	extraDataPtr, extraDataLen := sliceToPtr(extraData)
+	var hashLen C.int
+	var hashPtr *C.uchar
+	success := C.hash_composite(messagePtr, messageLen, extraDataPtr, extraDataLen, &hashPtr, &hashLen)
+	if !success {
+		return nil, GeneralError
+	}
+	hash := C.GoBytes(unsafe.Pointer(hashPtr), hashLen)
+	return hash, nil
+}
+
 
 func (self *PrivateKey) Destroy() {
 	C.destroy_private_key(self.ptr)

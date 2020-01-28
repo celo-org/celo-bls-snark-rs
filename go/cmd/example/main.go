@@ -17,6 +17,8 @@ func main() {
 	fmt.Printf("Public key: %x\n", publicKeyBytes)
 	message := []byte("test")
 	extraData := []byte("extra")
+	directHashNoPoP := bls.DirectHash(message, false)
+	fmt.Printf("Direct Hash: %x\n", directHashNoPoP)
 	signature, _ := privateKey.SignMessage(message, extraData, true)
 	signatureBytes, _ := signature.Serialize()
 	fmt.Printf("Signature: %x\n", signatureBytes)
