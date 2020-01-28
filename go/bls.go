@@ -143,9 +143,10 @@ func (self *PrivateKey) SignPoP(message []byte, ) (*Signature, error) {
 
 func HashDirect(message []byte, usePoP bool) ([]byte, error) {
 	messagePtr, messageLen := sliceToPtr(message)
-	var hashLen C.int
 	var hashPtr *C.uchar
+	var hashLen C.int
 	success := C.hash_direct(messagePtr, messageLen, &hashPtr, &hashLen, C.bool(usePoP))
+	defer C.free_vec(hashPtr, hashLen)
 	if !success {
 		return nil, GeneralError
 	}
