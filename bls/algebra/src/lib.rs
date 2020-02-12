@@ -19,8 +19,9 @@ use crate::{
     },
 };
 use algebra::{FromBytes, ToBytes,
-    curves::bls12_377::Bls12_377Parameters
+    curves::bls12_377::{Bls12_377Parameters, G1Affine, G2Affine}
 };
+use algebra::fields::{Field, bls12_377::{Fq, Fq2}};
 use rand::thread_rng;
 use std::{
     fmt::Display,
@@ -28,6 +29,7 @@ use std::{
 };
 use std::os::raw::c_int;
 use std::slice;
+use std::io::Read;
 
 
 lazy_static! {
@@ -198,11 +200,6 @@ pub extern "C" fn hash_direct(
 ) -> bool {
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-     /*   let hash =  if use_pop {
-            DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?;
-        } else {
-            DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?;
-        };*/
         let hash = match use_pop {
             true => DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?, 
             _ => DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?, 
@@ -237,6 +234,54 @@ pub extern "C" fn hash_composite(
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_hash = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+        }
+        std::mem::forget(obj_bytes);
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn compress_signature(
+    in_signature: *const u8,
+    in_signature_len: c_int,
+    out_signature: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
+        let signature = unsafe { slice::from_raw_parts(in_signature, in_signature_len as usize) };
+        let x = Fq::read(&signature[0..48]).unwrap();
+        let y = Fq::read(&signature[48..96]).unwrap();
+        let affine = G1Affine::new(x, y, false);
+        let mut obj_bytes = vec![];
+        affine.write(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_signature = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+        }
+        std::mem::forget(obj_bytes);
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn compress_pubkey(
+    in_pubkey: *const u8,
+    in_pubkey_len: c_int,
+    out_pubkey: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
+        let pubkey = unsafe { slice::from_raw_parts(in_pubkey, in_pubkey_len as usize) };
+        let x = Fq2::read(&pubkey[0..96]).unwrap();
+        let y = Fq2::read(&pubkey[96..192]).unwrap();
+        let affine = G2Affine::new(x, y, false);
+        let mut obj_bytes = vec![];
+        affine.write(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_pubkey = obj_bytes.as_mut_ptr();
             *out_len = obj_bytes.len() as c_int;
         }
         std::mem::forget(obj_bytes);

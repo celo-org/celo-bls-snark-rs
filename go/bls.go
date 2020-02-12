@@ -171,6 +171,29 @@ func HashComposite(message []byte, extraData []byte) ([]byte, error) {
 	return hash, nil
 }
 
+func CompressSignature(signature []byte) ([]byte, error) {
+	signaturePtr, signatureLen := sliceToPtr(signature)
+	var compressedLen C.int
+	var compressedPtr *C.uchar
+	success := C.compress_signature(signaturePtr, signatureLen, &compressedPtr, &compressedLen)
+	if !success {
+		return nil, GeneralError
+	}
+	compressedSignature := C.GoBytes(unsafe.Pointer(compressedPtr), compressedLen)
+	return compressedSignature, nil
+}
+
+func CompressPublickey(pubkey []byte) ([]byte, error) {
+	pubkeyPtr, pubkeyLen := sliceToPtr(pubkey)
+	var compressedLen C.int
+	var compressedPtr *C.uchar
+	success := C.compress_signature(pubkeyPtr, pubkeyLen, &compressedPtr, &compressedLen)
+	if !success {
+		return nil, GeneralError
+	}
+	compressedPubkey := C.GoBytes(unsafe.Pointer(compressedPtr), compressedLen)
+	return compressedPubkey, nil
+}
 
 func (self *PrivateKey) Destroy() {
 	C.destroy_private_key(self.ptr)
