@@ -23,7 +23,7 @@ func main() {
 	fmt.Printf("Direct Hash for PoP: %x\n", directHashForPoP)
 	compositeHash, _ := bls.HashComposite(message, extraData)
 	fmt.Printf("Composite Hash: %x\n", compositeHash)
-	compressedG1Elem, _ := bls.CompressSignature(directHashNoPoP)
+	compressedG1Elem, _ := bls.CompressSignature(directHashForPoP)
 	fmt.Printf("Compressed G1 Elem: %x\n", compressedG1Elem)
 	fmt.Printf("Compressed G1 Elem length: %d\n", len(compressedG1Elem))
 	fmt.Printf("Hash length: %d\n", len(directHashNoPoP))

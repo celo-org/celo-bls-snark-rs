@@ -21,7 +21,8 @@ use crate::{
 use algebra::{FromBytes, ToBytes,
     curves::bls12_377::{Bls12_377Parameters, G1Affine, G2Affine}
 };
-use algebra::fields::{Field, bls12_377::{Fq, Fq2}};
+use algebra::fields::bls12_377::{Fq, Fq2};
+use algebra::curves::ProjectiveCurve;
 use rand::thread_rng;
 use std::{
     fmt::Display,
@@ -29,7 +30,6 @@ use std::{
 };
 use std::os::raw::c_int;
 use std::slice;
-use std::io::Read;
 
 
 lazy_static! {
@@ -205,7 +205,7 @@ pub extern "C" fn hash_direct(
             _ => DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?, 
         };
         let mut obj_bytes = vec![];
-        hash.write(&mut obj_bytes)?;
+        hash.into_affine().write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_hash = obj_bytes.as_mut_ptr();
