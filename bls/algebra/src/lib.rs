@@ -22,7 +22,7 @@ use algebra::{FromBytes, ToBytes,
     curves::bls12_377::{Bls12_377Parameters, G1Affine, G2Affine}
 };
 use algebra::fields::bls12_377::{Fq, Fq2};
-use algebra::curves::ProjectiveCurve;
+use algebra::curves::{ProjectiveCurve, AffineCurve};
 use rand::thread_rng;
 use std::{
     fmt::Display,
@@ -253,8 +253,9 @@ pub extern "C" fn compress_signature(
         let x = Fq::read(&signature[0..48]).unwrap();
         let y = Fq::read(&signature[48..96]).unwrap();
         let affine = G1Affine::new(x, y, false);
+        let sig = Signature::from_sig(&affine.into_projective());
         let mut obj_bytes = vec![];
-        affine.write(&mut obj_bytes)?;
+        sig.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_signature = obj_bytes.as_mut_ptr();
@@ -277,8 +278,9 @@ pub extern "C" fn compress_pubkey(
         let x = Fq2::read(&pubkey[0..96]).unwrap();
         let y = Fq2::read(&pubkey[96..192]).unwrap();
         let affine = G2Affine::new(x, y, false);
+        let pk = PublicKey::from_pk(&affine.into_projective());
         let mut obj_bytes = vec![];
-        affine.write(&mut obj_bytes)?;
+        pk.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_pubkey = obj_bytes.as_mut_ptr();
