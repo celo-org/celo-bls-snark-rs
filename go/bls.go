@@ -187,7 +187,7 @@ func CompressPublickey(pubkey []byte) ([]byte, error) {
 	pubkeyPtr, pubkeyLen := sliceToPtr(pubkey)
 	var compressedLen C.int
 	var compressedPtr *C.uchar
-	success := C.compress_signature(pubkeyPtr, pubkeyLen, &compressedPtr, &compressedLen)
+	success := C.compress_pubkey(pubkeyPtr, pubkeyLen, &compressedPtr, &compressedLen)
 	if !success {
 		return nil, GeneralError
 	}
