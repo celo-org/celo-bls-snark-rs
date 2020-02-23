@@ -120,19 +120,6 @@ pub struct PublicKey {
     pk: G2Projective,
 }
 
-struct AggregateCacheState {
-    keys : HashSet<PublicKey>,
-    combined : G2Projective,
-}
-
-lazy_static! {
-    static ref FROM_BYTES_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
-    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState{
-        keys: HashSet::new(),
-        combined: G2Projective::zero().clone()
-    });
-}
-
 impl PublicKey {
     pub fn from_pk(pk: &G2Projective) -> PublicKey {
         PublicKey { pk: pk.clone() }
@@ -146,32 +133,15 @@ impl PublicKey {
         PublicKey::from_pk(&self.pk)
     }
 
-    pub fn clear_cache() {
-        FROM_BYTES_CACHE.lock().unwrap().clear();
-        let mut cache = AGGREGATE_CACHE.lock().unwrap();
-        cache.keys = HashSet::new();
-        cache.combined = G2Projective::zero().clone();
+    pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
+        let mut apk = G2Projective::zero();
+        for i in public_keys.iter() {
+            apk = apk + &(*i).pk;
+        }
+        PublicKey { pk: apk }
     }
 
     pub fn from_bytes(data: &Vec<u8>) -> IoResult<PublicKey> {
-        let cached_result = PublicKey::from_bytes_cached(data);
-        if cached_result.is_none() {
-            // cache miss
-            let generated_result = PublicKey::from_bytes_uncached(data)?;
-            FROM_BYTES_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
-            Ok(generated_result)
-        } else {
-            // cache hit
-            Ok(cached_result.unwrap())
-        }
-    }
-
-    pub fn from_bytes_cached(data: &Vec<u8>) -> Option<PublicKey> {
-        let mut cache = FROM_BYTES_CACHE.lock().unwrap();
-        Some(cache.get(data)?.clone())
-    }
-
-    pub fn from_bytes_uncached(data: &Vec<u8>) -> IoResult<PublicKey> {
         let mut x_bytes_with_y: Vec<u8> = data.to_owned();
         let x_bytes_with_y_len = x_bytes_with_y.len();
         let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
@@ -203,29 +173,6 @@ impl PublicKey {
         let chosen_y = if y_over_half { bigger } else { smaller };
         let pk = G2Affine::new(x, chosen_y, false);
         Ok(PublicKey::from_pk(&pk.into_projective()))
-    }
-
-    pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
-        // The set of validators changes slowly, so for speed we will compute the
-        // difference from the last call and do an incremental update
-        let mut keys : HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
-        for key in public_keys.iter() {
-            keys.insert((*key).clone());
-        }
-        let mut cache = AGGREGATE_CACHE.lock().unwrap();
-        let mut combined = cache.combined;
-
-        for key in cache.keys.difference(&keys) {
-            combined = combined - &(*key).pk;
-        }
-
-        for key in keys.difference(&cache.keys) {
-            combined = combined + &(*key).pk;
-        }
-
-        cache.keys = keys;
-        cache.combined = combined;
-        PublicKey::from_pk(&combined)
     }
 
     pub fn verify<H: HashToG1>(
@@ -318,7 +265,7 @@ impl FromBytes for PublicKey {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let mut x_bytes_with_y: Vec<u8> = vec![];
         reader.read_to_end(&mut x_bytes_with_y)?;
-        PublicKey::from_bytes(&x_bytes_with_y)
+        PublicKeyCache::from_bytes(&x_bytes_with_y)
     }
 }
 
@@ -381,6 +328,70 @@ impl FromBytes for Signature {
         let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
         let sig = G1Affine::new(x, chosen_y, false);
         Ok(Signature::from_sig(&sig.into_projective()))
+    }
+}
+
+struct AggregateCacheState {
+    keys : HashSet<PublicKey>,
+    combined : G2Projective,
+}
+
+lazy_static! {
+    static ref FROM_BYTES_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
+    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState{
+        keys: HashSet::new(),
+        combined: G2Projective::zero().clone()
+    });
+}
+
+pub struct PublicKeyCache {}
+impl PublicKeyCache {
+    pub fn clear_cache() {
+        FROM_BYTES_CACHE.lock().unwrap().clear();
+        let mut cache = AGGREGATE_CACHE.lock().unwrap();
+        cache.keys = HashSet::new();
+        cache.combined = G2Projective::zero().clone();
+    }
+
+    pub fn from_bytes(data: &Vec<u8>) -> IoResult<PublicKey> {
+        let cached_result = PublicKeyCache::from_bytes_cached(data);
+        if cached_result.is_none() {
+            // cache miss
+            let generated_result = PublicKey::from_bytes(data)?;
+            FROM_BYTES_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
+            Ok(generated_result)
+        } else {
+            // cache hit
+            Ok(cached_result.unwrap())
+        }
+    }
+
+    pub fn from_bytes_cached(data: &Vec<u8>) -> Option<PublicKey> {
+        let mut cache = FROM_BYTES_CACHE.lock().unwrap();
+        Some(cache.get(data)?.clone())
+    }
+
+    pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
+        // The set of validators changes slowly, so for speed we will compute the
+        // difference from the last call and do an incremental update
+        let mut keys : HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
+        for key in public_keys.iter() {
+            keys.insert((*key).clone());
+        }
+        let mut cache = AGGREGATE_CACHE.lock().unwrap();
+        let mut combined = cache.combined;
+
+        for key in cache.keys.difference(&keys) {
+            combined = combined - &(*key).pk;
+        }
+
+        for key in keys.difference(&cache.keys) {
+            combined = combined + &(*key).pk;
+        }
+
+        cache.keys = keys;
+        cache.combined = combined;
+        PublicKey::from_pk(&combined)
     }
 }
 
@@ -483,7 +494,7 @@ mod test {
         let sig1 = sk1.sign(&message[..], &[], &try_and_increment).unwrap();
         let sig2 = sk2.sign(&message[..], &[], &try_and_increment).unwrap();
 
-        let apk = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
+        let apk = PublicKeyCache::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
         let asig = Signature::aggregate(&[&sig1, &sig2]);
         apk.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
         apk.verify(&message[..], &[], &sig1, &try_and_increment)
@@ -494,6 +505,18 @@ mod test {
         let message2 = b"goodbye";
         apk.verify(&message2[..], &[], &asig, &try_and_increment)
             .unwrap_err();
+
+        let apk2 = PublicKeyCache::aggregate(&[&sk1.to_public()]);
+        apk2.verify(&message[..], &[], &asig, &try_and_increment).unwrap_err();
+        apk2.verify(&message[..], &[], &sig1, &try_and_increment).unwrap();
+
+        let apk3 = PublicKeyCache::aggregate(&[&sk2.to_public(), &sk1.to_public()]);
+        apk3.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk3.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
+
+        let apk4 = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
+        apk4.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk4.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
     }
 
     #[test]
@@ -507,6 +530,7 @@ mod test {
             let pk2 = PublicKey::read(pk_bytes.as_slice()).unwrap();
             assert_eq!(pk.get_pk().into_affine().x, pk2.get_pk().into_affine().x);
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
+            assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
     }
 }
