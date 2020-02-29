@@ -141,7 +141,7 @@ impl PublicKey {
         PublicKey { pk: apk }
     }
 
-    pub fn from_bytes(data: &Vec<u8>) -> IoResult<PublicKey> {
+    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
         let mut x_bytes_with_y: Vec<u8> = data.to_owned();
         let x_bytes_with_y_len = x_bytes_with_y.len();
         let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
@@ -265,7 +265,7 @@ impl FromBytes for PublicKey {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let mut x_bytes_with_y: Vec<u8> = vec![];
         reader.read_to_end(&mut x_bytes_with_y)?;
-        PublicKeyCache::from_bytes(&x_bytes_with_y)
+        PublicKeyCache::from_vec(&x_bytes_with_y)
     }
 }
 
@@ -337,7 +337,7 @@ struct AggregateCacheState {
 }
 
 lazy_static! {
-    static ref FROM_BYTES_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
+    static ref FROM_VEC_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
     static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState{
         keys: HashSet::new(),
         combined: G2Projective::zero().clone()
@@ -347,18 +347,22 @@ lazy_static! {
 pub struct PublicKeyCache {}
 impl PublicKeyCache {
     pub fn clear_cache() {
-        FROM_BYTES_CACHE.lock().unwrap().clear();
+        FROM_VEC_CACHE.lock().unwrap().clear();
         let mut cache = AGGREGATE_CACHE.lock().unwrap();
         cache.keys = HashSet::new();
         cache.combined = G2Projective::zero().clone();
     }
 
-    pub fn from_bytes(data: &Vec<u8>) -> IoResult<PublicKey> {
-        let cached_result = PublicKeyCache::from_bytes_cached(data);
+    pub fn resize(cap: usize) {
+        FROM_VEC_CACHE.lock().unwrap().resize(cap);
+    }
+
+    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
+        let cached_result = PublicKeyCache::from_vec_cached(data);
         if cached_result.is_none() {
             // cache miss
-            let generated_result = PublicKey::from_bytes(data)?;
-            FROM_BYTES_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
+            let generated_result = PublicKey::from_vec(data)?;
+            FROM_VEC_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
             Ok(generated_result)
         } else {
             // cache hit
@@ -366,8 +370,8 @@ impl PublicKeyCache {
         }
     }
 
-    pub fn from_bytes_cached(data: &Vec<u8>) -> Option<PublicKey> {
-        let mut cache = FROM_BYTES_CACHE.lock().unwrap();
+    pub fn from_vec_cached(data: &Vec<u8>) -> Option<PublicKey> {
+        let mut cache = FROM_VEC_CACHE.lock().unwrap();
         Some(cache.get(data)?.clone())
     }
 
@@ -521,6 +525,8 @@ mod test {
 
     #[test]
     fn test_public_key_serialization() {
+        PublicKeyCache::resize(256);
+        PublicKeyCache::clear_cache();
         let rng = &mut thread_rng();
         for _i in 0..100 {
             let sk = PrivateKey::generate(rng);
