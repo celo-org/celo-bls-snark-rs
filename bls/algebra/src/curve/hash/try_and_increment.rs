@@ -112,12 +112,12 @@ impl<'a, H: XOF> HashToG1 for TryAndIncrement<'a, H> {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_bytes = hash.to_vec();
                 let possible_x_bytes_len = possible_x_bytes.len();
+                let greatest = (possible_x_bytes[possible_x_bytes_len - 1] & GREATEST_MASK) == GREATEST_MASK;
                 possible_x_bytes[possible_x_bytes_len - 1] &= LAST_BYTE_MASK;
                 let possible_x = P::Fp::read(possible_x_bytes.as_slice())?;
                 if possible_x == P::Fp::zero() {
                     continue;
                 }
-                let greatest = (possible_x_bytes[possible_x_bytes_len - 1] & GREATEST_MASK) == GREATEST_MASK;
 
                 (possible_x, greatest)
             };
