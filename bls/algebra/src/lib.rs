@@ -1,22 +1,18 @@
-#[macro_use]
-extern crate bench_utils;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-
 pub mod bls;
 pub mod curve;
 pub mod hash;
 
+// Clean public API
+pub use bls::keys::{PublicKey, PrivateKey, Signature};
+pub use curve::hash::try_and_increment::TryAndIncrement;
+pub use hash::{composite::CompositeHasher, direct::DirectHasher};
+
+use lazy_static::lazy_static;
+use log::error;
+
 use crate::{
-    bls::keys::{PrivateKey, PublicKey, Signature, SIG_DOMAIN, POP_DOMAIN},
-    curve::hash::try_and_increment::TryAndIncrement,
+    bls::keys::{SIG_DOMAIN, POP_DOMAIN},
     curve::hash::HashToG1,
-    hash::{
-        direct::DirectHasher,
-        composite::CompositeHasher
-    },
 };
 use algebra::{ProjectiveCurve, AffineCurve, FromBytes, ToBytes, bls12_377::{Parameters as Bls12_377Parameters, G1Affine, G2Affine, Fq, Fq2}};
 use rand::thread_rng;

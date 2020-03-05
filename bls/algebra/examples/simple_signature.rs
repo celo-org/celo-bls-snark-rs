@@ -1,13 +1,10 @@
-#[macro_use]
-extern crate algebra;
-
-use bls_zexe::{
-    bls::keys::{PrivateKey, PublicKey, Signature},
-    curve::hash::try_and_increment::TryAndIncrement,
-    hash::composite::CompositeHasher,
+use bls_crypto::{
+    PrivateKey, PublicKey, Signature,
+    TryAndIncrement,
+    CompositeHasher,
 };
 
-use algebra::bytes::ToBytes;
+use algebra::{ToBytes, to_bytes};
 
 use clap::{App, Arg};
 use rand::thread_rng;

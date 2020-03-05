@@ -1,17 +1,12 @@
 use algebra::{
-    fields::{
-        FpParameters,
-        PrimeField,
-        bls12_377::{
-            Fq,
-            FqParameters,
-        },
+    FpParameters, PrimeField, ProjectiveCurve, ToBytes,
+    bls12_377::{
+        Fq,
+        FqParameters,
     },
-    curves::ProjectiveCurve,
-    bytes::ToBytes,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
-use bls_zexe::bls::keys::PublicKey;
+use bls_crypto::PublicKey;
 use std::error::Error;
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
@@ -131,10 +126,7 @@ mod test {
     use rand::{Rng, SeedableRng};
     use crate::encoding::{bytes_to_bits, bits_to_bytes};
     use rand_xorshift::XorShiftRng;
-    use algebra::fields::{
-        FpParameters,
-        bls12_377::FqParameters,
-    };
+    use algebra::{FpParameters, bls12_377::FqParameters};
 
     #[test]
     fn test_bytes_to_bits() {

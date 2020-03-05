@@ -26,7 +26,7 @@ pub static POP_DOMAIN: &'static [u8] = b"ULforpop";
 /// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
 use std::{
     io::{self, Read, Result as IoResult, Write},
-    ops::{Mul, Neg},
+    ops::Neg,
 };
 
 #[derive(Clone)]

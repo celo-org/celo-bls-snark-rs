@@ -1,4 +1,4 @@
-use std::ops::{Div, Mul, Neg};
+use std::ops::{Div, Neg};
 use algebra::{Zero, One};
 
 use algebra::{
@@ -96,6 +96,7 @@ fn curve_x<P: Bls12Parameters>() -> <P::G2Parameters as ModelParameters>::Scalar
 
 /// Scott et al. method for fast cofactor multiplication. See page 7 in
 /// https://eprint.iacr.org/2017/419.pdf.
+#[allow(unused)]
 pub fn scale_by_cofactor_scott<P: Bls12Parameters>(p: &G2Projective<P>) -> G2Projective<P> {
     let x = curve_x::<P>();
 

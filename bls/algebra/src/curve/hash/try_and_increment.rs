@@ -7,6 +7,8 @@ use crate::{
 };
 use byteorder::WriteBytesExt;
 use hex;
+use log::debug;
+use bench_utils::{start_timer, end_timer};
 
 use algebra::{Zero, One};
 use algebra::{curves::{
@@ -15,7 +17,7 @@ use algebra::{curves::{
         ModelParameters, SWModelParameters,
     },
     AffineCurve,
-}, fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField}, bytes::FromBytes, Group};
+}, fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField}, bytes::FromBytes};
 use std::error::Error;
 
 #[allow(dead_code)]
