@@ -26,10 +26,3 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
-
-[replace] # remove this once changes are upstreamed
-"https://github.com/scipr-lab/zexe#r1cs-std:0.1.0" = { package = "r1cs-std", git = "https://github.com/gakonst/zexe", branch = "bls-debugging" }
-"https://github.com/scipr-lab/zexe#r1cs-core:0.1.0" = { package = "r1cs-core", git = "https://github.com/gakonst/zexe", branch = "bls-debugging" }
-"https://github.com/scipr-lab/zexe#crypto-primitives:0.1.0" = { package = "crypto-primitives", git = "https://github.com/gakonst/zexe", branch = "bls-debugging" }
-"https://github.com/scipr-lab/zexe#algebra:0.1.0" = { package = "algebra", git = "https://github.com/gakonst/zexe", branch = "bls-debugging" }
-"https://github.com/scipr-lab/zexe#groth16:0.1.0" = { package = "groth16", git = "https://github.com/gakonst/zexe", branch = "bls-debugging" }
