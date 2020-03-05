@@ -18,11 +18,7 @@ use crate::{
         composite::CompositeHasher
     },
 };
-use algebra::{FromBytes, ToBytes,
-    curves::bls12_377::{Bls12_377Parameters, G1Affine, G2Affine}
-};
-use algebra::fields::bls12_377::{Fq, Fq2};
-use algebra::curves::{ProjectiveCurve, AffineCurve};
+use algebra::{ProjectiveCurve, AffineCurve, FromBytes, ToBytes, bls12_377::{Parameters as Bls12_377Parameters, G1Affine, G2Affine, Fq, Fq2}};
 use rand::thread_rng;
 use std::{
     fmt::Display,
@@ -201,8 +197,8 @@ pub extern "C" fn hash_direct(
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let hash = match use_pop {
-            true => DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?, 
-            _ => DIRECT_HASH_TO_G2.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?, 
+            true => DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?, 
+            _ => DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?, 
         };
         let mut obj_bytes = vec![];
         hash.into_affine().write(&mut obj_bytes)?;
@@ -228,7 +224,7 @@ pub extern "C" fn hash_composite(
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let hash = COMPOSITE_HASH_TO_G2.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, extra_data)?;
+        let hash = COMPOSITE_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, extra_data)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();

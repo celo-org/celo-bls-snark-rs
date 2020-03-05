@@ -1,14 +1,11 @@
 use std::ops::{Div, Mul, Neg};
+use algebra::{Zero, One};
 
 use algebra::{
     biginteger::BigInteger,
-    curves::{
-        models::{
-            bls12::{Bls12Parameters, G2Affine, G1Projective, G2Projective},
-            ModelParameters,
-        },
-        AffineCurve, ProjectiveCurve,
-    },
+    bls12::{Bls12Parameters, G2Affine, G1Projective, G2Projective},
+    ModelParameters,
+    AffineCurve, ProjectiveCurve,
     fields::{fp12_2over3over2::Fp12, fp6_3over2::Fp6, BitIterator, Field, Fp2, PrimeField},
 };
 
@@ -103,13 +100,13 @@ pub fn scale_by_cofactor_scott<P: Bls12Parameters>(p: &G2Projective<P>) -> G2Pro
     let x = curve_x::<P>();
 
     let one = <P::G2Parameters as ModelParameters>::ScalarField::one();
-    let p1 = p.mul(&x); //x
-    let p15 = p1 - &p; //x-1
-    let p2 = p1.mul(&(x - &one)); //x^2-x
-    let p3 = p2.neg() + &p15; //-x^2+2x-1
-    let p4 = (p.neg() + &p2).mul(&x); //x^3-x^2-x
-    let p5 = p4.clone() + &p; //x^3-x^2-x+1
-    let p6 = p4 + &p.double().double(); //x^3-x^2-x+4
+    let p1 = p.mul(x); // x
+    let p15 = p1 - p; // x-1
+    let p2 = p1.mul(x - &one); // x^2-x
+    let p3 = p2.neg() + &p15; // -x^2 + 2x -1
+    let p4 = (p.neg() + &p2).mul(x); // x^3 - x^2 -x
+    let p5 = p4 + p; // x^3-x^2-x+1
+    let p6 = p4 + &p.double().double(); // x^3-x^2-x+4
 
     p6 + &psi::<P>(&p5, 1) + &psi::<P>(&p3, 2)
 }
@@ -120,10 +117,10 @@ pub fn scale_by_cofactor_fuentes<P: Bls12Parameters>(p: &G2Projective<P>) -> G2P
     let x = curve_x::<P>();
 
     let one = <P::G2Parameters as ModelParameters>::ScalarField::one();
-    let p1 = p.mul(&x); //x
-    let p2 = p1 - &p; //x-1
-    let p3 = p2.mul(&(x + &one)); //x^2-1
-    let p4 = p3 - &p1; //x^2-x-1
+    let p1 = p.mul(x); // x
+    let p2 = p1 - p; // x-1
+    let p3 = p2.mul(x + &one); // x^2-1
+    let p4 = p3 - &p1; // x^2-x-1
     let p5 = p.double(); //2
 
     p4 + &psi::<P>(&p2, 1) + &psi::<P>(&p5, 2)
@@ -142,13 +139,10 @@ mod test {
     use super::{curve_x, psi, scale_by_cofactor_fuentes, scale_by_cofactor_scott};
 
     use algebra::{
-        biginteger::BigInteger,
-        curves::{
-            bls12_377::{Bls12_377Parameters, G2Projective},
-            models::bls12::Bls12Parameters,
-            ModelParameters, ProjectiveCurve,
-        },
-        fields::{bls12_377::Fr, FpParameters, PrimeField},
+        Zero,
+        PrimeField, FpParameters, ModelParameters, ProjectiveCurve, BigInteger,
+        curves::bls12::Bls12Parameters,
+        bls12_377::{G2Projective, Fr, Parameters as Bls12_377Parameters},
         BitIterator,
     };
 
@@ -182,10 +176,10 @@ mod test {
             let scott_cofactor = scale_by_cofactor_scott::<Bls12_377Parameters>(&p);
 
             let three = Fr::from_str("3").unwrap();
-            let naive_cofactor = p.into_affine().scale_by_cofactor() * &three;
+            let naive_cofactor = p.into_affine().scale_by_cofactor().mul(three);
             assert_eq!(naive_cofactor, scott_cofactor);
             let modulus = curve_r_modulus::<Bls12_377Parameters>();
-            assert!(scott_cofactor.mul(&modulus).is_zero());
+            assert!(scott_cofactor.mul(modulus).is_zero());
         }
     }
 
@@ -199,12 +193,12 @@ mod test {
             let fuentes_cofactor = scale_by_cofactor_fuentes::<Bls12_377Parameters>(&p);
 
             let three = Fr::from_str("3").unwrap();
-            let px2 = p.mul(&x).mul(&x);
+            let px2 = p.mul(x).mul(x);
             let p = px2 - &p;
-            let naive_cofactor = p.into_affine().scale_by_cofactor() * &three;
+            let naive_cofactor = p.into_affine().scale_by_cofactor().mul(three);
             assert_eq!(naive_cofactor, fuentes_cofactor);
             let modulus = curve_r_modulus::<Bls12_377Parameters>();
-            assert!(fuentes_cofactor.mul(&modulus).is_zero());
+            assert!(fuentes_cofactor.mul(modulus).is_zero());
         }
     }
 

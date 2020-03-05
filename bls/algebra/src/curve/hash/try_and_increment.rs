@@ -8,6 +8,7 @@ use crate::{
 use byteorder::WriteBytesExt;
 use hex;
 
+use algebra::{Zero, One};
 use algebra::{curves::{
     models::{
         bls12::{Bls12Parameters, G1Affine, G2Affine, G1Projective, G2Projective},
@@ -229,12 +230,12 @@ mod test {
         hash::composite::CompositeHasher,
     };
 
-    use algebra::curves::bls12_377::{Bls12_377Parameters, G2Projective};
+    use algebra::bls12_377::{Parameters, G2Projective};
 
     #[test]
     fn test_hash_to_curve() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>( &[], &[], &[]).unwrap();
+        let _g: G2Projective = try_and_increment.hash::<Parameters>( &[], &[], &[]).unwrap();
     }
 }

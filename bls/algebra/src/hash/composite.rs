@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
+use algebra::{bytes::ToBytes, edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
     pedersen::PedersenWindow,

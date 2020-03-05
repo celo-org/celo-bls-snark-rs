@@ -1,20 +1,16 @@
-use crate::curve::hash::{HashToG1};
+use crate::curve::hash::HashToG1;
 use algebra::{
+    Zero, One,
     bytes::{
         FromBytes,
         ToBytes
     },
-    curves::{
-        bls12_377::{
-            Bls12_377, Bls12_377Parameters, g1::Bls12_377G1Parameters, g2::Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
-        },
-    AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve,
-    models::SWModelParameters,
-    }, fields::{
-        bls12_377::{Fq12, Fq, Fq2, Fr},
-        Field,
-        PrimeField,
-    }, SquareRootField,
+    bls12_377::{Fq12, Fq, Fq2, Fr,
+        Bls12_377, Parameters as Bls12_377Parameters, g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
+    },
+    AffineCurve, PairingEngine, ProjectiveCurve,
+    curves::SWModelParameters,
+    Field, PrimeField, SquareRootField,
     UniformRand,
 };
 use rand::Rng;
@@ -64,12 +60,12 @@ impl PrivateKey {
         Ok(Signature::from_sig(
             &hash_to_g1
                 .hash::<Bls12_377Parameters>(domain, message, extra_data)?
-                .mul(&self.sk),
+                .mul(self.sk),
         ))
     }
 
     pub fn to_public(&self) -> PublicKey {
-        PublicKey::from_pk(&G2Projective::prime_subgroup_generator().mul(&self.sk))
+        PublicKey::from_pk(&G2Projective::prime_subgroup_generator().mul(self.sk))
     }
 }
 
@@ -160,15 +156,15 @@ impl PublicKey {
     ) -> Result<(), Box<dyn Error>> {
         let pairing = Bls12_377::product_of_pairings(&vec![
             (
-                &signature.get_sig().into_affine().prepare(),
-                &G2Affine::prime_subgroup_generator().neg().prepare(),
+                signature.get_sig().into_affine().into(),
+                G2Affine::prime_subgroup_generator().neg().into(),
             ),
             (
-                &hash_to_g1
+                hash_to_g1
                     .hash::<Bls12_377Parameters>(domain, message, extra_data)?
                     .into_affine()
-                    .prepare(),
-                &self.pk.into_affine().prepare(),
+                    .into(),
+                self.pk.into_affine().into(),
             ),
         ]);
         if pairing == Fq12::one() {
