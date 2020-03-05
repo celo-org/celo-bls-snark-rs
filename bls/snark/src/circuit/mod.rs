@@ -1,35 +1,51 @@
-use algebra::{fields::{
+use algebra::{
+    One,
     Field,
     PrimeField,
     sw6::{Fr, FrParameters},
-    bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
-}, curves::{
     ProjectiveCurve,
+    edwards_sw6::EdwardsProjective,
     bls12_377::{
         Bls12_377,
         G1Projective,
         G2Projective,
-    }
-}, FpParameters, ToBytes, FromBytes, biginteger::BigInteger};
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
-use crate::gadgets::{
-    hash_to_group::HashToGroupGadget,
-    y_to_bit::YToBitGadget,
-    validator::ValidatorUpdateGadget,
-    bls::BlsVerifyGadget,
+        Fr as BlsFr, FrParameters as BlsFrParameters,
+        Parameters as Bls12_377Parameters,
+    },
+    FpParameters, 
+    ToBytes, FromBytes, BigInteger,
 };
-use r1cs_std::{Assignment, eq::EqGadget, alloc::AllocGadget, groups::{
-    GroupGadget,
-    curves::short_weierstrass::bls12::{G1Gadget, G2Gadget}
-}, ToBitsGadget, fields::{
-    FieldGadget,
-    fp::FpGadget,
-}, pairing::bls12_377::PairingGadget};
-use algebra::curves::bls12_377::Bls12_377Parameters;
-use r1cs_std::bits::boolean::Boolean;
-use r1cs_std::bits::uint32::UInt32;
-use crate::gadgets::hash_to_group::{MultipackGadget, HashToBitsGadget};
-use groth16::{Proof, VerifyingKey};
+
+use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
+
+use r1cs_std::{
+    Assignment, 
+    eq::EqGadget, 
+    alloc::AllocGadget, 
+    groups::{
+        GroupGadget,
+        curves::short_weierstrass::bls12::{G1Gadget, G2Gadget}
+    }, 
+    ToBitsGadget, 
+    fields::{
+        FieldGadget,
+        fp::FpGadget,
+    }, 
+    edwards_sw6::EdwardsSWGadget,
+    bls12_377::PairingGadget,
+    bits::{
+        boolean::Boolean,
+        uint32::UInt32,
+    },
+};
+
+
+use crate::encoding::{bits_to_bytes, bytes_to_bits};
+use r1cs_std::bits::uint8::UInt8;
+use crypto_primitives::FixedLengthCRHGadget;
+use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
+use crypto_primitives::prf::blake2s::constraints::{blake2s_gadget, blake2s_gadget_with_parameters};
+use crypto_primitives::prf::Blake2sWithParameterBlock;
 use crypto_primitives::nizk::{
     constraints::NIZKVerifierGadget,
     groth16::{
@@ -37,24 +53,26 @@ use crypto_primitives::nizk::{
         constraints::{Groth16VerifierGadget, ProofGadget, VerifyingKeyGadget}
     }
 };
-use crate::encoding::{bits_to_bytes, bytes_to_bits};
-use bls_zexe::{
+use groth16::{Proof, VerifyingKey};
+
+use crate::gadgets::{
+    hash_to_group::HashToGroupGadget,
+    y_to_bit::YToBitGadget,
+    validator::ValidatorUpdateGadget,
+    bls::BlsVerifyGadget,
+    hash_to_group::{MultipackGadget, HashToBitsGadget},
+};
+
+use bls_crypto::{
     curve::hash::try_and_increment::TryAndIncrement,
     hash::{
         XOF,
         composite::CompositeHasher
-    }
+    },
+    bls::keys::SIG_DOMAIN,
+    curve::hash::HashToG2,
+    hash::composite::CRH,
 };
-use bls_zexe::bls::keys::SIG_DOMAIN;
-use r1cs_std::bits::uint8::UInt8;
-use bls_zexe::curve::hash::HashToG2;
-use crypto_primitives::FixedLengthCRHGadget;
-use bls_zexe::hash::composite::CRH;
-use r1cs_std::groups::curves::twisted_edwards::edwards_sw6::EdwardsSWGadget;
-use algebra::curves::edwards_sw6::EdwardsProjective;
-use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
-use crypto_primitives::prf::blake2s::constraints::{blake2s_gadget, blake2s_gadget_with_parameters};
-use crypto_primitives::prf::Blake2sWithParameterBlock;
 
 type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsSWGadget>;
 

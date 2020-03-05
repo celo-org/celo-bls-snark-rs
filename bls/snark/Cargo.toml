@@ -11,8 +11,8 @@ algebra = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", 
 r1cs-core = { git = "https://github.com/scipr-lab/zexe" }
 r1cs-std = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "edwards_sw6", "edwards_bls12"] }
 crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["r1cs", "groth16"] }
+groth16 = { git = "https://github.com/scipr-lab/zexe" }
 
-# groth16 = { path = "../../zexe/groth16" }
 # bench-utils = { path = "../../zexe/bench-utils" }
 
 rand = "0.7" 

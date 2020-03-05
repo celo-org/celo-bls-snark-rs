@@ -1,6 +1,6 @@
 pub mod encoding;
 pub mod gadgets;
-// pub mod circuit;
+pub mod circuit;
 
 #[macro_use]
 extern crate log;
