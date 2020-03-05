@@ -1,11 +1,11 @@
 pub mod encoding;
 pub mod gadgets;
-pub mod circuit;
+// pub mod circuit;
 
 #[macro_use]
 extern crate log;
 
-use bls_zexe::bls::keys::PublicKey;
+use bls_crypto::PublicKey;
 
 use std::{
     os::raw::{c_ushort, c_uint, c_int},

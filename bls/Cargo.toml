@@ -1,6 +1,9 @@
 [workspace]
 
-members = [ "algebra", "snark"]
+members = [ 
+    "algebra", 
+    "snark"
+]
 
 [profile.release]
 opt-level = 3
@@ -23,3 +26,9 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+[replace]
+"https://github.com/scipr-lab/zexe#r1cs-std:0.1.0" = { package = "r1cs-std", path = "/Users/gakonst/projects/celo-contract/zexe/r1cs-std" }
+"https://github.com/scipr-lab/zexe#r1cs-core:0.1.0" = { package = "r1cs-core", path = "/Users/gakonst/projects/celo-contract/zexe/r1cs-core" }
+"https://github.com/scipr-lab/zexe#crypto-primitives:0.1.0" = { package = "crypto-primitives", path = "/Users/gakonst/projects/celo-contract/zexe/crypto-primitives" }
+"https://github.com/scipr-lab/zexe#algebra:0.1.0" = { package = "algebra", path = "/Users/gakonst/projects/celo-contract/zexe/algebra" }

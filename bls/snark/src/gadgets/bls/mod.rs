@@ -168,24 +168,22 @@ mod test {
     use rand_xorshift::XorShiftRng;
 
     use algebra::{
-        curves::{
-            bls12_377::{
-                Bls12_377, G1Projective as Bls12_377G1Projective,
-                G1Affine as Bls12_377G1Affine,
-                G2Projective as Bls12_377G2Projective,
-            },
-            AffineCurve,
-            ProjectiveCurve,
+        Zero,
+        bls12_377::{
+            Bls12_377, G1Projective as Bls12_377G1Projective,
+            G1Affine as Bls12_377G1Affine,
+            G2Projective as Bls12_377G2Projective,
+            Fr as Bls12_377Fr,
         },
-        fields::bls12_377::Fr as Bls12_377Fr,
-        fields::sw6::Fr as SW6Fr,
-        fields::Field,
+        AffineCurve,
+        ProjectiveCurve,
+        sw6::Fr as SW6Fr,
+        Field,
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
-        groups::bls12::bls12_377::{G1Gadget as Bls12_377G1Gadget, G2Gadget as Bls12_377G2Gadget},
-        pairing::bls12_377::PairingGadget as Bls12_377PairingGadget,
+        bls12_377::{G1Gadget as Bls12_377G1Gadget, G2Gadget as Bls12_377G2Gadget, PairingGadget as Bls12_377PairingGadget},
         test_constraint_system::TestConstraintSystem,
         alloc::AllocGadget,
         boolean::Boolean,
@@ -201,22 +199,22 @@ mod test {
     #[test]
     fn test_signature() {
         let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        let message_hash = Bls12_377G2Projective::rand(rng);
+        let message_hash = Bls12_377G1Projective::rand(rng);
         let secret_key = Bls12_377Fr::rand(rng);
 
-        let generator = Bls12_377G1Projective::prime_subgroup_generator();
-        let pub_key = generator * &secret_key;
-        let signature = message_hash * &secret_key;
-        let fake_signature = Bls12_377G2Projective::rand(rng);
+        let generator = Bls12_377G2Projective::prime_subgroup_generator();
+        let pub_key = generator.mul(secret_key);
+        let signature = message_hash.mul(secret_key);
+        let fake_signature = Bls12_377G1Projective::rand(rng);
 
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -239,11 +237,11 @@ mod test {
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(fake_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -266,27 +264,27 @@ mod test {
     #[test]
     fn test_signature_bitmap() {
         let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        let message_hash = Bls12_377G2Projective::rand(rng);
+        let message_hash = Bls12_377G1Projective::rand(rng);
         let secret_key = Bls12_377Fr::rand(rng);
         let secret_key2 = Bls12_377Fr::rand(rng);
 
-        let generator = Bls12_377G1Projective::prime_subgroup_generator();
-        let pub_key = generator.clone() * &secret_key;
-        let pub_key2 = generator.clone() * &secret_key2;
-        let signature = message_hash.clone() * &secret_key;
-        let signature2 = message_hash.clone() * &secret_key2;
+        let generator = Bls12_377G2Projective::prime_subgroup_generator();
+        let pub_key = generator.clone().mul(secret_key);
+        let pub_key2 = generator.clone().mul(secret_key2);
+        let signature = message_hash.clone().mul(secret_key);
+        let signature2 = message_hash.clone().mul(secret_key2);
         let aggregated_signature = signature + &signature2;
 
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(true)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -310,13 +308,13 @@ mod test {
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "aggregated signature"), || Ok(aggregated_signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -340,13 +338,13 @@ mod test {
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -370,13 +368,13 @@ mod test {
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
             let bitmap = vec![Boolean::constant(true), Boolean::constant(false)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -401,26 +399,26 @@ mod test {
     #[test]
     fn test_signature_zero() {
         let rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
-        let message_hash = Bls12_377G2Projective::rand(rng);
+        let message_hash = Bls12_377G1Projective::rand(rng);
         let secret_key = Bls12_377Fr::zero();
-        let secret_key2 = Bls12_377Fr::rand(rng);
+        let secret_key2 = Bls12_377Fr::zero();
 
-        let generator = Bls12_377G1Projective::prime_subgroup_generator();
-        let pub_key = generator.clone() * &secret_key;
-        let pub_key2 = generator * &secret_key2;
-        let signature = message_hash.clone() * &secret_key;
-        let signature2 = message_hash * &secret_key2;
+        let generator = Bls12_377G2Projective::prime_subgroup_generator();
+        let pub_key = generator.clone().mul(secret_key);
+        let pub_key2 = generator.clone().mul(secret_key2);
+        let signature = message_hash.clone().mul(secret_key);
+        let signature2 = message_hash.clone().mul(secret_key2);
 
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
 
             let bitmap = vec![Boolean::constant(false), Boolean::constant(true)];
             let maximum_non_signers_plus_one = FpGadget::alloc(
@@ -444,13 +442,13 @@ mod test {
         {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let message_hash_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
             let pub_key_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key"), || Ok(pub_key)).unwrap();
             let pub_key2_var =
-                Bls12_377G1Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
+                Bls12_377G2Gadget::alloc(cs.ns(|| "pub_key2"), || Ok(pub_key2)).unwrap();
             let signature_var =
-                Bls12_377G2Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
+                Bls12_377G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature2)).unwrap();
 
             let bitmap = vec![Boolean::constant(false), Boolean::constant(true)];
             let maximum_non_signers_plus_one = FpGadget::alloc(

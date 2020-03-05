@@ -135,7 +135,7 @@ pub fn scale_by_cofactor_g1<P: Bls12Parameters>(p: &G1Projective<P>) -> G1Projec
 mod test {
     use rand_xorshift::XorShiftRng;
     use rand::{Rng, SeedableRng};
-    use std::{ops::Mul, str::FromStr};
+    use std::str::FromStr;
 
     use super::{curve_x, psi, scale_by_cofactor_fuentes, scale_by_cofactor_scott};
 

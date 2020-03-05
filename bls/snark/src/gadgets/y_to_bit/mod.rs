@@ -1,15 +1,8 @@
 use algebra::{
-    Field, PrimeField,
+    One, 
+    PrimeField,
     curves::{
-        edwards_sw6::{
-            EdwardsProjective,
-        },
-        models::{
-            bls12::Bls12Parameters,
-        }
-    },
-    fields::{
-        sw6::Fr as SW6Fr
+        bls12::Bls12Parameters,
     },
 };
 use r1cs_core::{SynthesisError};
@@ -20,15 +13,10 @@ use r1cs_std::{
         FieldGadget,
     },
     groups::{
-        curves::{
-            short_weierstrass::bls12::{
-                G1Gadget,
-                G2Gadget,
-            },
-            twisted_edwards::edwards_sw6::{
-                EdwardsSWGadget,
-            }
-        },
+        curves::short_weierstrass::bls12::{
+            G1Gadget,
+            G2Gadget,
+        }
     },
     alloc::AllocGadget,
     boolean::Boolean,
@@ -251,20 +239,16 @@ mod test {
     use rand_xorshift::XorShiftRng;
 
     use algebra::{
-        curves::{
-            bls12_377::{
-                G1Projective as Bls12_377G1Projective,
-                G2Projective as Bls12_377G2Projective,
-                Bls12_377Parameters,
-            },
-            models::bls12::Bls12Parameters,
-            ProjectiveCurve,
+        bls12_377::{
+            G1Projective as Bls12_377G1Projective,
+            G2Projective as Bls12_377G2Projective,
+            Parameters as Bls12_377Parameters,
+            Fr as Bls12_377Fr,
         },
-        fields::{
-            bls12_377::Fr as Bls12_377Fr,
-            sw6::Fr as SW6Fr,
-            PrimeField,
-        },
+        sw6::Fr as SW6Fr,
+        curves::bls12::Bls12Parameters,
+        ProjectiveCurve,
+        PrimeField,
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
@@ -287,7 +271,7 @@ mod test {
             let secret_key = Bls12_377Fr::rand(rng);
 
             let generator = Bls12_377G1Projective::prime_subgroup_generator();
-            let pub_key = generator.clone() * &secret_key;
+            let pub_key = generator.clone().mul(secret_key);
 
             let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
 
@@ -322,7 +306,7 @@ mod test {
             let secret_key = Bls12_377Fr::rand(rng);
 
             let generator = Bls12_377G2Projective::prime_subgroup_generator();
-            let pub_key = generator.clone() * &secret_key;
+            let pub_key = generator.clone().mul(secret_key);
 
             let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
 

@@ -1,73 +1,59 @@
-use algebra::{BigInteger, Field, curves::{
-    ProjectiveCurve,
-    edwards_sw6::{
-        EdwardsProjective,
-    },
-    edwards_bls12::{
-        EdwardsProjective as EdwardsBls,
-    },
-    models::{
-        SWModelParameters,
-    }
-}, fields::{
-    FpParameters,
-    sw6::Fr as SW6Fr,
-    sw6::FrParameters as SW6FrParameters,
-    bls12_377::Fr as Bls12_377Fr,
-    bls12_377::FrParameters as Bls12_377FrParameters,
-    bls12_377::Fq as Bls12_377Fp,
-    bls12_377::Fq2 as Bls12_377Fp2,
-    bls12_377::Fq6 as Bls12_377Fp6,
-    bls12_377::Fq12 as Bls12_377Fp12,
-}, BitIterator, PrimeField, AffineCurve, Group, Fp2Parameters};
-use r1cs_core::{SynthesisError, ConstraintSystem};
-use r1cs_std::{Assignment, eq::EqGadget, groups::{
-    GroupGadget,
-    curves::{
-        short_weierstrass::bls12::{
-            G1Gadget,
-            G2Gadget,
-        },
-        twisted_edwards::edwards_sw6::{
-            EdwardsSWGadget,
-        },
-        twisted_edwards::edwards_bls12::{
-            EdwardsBlsGadget,
-        },
-    },
-}, fields::{
-    FieldGadget,
-    edwards_sw6::FqGadget as EdwardsFqGadget,
-    bls12_377::{
-        Fq2Gadget as Fp2Gadget,
-        Fq6Gadget as Fp6Gadget,
-        Fq12Gadget as Fp12Gadget
-    }
-}, alloc::AllocGadget, boolean::Boolean, bits::{
-    ToBitsGadget,
-}, ToBytesGadget};
-use crypto_primitives::{
-    FixedLengthCRHGadget,
-    crh::bowe_hopwood::constraints::{BoweHopwoodPedersenCRHGadget},
-};
-
-use bls_zexe::{
-    curve::hash::try_and_increment::get_point_from_x_g1,
-    hash::composite::{CompositeHasher, CRH},
-    bls::keys::SIG_DOMAIN,
-};
-use r1cs_std::bits::uint8::UInt8;
-use crate::gadgets::y_to_bit::YToBitGadget;
-use algebra::curves::bls12_377::{Bls12_377Parameters, G1Projective as Bls12_377G1Projective, G2Projective as Bls12_377G2Projective, g1::Bls12_377G1Parameters, Bls12_377};
 use algebra::fields::models::fp6_3over2::Fp6Parameters;
 use algebra::fields::models::fp12_2over3over2::Fp12Parameters;
 use algebra::curves::models::bls12::Bls12Parameters;
-use crypto_primitives::prf::blake2s::constraints::blake2s_gadget_with_parameters;
-use crypto_primitives::prf::Blake2sWithParameterBlock;
-use algebra::curves::sw6::SW6;
+use algebra::{ProjectiveCurve, Zero, One, BigInteger, Field,
+    FpParameters,
+    bls12_377::{
+        Fr as Bls12_377Fr,
+        Fq as Bls12_377Fp,
+        Fq2 as Bls12_377Fp2,
+        Fq6 as Bls12_377Fp6,
+        Fq12 as Bls12_377Fp12,
+        Parameters as Bls12_377Parameters, 
+        G1Projective as Bls12_377G1Projective, 
+        G2Projective as Bls12_377G2Projective, 
+        g1::Parameters as Bls12_377G1Parameters, 
+    },
+    curves::{
+        SWModelParameters,
+    },
+    sw6::{Fr as SW6Fr, FrParameters as SW6FrParameters},
+    BitIterator, PrimeField, AffineCurve, Fp2Parameters,
+};
+
+use r1cs_core::{SynthesisError, ConstraintSystem};
+use r1cs_std::{
+    Assignment, 
+    eq::EqGadget, 
+    groups::{
+        GroupGadget,
+    },
+    groups::bls12::{
+        G1Gadget,
+        G2Gadget,
+    },
+    bls12_377::{
+        Fq2Gadget as Fp2Gadget,
+        Fq6Gadget as Fp6Gadget,
+        Fq12Gadget as Fp12Gadget,
+    },
+    fields::{
+        FieldGadget,
+    },
+    alloc::AllocGadget, 
+    boolean::Boolean, 
+    bits::ToBitsGadget,
+};
 use r1cs_std::fields::fp::FpGadget;
 
-type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, SW6Fr, EdwardsSWGadget>;
+use bls_crypto::{
+    curve::hash::try_and_increment::get_point_from_x_g1,
+    bls::keys::SIG_DOMAIN,
+};
+use crate::gadgets::y_to_bit::YToBitGadget;
+
+use crypto_primitives::prf::blake2s::constraints::blake2s_gadget_with_parameters;
+use crypto_primitives::prf::Blake2sWithParameterBlock;
 
 pub struct MultipackGadget {
 
@@ -152,6 +138,7 @@ pub struct HashToBitsGadget {
 }
 
 impl HashToBitsGadget {
+    #[allow(unused)]
     pub fn hash_to_bits<CS: r1cs_core::ConstraintSystem<HashToBitsField>>(
         mut cs: CS,
         message: &[Boolean],
@@ -202,6 +189,7 @@ pub struct HashToGroupGadget {
 }
 
 impl HashToGroupGadget {
+    #[allow(unused)]
     pub fn hash_to_group<CS: r1cs_core::ConstraintSystem<SW6Fr>>(
         mut cs: CS,
         xof_bits: &[Boolean],
@@ -256,7 +244,7 @@ impl HashToGroupGadget {
         Ok(scaled_point)
     }
 
-    pub fn psi<CS: r1cs_core::ConstraintSystem<SW6Fr>>(mut cs: CS, p: &G2Gadget<Bls12_377Parameters>, power:usize) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
+    pub fn psi<CS: r1cs_core::ConstraintSystem<SW6Fr>>(mut cs: CS, p: &G2Gadget<Bls12_377Parameters>, power: usize) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
         let (omega2, omega3) = {
             (Bls12_377Fp12::new(
                 Bls12_377Fp6::new(
@@ -327,6 +315,7 @@ impl HashToGroupGadget {
         let processed_p = G2Gadget::<Bls12_377Parameters>::new(
             twisted_x.c0.c0,
             twisted_y.c0.c0,
+            Boolean::constant(false),
         );
         Ok(processed_p)
     }
@@ -343,6 +332,7 @@ impl HashToGroupGadget {
         Ok(scaled)
     }
 
+    #[allow(unused)]
     fn scale_by_cofactor_fuentes<CS: r1cs_core::ConstraintSystem<SW6Fr>>(mut cs: CS, p: &G2Gadget<Bls12_377Parameters>) -> Result<G2Gadget<Bls12_377Parameters>, SynthesisError> {
         let generator = Bls12_377G2Projective::prime_subgroup_generator();
         let generator_var =
