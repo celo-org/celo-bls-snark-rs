@@ -5,34 +5,28 @@ use groth16::{create_random_proof, generate_random_parameters, prepare_verifying
 use bls_snark::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits, OUT_DOMAIN};
 use blake2s_simd::Params;
 use algebra::{
+    Zero,
     PrimeField,
-    fields::{
-        FpParameters,
-        sw6::{Fr, FrParameters},
-        bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
-    },
-    curves::{
-        ProjectiveCurve,
-        sw6::SW6
-    }
+    sw6::{Fr, FrParameters, SW6},
+    bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
+    FpParameters,
+    ProjectiveCurve,
+    BigInteger,
+    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377Parameters},
 };
 use rand::thread_rng;
-use algebra::{
-    biginteger::BigInteger,
-    curves::bls12_377::{Bls12_377, G1Projective, G2Projective, Bls12_377Parameters}
-};
 use bls_snark::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits, encode_public_key, encode_u32, encode_u16};
-use bls_zexe::bls::keys::{PublicKey, PrivateKey, Signature};
+use bls_crypto::bls::keys::{PublicKey, PrivateKey, Signature};
 use r1cs_std::bits::boolean::Boolean;
-use bls_zexe::hash::{
+use bls_crypto::hash::{
     XOF,
     composite::CompositeHasher
 };
-use bls_zexe::curve::hash::{
+use bls_crypto::curve::hash::{
     HashToG2,
     try_and_increment::TryAndIncrement
 };
-use bls_zexe::bls::keys::SIG_DOMAIN;
+use bls_crypto::bls::keys::SIG_DOMAIN;
 use r1cs_std::test_constraint_system::TestConstraintSystem;
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem};
 use std::env;
