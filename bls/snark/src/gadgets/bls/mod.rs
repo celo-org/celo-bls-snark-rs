@@ -184,7 +184,6 @@ where
         }
         // Rebind `num_non_signers` to a constraint
         let num_non_signers = FpGadget::alloc(&mut cs.ns(|| "num signers"), || {
-            // This _must_ be cast to u128 or otherwise we get runtime errors
             Ok(F::from(num_non_signers))
         })?;
 
