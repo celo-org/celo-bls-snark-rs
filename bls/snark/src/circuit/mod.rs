@@ -1,10 +1,7 @@
-#![allow(unused)] // TODO: Remove this
 use algebra::{
     One,
-    Field,
     PrimeField,
     sw6::{Fr, FrParameters},
-    ProjectiveCurve,
     edwards_sw6::EdwardsProjective,
     bls12_377::{
         Bls12_377,
@@ -14,17 +11,14 @@ use algebra::{
         Parameters as Bls12_377Parameters,
     },
     FpParameters, 
-    ToBytes, FromBytes, BigInteger,
 };
 
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
 use r1cs_std::{
-    Assignment, 
     eq::EqGadget, 
     alloc::AllocGadget, 
     groups::{
-        GroupGadget,
         curves::short_weierstrass::bls12::{G1Gadget, G2Gadget}
     }, 
     ToBitsGadget, 
@@ -36,7 +30,6 @@ use r1cs_std::{
     bls12_377::PairingGadget,
     bits::{
         boolean::Boolean,
-        uint32::UInt32,
     },
 };
 
@@ -45,7 +38,7 @@ use crate::encoding::{bits_to_bytes, bytes_to_bits};
 use r1cs_std::bits::uint8::UInt8;
 use crypto_primitives::FixedLengthCRHGadget;
 use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
-use crypto_primitives::prf::blake2s::constraints::{blake2s_gadget, blake2s_gadget_with_parameters};
+use crypto_primitives::prf::blake2s::constraints::{blake2s_gadget_with_parameters};
 use crypto_primitives::prf::Blake2sWithParameterBlock;
 use crypto_primitives::nizk::{
     constraints::NIZKVerifierGadget,
@@ -71,7 +64,6 @@ use bls_crypto::{
         composite::CompositeHasher
     },
     bls::keys::SIG_DOMAIN,
-    curve::hash::HashToG2,
     hash::composite::CRH,
 };
 
@@ -98,7 +90,7 @@ impl ConstraintSynthesizer<BlsFr> for HashToBits {
             } else {
                 let bits_bools = bits.into_iter().map(|b| b.unwrap()).collect::<Vec<_>>();
                 if bits_bools.iter().all(|b| b.get_value().is_some()) {
-                    let epoch_bytes = bits_to_bytes(&bits_bools.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
+                    let _epoch_bytes = bits_to_bytes(&bits_bools.iter().map(|b| b.get_value().unwrap()).collect::<Vec<_>>());
                     //println!("hash to bits bytes: {}", hex::encode(&epoch_bytes));
                 }
                 Ok(bits_bools)
@@ -265,7 +257,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                 &input_bytes,
             )?;
 
-            let mut crh_bits = crh_result.x.to_bits(
+            let crh_bits = crh_result.x.to_bits(
                 cs.ns(|| "crh bits"),
             )?;
 
@@ -278,7 +270,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
 
             crh_bits.reverse();
             crh_bits.extend_from_slice(&first_bits);
-            for i in 0..(crh_bits_len_rounded - crh_bits_len) {
+            for _i in 0..(crh_bits_len_rounded - crh_bits_len) {
                 crh_bits.push(Boolean::constant(false));
             }
 
@@ -286,7 +278,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
 
 
-            let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7) / 8) * 8) as usize;
+            let _modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7) / 8) * 8) as usize;
             let xof_bits = if is_first_last {
                 let xof_target_bits = 256;
                 let xof_bits = if epoch_bits.iter().any(|x| x.get_value().is_none()) {
@@ -361,7 +353,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
                     Ok(Fr::from_repr(<FrParameters as FpParameters>::BigInt::from(non_signers as u64)))
                 },
             )?;
-            let mut epoch_index = FpGadget::<Fr>::alloc(
+            let epoch_index = FpGadget::<Fr>::alloc(
                 cs.ns(|| format!("{}: epoch index", i)),
                 || {
                     let epoch_index = update.epoch_index.ok_or(SynthesisError::AssignmentMissing)?;
@@ -467,7 +459,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             current_epoch_index = epoch_index;
         }
 
-        let mut last_epoch_bits = current_epoch_bits;
+        let last_epoch_bits = current_epoch_bits;
         assert_eq!(first_epoch_bits.len(), last_epoch_bits.len());
 
         let packed_messages = all_crh_bits.chunks(BlsFrParameters::CAPACITY as usize).into_iter().map(|b| {

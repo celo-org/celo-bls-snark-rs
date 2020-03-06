@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate bench_utils;
 
-use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey, Proof};
+use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, Proof};
 use bls_snark::circuit::{ValidatorSetUpdate, SingleUpdate, HashProof, HashToBits, OUT_DOMAIN};
 use blake2s_simd::Params;
 use algebra::{
@@ -10,25 +10,22 @@ use algebra::{
     sw6::{Fr, FrParameters, SW6},
     bls12_377::{Fr as BlsFr, FrParameters as BlsFrParameters},
     FpParameters,
-    ProjectiveCurve,
     BigInteger,
     bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377Parameters},
 };
 use rand::thread_rng;
-use bls_snark::encoding::{encode_epoch_block_to_bits, encode_zero_value_public_key, encode_epoch_block_to_bytes, bits_to_bytes, bytes_to_bits, encode_public_key, encode_u32, encode_u16};
+use bls_snark::encoding::{encode_epoch_block_to_bits, bits_to_bytes, bytes_to_bits};
 use bls_crypto::bls::keys::{PublicKey, PrivateKey, Signature};
-use r1cs_std::bits::boolean::Boolean;
 use bls_crypto::hash::{
     XOF,
     composite::CompositeHasher
 };
 use bls_crypto::curve::hash::{
-    HashToG2,
     try_and_increment::TryAndIncrement
 };
 use bls_crypto::bls::keys::SIG_DOMAIN;
 use r1cs_std::test_constraint_system::TestConstraintSystem;
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem};
+use r1cs_core::{ConstraintSynthesizer};
 use std::env;
 
 fn main() {
@@ -41,13 +38,9 @@ fn main() {
     let num_bits_in_hash = 512;
     let num_epochs: usize = args[2].parse().unwrap();
     let rng = &mut thread_rng();
-    let epoch_bits = encode_epoch_block_to_bits(0, 0, &PublicKey::from_pk(&G2Projective::prime_subgroup_generator()), &vec![
-        &PublicKey::from_pk(&G2Projective::prime_subgroup_generator()); num_validators
-    ]).unwrap();
-    let epoch_bits_len = epoch_bits.len() + 8;
     let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
 
-    let private_keys = (0..num_validators).map(|i| {
+    let private_keys = (0..num_validators).map(|_| {
         PrivateKey::generate(rng)
     }).collect::<Vec<_>>();
     let pubs = private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
@@ -107,7 +100,7 @@ fn main() {
 
     let mut current_private_keys = private_keys.clone();
     for i in 0..num_epochs {
-        let new_private_keys = (0..num_validators).map(|i| {
+        let new_private_keys = (0..num_validators).map(|_| {
             PrivateKey::generate(rng)
         }).collect::<Vec<_>>();
         let new_pubs = new_private_keys.iter().map(|k| k.to_public()).collect::<Vec<_>>();
@@ -159,7 +152,6 @@ fn main() {
         let xof_target_bits = 512;
         let hash = composite_hasher.xof( SIG_DOMAIN, &crh_bytes, xof_target_bits/8).unwrap();
         let hash_bits = bytes_to_bits(&hash, xof_target_bits).iter().rev().map(|b| *b).collect::<Vec<bool>>();
-        let modulus_bit_rounded = (((FrParameters::MODULUS_BITS + 7)/8)*8) as usize;
         let hash_bits = &[
             &hash_bits[..FrParameters::MODULUS_BITS as usize], //.iter().rev().map(|b| *b).collect::<Vec<bool>>()[..],
             &[hash_bits[FrParameters::MODULUS_BITS as usize]][..],
@@ -214,7 +206,7 @@ fn main() {
     let hash_proof = create_random_proof(c, &hash_params, rng).unwrap();
     assert!(verify_proof(&prepared_verifying_key, &hash_proof, public_inputs_for_hash.as_slice()).unwrap());
     //println!("verified public input len: {}", public_inputs_for_hash.len());
-    public_inputs_for_hash.iter().for_each(|p| {
+    public_inputs_for_hash.iter().for_each(|_| {
         //println!("verified public input: {}", p);
     });
     end_timer!(hash_to_bits_time);

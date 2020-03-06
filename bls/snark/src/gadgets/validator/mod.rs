@@ -266,7 +266,7 @@ mod test {
             let pub_key2 = generator.clone().mul(secret_key2);
             let pub_key3 = generator.clone().mul(secret_key3);
 
-            let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
+            let _half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
 
             {
                 let mut cs = TestConstraintSystem::<SW6Fr>::new();
@@ -279,7 +279,7 @@ mod test {
                     ).unwrap()
                     ).collect::<Vec<G2Gadget::<Bls12_377Parameters>>>();
 
-                let bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
+                let _bits = ValidatorUpdateGadget::<Bls12_377Parameters>::to_bits(
                     cs.ns(|| "validator update"),
                     validator_set.clone(),
                 ).unwrap();
