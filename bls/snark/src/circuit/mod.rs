@@ -1,3 +1,4 @@
+#![allow(unused)] // TODO: Remove this
 use algebra::{
     One,
     Field,
@@ -451,12 +452,12 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             }
             */
 
-            let (prepared_aggregated_public_key, prepared_message_hash) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
+            let (prepared_message_hash, prepared_aggregated_public_key) = BlsVerifyGadget::<Bls12_377, Fr, PairingGadget>::verify_partial(
                 cs.ns(|| format!("{}: verify signature partial", i)),
                 current_pub_keys_vars.as_slice(),
                 signed_bitmap.as_slice(),
-                message_hash,
-                current_maximum_non_signers.clone(),
+                &message_hash,
+                &current_maximum_non_signers.clone(),
             )?;
             prepared_aggregated_public_keys.push(prepared_aggregated_public_key);
             prepared_message_hashes.push(prepared_message_hash);
@@ -502,7 +503,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate {
             cs.ns(|| format!("batch verify BLS")),
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
-            aggregated_signature,
+            &aggregated_signature,
         )?;
 
         let mut xof_bits = vec![];
