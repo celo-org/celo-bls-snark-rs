@@ -1,5 +1,3 @@
-extern crate lru;
-
 use lru::LruCache;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -225,7 +223,10 @@ impl PublicKey {
 
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
-        // The equality operator in G2Projective is very slow
+        // This byte-level equality operator differs from the (much slower) semantic
+        // equality operator in G2Projective.  We require byte-level equality here 
+        // for HashSet to work correctly.  HashSet requires that item equality 
+        // implies hash equality.
         self.pk.x == other.pk.x && self.pk.y == other.pk.y && self.pk.z == other.pk.z
     }
 }
