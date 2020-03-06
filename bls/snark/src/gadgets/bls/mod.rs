@@ -146,7 +146,7 @@ where
     }
 
     /// Enforces that the provided bitmap contains no more than `maximum_non_signers`
-    /// 0s. Also returns a gadget
+    /// 0s. Also returns a gadget of the prepared message hash and a gadget for the aggregate public key 
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length (due to internal call to `enforced_aggregated_pubkeys`)
