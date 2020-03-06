@@ -1,4 +1,13 @@
 use crate::curve::hash::HashToG1;
+
+use lru::LruCache;
+use lazy_static::lazy_static;
+use std::{
+    sync::Mutex,
+    hash::{Hash, Hasher},
+    collections::HashSet,
+};
+
 use algebra::{
     Zero, One,
     bytes::{
@@ -103,7 +112,7 @@ impl Error for BLSError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct PublicKey {
     pk: G2Projective,
 }
@@ -117,90 +126,20 @@ impl PublicKey {
         self.pk.clone()
     }
 
+    pub fn clone(&self) -> PublicKey {
+        PublicKey::from_pk(&self.pk)
+    }
+
     pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
         let mut apk = G2Projective::zero();
         for i in public_keys.iter() {
             apk = apk + &(*i).pk;
         }
-
         PublicKey { pk: apk }
     }
 
-    pub fn verify<H: HashToG1>(
-        &self,
-        message: &[u8],
-        extra_data: &[u8],
-        signature: &Signature,
-        hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
-        self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g1)
-    }
-
-    pub fn verify_pop<H: HashToG1>(
-        &self,
-        message: &[u8],
-        signature: &Signature,
-        hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
-        self.verify_sig(POP_DOMAIN, &message, &[], signature, hash_to_g1)
-    }
-
-
-    fn verify_sig<H: HashToG1>(
-        &self,
-        domain: &[u8],
-        message: &[u8],
-        extra_data: &[u8],
-        signature: &Signature,
-        hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
-        let pairing = Bls12_377::product_of_pairings(&vec![
-            (
-                signature.get_sig().into_affine().into(),
-                G2Affine::prime_subgroup_generator().neg().into(),
-            ),
-            (
-                hash_to_g1
-                    .hash::<Bls12_377Parameters>(domain, message, extra_data)?
-                    .into_affine()
-                    .into(),
-                self.pk.into_affine().into(),
-            ),
-        ]);
-        if pairing == Fq12::one() {
-            Ok(())
-        } else {
-            Err(BLSError::VerificationFailed)?
-        }
-    }
-}
-
-impl ToBytes for PublicKey {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        let affine = self.pk.into_affine();
-        let mut x_bytes: Vec<u8> = vec![];
-        let y_c0_big = affine.y.c0.into_repr();
-        let y_c1_big = affine.y.c1.into_repr();
-        let half = Fq::modulus_minus_one_div_two();
-        affine.x.write(&mut x_bytes)?;
-        let num_x_bytes = x_bytes.len();
-        if y_c1_big > half {
-            x_bytes[num_x_bytes - 1] |= 0x80;
-        } else if y_c1_big == half && y_c0_big > half {
-            x_bytes[num_x_bytes - 1] |= 0x80;
-        }
-        writer.write(&x_bytes)?;
-
-        Ok(())
-    }
-}
-
-impl FromBytes for PublicKey {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let mut x_bytes_with_y: Vec<u8> = vec![];
-        reader.read_to_end(&mut x_bytes_with_y)?;
+    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
+        let mut x_bytes_with_y: Vec<u8> = data.to_owned();
         let x_bytes_with_y_len = x_bytes_with_y.len();
         let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
         x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
@@ -231,7 +170,102 @@ impl FromBytes for PublicKey {
         let chosen_y = if y_over_half { bigger } else { smaller };
         let pk = G2Affine::new(x, chosen_y, false);
         Ok(PublicKey::from_pk(&pk.into_projective()))
+    }
 
+    pub fn verify<H: HashToG1>(
+        &self,
+        message: &[u8],
+        extra_data: &[u8],
+        signature: &Signature,
+        hash_to_g1: &H,
+    ) -> Result<(), Box<dyn Error>> {
+        self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g1)
+    }
+
+    pub fn verify_pop<H: HashToG1>(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        hash_to_g1: &H,
+    ) -> Result<(), Box<dyn Error>> {
+        self.verify_sig(POP_DOMAIN, &message, &[], signature, hash_to_g1)
+    }
+
+    fn verify_sig<H: HashToG1>(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+        signature: &Signature,
+        hash_to_g1: &H,
+    ) -> Result<(), Box<dyn Error>> {
+        let pairing = Bls12_377::product_of_pairings(&vec![
+            (
+                signature.get_sig().into_affine().into(),
+                G2Affine::prime_subgroup_generator().neg().into(),
+            ),
+            (
+                hash_to_g1
+                    .hash::<Bls12_377Parameters>(domain, message, extra_data)?
+                    .into_affine()
+                    .into(),
+                self.pk.into_affine().into(),
+            ),
+        ]);
+        if pairing == Fq12::one() {
+            Ok(())
+        } else {
+            Err(BLSError::VerificationFailed)?
+        }
+    }
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        // This byte-level equality operator differs from the (much slower) semantic
+        // equality operator in G2Projective.  We require byte-level equality here 
+        // for HashSet to work correctly.  HashSet requires that item equality 
+        // implies hash equality.
+        self.pk.x == other.pk.x && self.pk.y == other.pk.y && self.pk.z == other.pk.z
+    }
+}
+
+impl Hash for PublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Only hash based on `y` for slight speed improvement
+        self.pk.y.hash(state);
+        // self.pk.x.hash(state);
+        // self.pk.z.hash(state);
+    }
+}
+
+impl ToBytes for PublicKey {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        let affine = self.pk.into_affine();
+        let mut x_bytes: Vec<u8> = vec![];
+        let y_c0_big = affine.y.c0.into_repr();
+        let y_c1_big = affine.y.c1.into_repr();
+        let half = Fq::modulus_minus_one_div_two();
+        affine.x.write(&mut x_bytes)?;
+        let num_x_bytes = x_bytes.len();
+        if y_c1_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
+        } else if y_c1_big == half && y_c0_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
+        }
+        writer.write(&x_bytes)?;
+
+        Ok(())
+    }
+}
+
+impl FromBytes for PublicKey {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let mut x_bytes_with_y: Vec<u8> = vec![];
+        reader.read_to_end(&mut x_bytes_with_y)?;
+        PublicKeyCache::from_vec(&x_bytes_with_y)
     }
 }
 
@@ -298,6 +332,74 @@ impl FromBytes for Signature {
     }
 }
 
+struct AggregateCacheState {
+    keys : HashSet<PublicKey>,
+    combined : G2Projective,
+}
+
+lazy_static! {
+    static ref FROM_VEC_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
+    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState{
+        keys: HashSet::new(),
+        combined: G2Projective::zero().clone()
+    });
+}
+
+pub struct PublicKeyCache {}
+impl PublicKeyCache {
+    pub fn clear_cache() {
+        FROM_VEC_CACHE.lock().unwrap().clear();
+        let mut cache = AGGREGATE_CACHE.lock().unwrap();
+        cache.keys = HashSet::new();
+        cache.combined = G2Projective::zero().clone();
+    }
+
+    pub fn resize(cap: usize) {
+        FROM_VEC_CACHE.lock().unwrap().resize(cap);
+    }
+
+    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
+        let cached_result = PublicKeyCache::from_vec_cached(data);
+        if cached_result.is_none() {
+            // cache miss
+            let generated_result = PublicKey::from_vec(data)?;
+            FROM_VEC_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
+            Ok(generated_result)
+        } else {
+            // cache hit
+            Ok(cached_result.unwrap())
+        }
+    }
+
+    pub fn from_vec_cached(data: &Vec<u8>) -> Option<PublicKey> {
+        let mut cache = FROM_VEC_CACHE.lock().unwrap();
+        Some(cache.get(data)?.clone())
+    }
+
+    pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
+        // The set of validators changes slowly, so for speed we will compute the
+        // difference from the last call and do an incremental update
+        let mut keys : HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
+        for key in public_keys.iter() {
+            keys.insert((*key).clone());
+        }
+        let mut cache = AGGREGATE_CACHE.lock().unwrap();
+        let mut combined = cache.combined;
+
+        for key in cache.keys.difference(&keys) {
+            combined = combined - &(*key).pk;
+        }
+
+        for key in keys.difference(&cache.keys) {
+            combined = combined + &(*key).pk;
+        }
+
+        cache.keys = keys;
+        cache.combined = combined;
+        PublicKey::from_pk(&combined)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -361,7 +463,7 @@ mod test {
         }
     }
 
-        #[test]
+    #[test]
     fn test_pop() {
         init();
 
@@ -397,7 +499,7 @@ mod test {
         let sig1 = sk1.sign(&message[..], &[], &try_and_increment).unwrap();
         let sig2 = sk2.sign(&message[..], &[], &try_and_increment).unwrap();
 
-        let apk = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
+        let apk = PublicKeyCache::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
         let asig = Signature::aggregate(&[&sig1, &sig2]);
         apk.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
         apk.verify(&message[..], &[], &sig1, &try_and_increment)
@@ -408,10 +510,24 @@ mod test {
         let message2 = b"goodbye";
         apk.verify(&message2[..], &[], &asig, &try_and_increment)
             .unwrap_err();
+
+        let apk2 = PublicKeyCache::aggregate(&[&sk1.to_public()]);
+        apk2.verify(&message[..], &[], &asig, &try_and_increment).unwrap_err();
+        apk2.verify(&message[..], &[], &sig1, &try_and_increment).unwrap();
+
+        let apk3 = PublicKeyCache::aggregate(&[&sk2.to_public(), &sk1.to_public()]);
+        apk3.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk3.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
+
+        let apk4 = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
+        apk4.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk4.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
     }
 
     #[test]
     fn test_public_key_serialization() {
+        PublicKeyCache::resize(256);
+        PublicKeyCache::clear_cache();
         let rng = &mut thread_rng();
         for _i in 0..100 {
             let sk = PrivateKey::generate(rng);
@@ -421,6 +537,7 @@ mod test {
             let pk2 = PublicKey::read(pk_bytes.as_slice()).unwrap();
             assert_eq!(pk.get_pk().into_affine().x, pk2.get_pk().into_affine().x);
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
+            assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
     }
 

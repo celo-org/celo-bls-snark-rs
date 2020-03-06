@@ -11,7 +11,7 @@ use lazy_static::lazy_static;
 use log::error;
 
 use crate::{
-    bls::keys::{SIG_DOMAIN, POP_DOMAIN},
+    bls::keys::{PublicKeyCache, SIG_DOMAIN, POP_DOMAIN},
     curve::hash::HashToG1,
 };
 use algebra::{ProjectiveCurve, AffineCurve, FromBytes, ToBytes, bls12_377::{Parameters as Bls12_377Parameters, G1Affine, G2Affine, Fq, Fq2}};
@@ -405,7 +405,7 @@ pub extern "C" fn aggregate_public_keys(
             .into_iter()
             .map(|pk| unsafe { &*pk })
             .collect::<Vec<&PublicKey>>();
-        let aggregated_public_key = PublicKey::aggregate(&public_keys[..]);
+        let aggregated_public_key = PublicKeyCache::aggregate(&public_keys[..]);
         unsafe {
             *out_public_key = Box::into_raw(Box::new(aggregated_public_key));
         }
@@ -430,7 +430,7 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .into_iter()
             .map(|pk| unsafe { &*pk })
             .collect::<Vec<&PublicKey>>();
-        let aggregated_public_key_to_subtract = PublicKey::aggregate(&public_keys[..]);
+        let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
         let prepared_aggregated_public_key = PublicKey::from_pk(
             &(aggregated_public_key.get_pk() - &aggregated_public_key_to_subtract.get_pk())
         );
