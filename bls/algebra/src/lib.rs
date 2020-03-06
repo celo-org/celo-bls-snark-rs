@@ -10,7 +10,7 @@ pub mod curve;
 pub mod hash;
 
 use crate::{
-    bls::keys::{PrivateKey, PublicKey, Signature, SIG_DOMAIN, POP_DOMAIN},
+    bls::keys::{PrivateKey, PublicKey, PublicKeyCache, Signature, SIG_DOMAIN, POP_DOMAIN},
     curve::hash::try_and_increment::TryAndIncrement,
     curve::hash::HashToG1,
     hash::{
@@ -413,7 +413,7 @@ pub extern "C" fn aggregate_public_keys(
             .into_iter()
             .map(|pk| unsafe { &*pk })
             .collect::<Vec<&PublicKey>>();
-        let aggregated_public_key = PublicKey::aggregate(&public_keys[..]);
+        let aggregated_public_key = PublicKeyCache::aggregate(&public_keys[..]);
         unsafe {
             *out_public_key = Box::into_raw(Box::new(aggregated_public_key));
         }
@@ -438,7 +438,7 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .into_iter()
             .map(|pk| unsafe { &*pk })
             .collect::<Vec<&PublicKey>>();
-        let aggregated_public_key_to_subtract = PublicKey::aggregate(&public_keys[..]);
+        let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
         let prepared_aggregated_public_key = PublicKey::from_pk(
             &(aggregated_public_key.get_pk() - &aggregated_public_key_to_subtract.get_pk())
         );
