@@ -147,6 +147,13 @@ impl<
             || Ok(ConstraintF::from(num_non_signers_num.get()? as u128))
         )?;
 
+        cs.enforce(
+            || "enforce num signers lc equal to num",
+            |_| num_non_signers_lc,
+            |lc| lc + (ConstraintF::one(), CS::one()),
+            |lc| num_non_signers.get_variable() + lc,
+        );
+
         SmallerThanGadget::<ConstraintF>::enforce_smaller_than(
             cs.ns(|| "enforce enough signers"),
             &num_non_signers,
