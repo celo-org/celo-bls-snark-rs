@@ -3,7 +3,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 use algebra::curves::models::bls12::Bls12Parameters;
 use algebra::{
     curves::{bls12::G1Projective, short_weierstrass_jacobian::GroupProjective, SWModelParameters},
-    AffineCurve, BigInteger, BitIterator, FpParameters, One, PrimeField, ProjectiveCurve,
+    AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
 };
 use crypto_primitives::prf::{
     blake2s::constraints::blake2s_gadget_with_parameters, Blake2sWithParameterBlock,
@@ -217,54 +217,116 @@ mod test {
 
     use bls_zexe::{
         bls::keys::SIG_DOMAIN,
-        curve::hash::{try_and_increment::TryAndIncrement, HashToG1},
+        curve::hash::try_and_increment::TryAndIncrement,
         hash::composite::CompositeHasher,
     };
+
+    use crypto_primitives::FixedLengthCRHGadget;
+    use bls_zexe::hash::composite::CRH;
+    use r1cs_std::edwards_sw6::EdwardsSWGadget;
+    use algebra::edwards_sw6::EdwardsProjective;
+    use algebra::edwards_sw6::Fq as Fr;
+    use r1cs_std::bits::uint8::UInt8;
+    use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
+
+    type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsSWGadget>;
 
     #[test]
     fn test_hash_to_group() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let expected_hash = try_and_increment
-            .hash::<bls12_377::Parameters>(SIG_DOMAIN, &[0xFE], &[])
-            .unwrap()
-            .into_affine();
+        let expected_hash_with_attempt = try_and_increment
+            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, &[0xFF], &[])
+            .unwrap();
 
+        let (expected_hash, attempt) = (expected_hash_with_attempt.0.into_affine(), expected_hash_with_attempt.1);
+        assert_eq!(attempt, 0);
+            
         let message = [
             // The counter is 0
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
+
             // bit representation of 0xFE (11111110)
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
+            Boolean::constant(true),
             Boolean::constant(false),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
+            Boolean::constant(false),
         ];
 
         let mut cs = TestConstraintSystem::<bls12_377::Fq>::new();
+
+        let input_bytes: Vec<UInt8> = message.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
+                let mut chunk_padded = chunk.clone().to_vec();
+                if chunk_padded.len() < 8 {
+                    chunk_padded.resize(8, Boolean::constant(false));
+                }
+                UInt8::from_bits_le(&chunk_padded)
+            }).collect();
+
+        let crh_params =
+        <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::ParametersGadget::alloc(
+            &mut cs.ns(|| "pedersen parameters"),
+            || {
+                match CompositeHasher::setup_crh() {
+                    Ok(x) => Ok(x),
+                    Err(e) => {
+                        println!("error: {}", e);
+                        Err(SynthesisError::AssignmentMissing)
+                    },
+                }
+            }
+        ).unwrap();
+
+        let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
+            &mut cs.ns(|| "pedersen evaluation"),
+            &crh_params,
+            &input_bytes,
+        ).unwrap();
+
+        let crh_bits = crh_result.x.to_bits(
+            cs.ns(|| "crh bits"),
+        ).unwrap();
+
+        let crh_bits_len = crh_bits.len();
+        let crh_bits_len_rounded = ((crh_bits_len + 7) / 8) * 8;
+
+        let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
+        first_bits.reverse();
+        let mut crh_bits = crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
+
+        crh_bits.reverse();
+        crh_bits.extend_from_slice(&first_bits);
+        for _ in 0..(crh_bits_len_rounded - crh_bits_len) {
+            crh_bits.push(Boolean::constant(false));
+        }
+
+        let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
+
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
         let xof_bits = HashToBitsGadget::hash_to_bits::<bls12_377::Parameters, _, _>(
             cs.ns(|| "hash to bits"),
-            &message,
+            &crh_bits,
             512,
             personalization,
         )
         .unwrap();
-        assert_eq!(xof_bits.len(), 378);
+        assert_eq!(xof_bits.len(), 512);
 
         let hash = HashToGroupGadget::<bls12_377::Parameters>::hash_to_group(
             cs.ns(|| "hash to group"),
+            //xof_bits.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>().as_slice(),
             &xof_bits,
         )
         .unwrap();
