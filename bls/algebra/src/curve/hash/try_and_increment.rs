@@ -7,14 +7,17 @@ use crate::{
 };
 use byteorder::WriteBytesExt;
 use hex;
+use log::debug;
+use bench_utils::{start_timer, end_timer};
 
+use algebra::{Zero, One};
 use algebra::{curves::{
     models::{
         bls12::{Bls12Parameters, G1Affine, G2Affine, G1Projective, G2Projective},
         ModelParameters, SWModelParameters,
     },
     AffineCurve,
-}, fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField}, bytes::FromBytes, Group};
+}, fields::{Field, Fp2, FpParameters, PrimeField, SquareRootField}, bytes::FromBytes};
 use std::error::Error;
 
 #[allow(dead_code)]
@@ -56,7 +59,7 @@ impl<'a, H: XOF> TryAndIncrement<'a, H> {
     }
 }
 
-fn get_point_from_x_g1<P: Bls12Parameters>(
+pub fn get_point_from_x_g1<P: Bls12Parameters>(
     x: <P::G1Parameters as ModelParameters>::BaseField,
     greatest: bool,
 ) -> Option<G1Affine<P>> {
@@ -73,7 +76,7 @@ fn get_point_from_x_g1<P: Bls12Parameters>(
     })
 }
 
-fn get_point_from_x<P: Bls12Parameters>(
+pub fn get_point_from_x<P: Bls12Parameters>(
     x: <P::G2Parameters as ModelParameters>::BaseField,
     greatest: bool,
 ) -> Option<G2Affine<P>> {
@@ -89,28 +92,42 @@ fn get_point_from_x<P: Bls12Parameters>(
         G2Affine::<P>::new(x, y, false)
     })
 }
+
 impl<'a, H: XOF> HashToG1 for TryAndIncrement<'a, H> {
     fn hash<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<G1Projective<P>, Box<dyn Error>> {
+        match self.hash_with_attempt::<P>(domain, message, extra_data) {
+            Ok(x) => Ok(x.0),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl<'a, H: XOF> TryAndIncrement<'a, H> {
+    pub fn hash_with_attempt<P: Bls12Parameters>(&self, domain: &[u8], message: &[u8], extra_data: &[u8]) -> Result<(G1Projective<P>, usize), Box<dyn Error>> {
         const NUM_TRIES: usize = 256;
-        const EXPECTED_TOTAL_BITS: usize = 384;
+        const EXPECTED_TOTAL_BITS: usize = 512;
         const LAST_BYTE_MASK: u8 = 1;
         const GREATEST_MASK: u8 = 2;
 
-        //round up to a multiple of 8
         let fp_bits = (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64)/8.0).ceil() as usize)*8;
         let num_bits = fp_bits;
-        assert_eq!(num_bits, EXPECTED_TOTAL_BITS);
         let num_bytes = num_bits / 8;
+
+        //round up to a multiple of 8
+        let hash_fp_bits = (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64)/256.0).ceil() as usize)*256;
+        let hash_num_bits = hash_fp_bits;
+        assert_eq!(hash_num_bits, EXPECTED_TOTAL_BITS);
+        let hash_num_bytes = hash_num_bits / 8;
         let mut counter: [u8; 1] = [0; 1];
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = self
                 .hasher
-                .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
+                .hash(domain, &[&counter, extra_data, &message].concat(), hash_num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
-                let mut possible_x_bytes = hash.to_vec();
+                let mut possible_x_bytes = hash[..num_bytes].to_vec();
                 let possible_x_bytes_len = possible_x_bytes.len();
                 let greatest = (possible_x_bytes[possible_x_bytes_len - 1] & GREATEST_MASK) == GREATEST_MASK;
                 possible_x_bytes[possible_x_bytes_len - 1] &= LAST_BYTE_MASK;
@@ -125,7 +142,7 @@ impl<'a, H: XOF> HashToG1 for TryAndIncrement<'a, H> {
                 None => continue,
                 Some(x) => {
                     debug!(
-                        "succeeded hashing \"{}\" to G2 in {} tries",
+                        "succeeded hashing \"{}\" to G1 in {} tries",
                         hex::encode(message),
                         c
                     );
@@ -134,9 +151,9 @@ impl<'a, H: XOF> HashToG1 for TryAndIncrement<'a, H> {
                         &x.into_projective(),
                     );
                     if scaled.is_zero() {
-                        return Err(HashToCurveError::SmallOrderPoint)?;
+                        continue;
                     }
-                    return Ok(scaled);
+                    return Ok((scaled, c));
                 }
             }
         }
@@ -160,9 +177,10 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
+            let message_with_counter = &[&counter, extra_data, &message].concat();
             let hash = self
                 .hasher
-                .hash(domain, &[&counter, extra_data, &message].concat(), num_bytes)?;
+                .hash(domain, message_with_counter, num_bytes)?;
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_0_bytes = (&hash[..hash.len()/2]).to_vec();
@@ -202,6 +220,7 @@ impl<'a, H: XOF> HashToG2 for TryAndIncrement<'a, H> {
             }
         }
         Err(HashToCurveError::CannotFindPoint)?
+
     }
 }
 
@@ -213,12 +232,12 @@ mod test {
         hash::composite::CompositeHasher,
     };
 
-    use algebra::curves::bls12_377::{Bls12_377Parameters, G2Projective};
+    use algebra::bls12_377::{Parameters, G2Projective};
 
     #[test]
     fn test_hash_to_curve() {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let _g: G2Projective = try_and_increment.hash::<Bls12_377Parameters>( &[], &[], &[]).unwrap();
+        let _g: G2Projective = try_and_increment.hash::<Parameters>( &[], &[], &[]).unwrap();
     }
 }

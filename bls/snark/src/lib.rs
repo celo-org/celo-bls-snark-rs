@@ -4,7 +4,7 @@ pub mod gadgets;
 #[macro_use]
 extern crate log;
 
-use bls_zexe::bls::keys::PublicKey;
+use bls_zexe::PublicKey;
 
 use std::{
     os::raw::{c_ushort, c_uint, c_int},

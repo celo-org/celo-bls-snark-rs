@@ -3,7 +3,7 @@ extern crate hex;
 use crate::hash::XOF;
 use super::direct::DirectHasher;
 
-use algebra::{bytes::ToBytes, curves::edwards_bls12::EdwardsAffine as Edwards};
+use algebra::{bytes::ToBytes, edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
     pedersen::PedersenWindow,
@@ -15,15 +15,15 @@ use rand_chacha::ChaChaRng;
 
 use std::error::Error;
 
-type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
-type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
+pub type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
+pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
 
 #[derive(Clone)]
-struct Window;
+pub struct Window;
 
 impl PedersenWindow for Window {
-    const WINDOW_SIZE: usize = 4;
-    const NUM_WINDOWS: usize = 9820; //(100*385+384*2+1)/4 ~ 9820 ~ 100*(Fq + sign bit) + Fq2 + sign bit
+    const WINDOW_SIZE: usize = 93;
+    const NUM_WINDOWS: usize = 280;
 }
 
 pub struct CompositeHasher {
@@ -52,7 +52,7 @@ impl CompositeHasher {
         Ok(ChaChaRng::from_seed(seed))
     }
 
-    fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
+    pub fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
         let mut rng = CompositeHasher::prng()?;
         CRH::setup::<_>(&mut rng)
     }
@@ -60,7 +60,7 @@ impl CompositeHasher {
 
 impl XOF for CompositeHasher {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let h = CRH::evaluate(&self.parameters, message)?;
+        let h = CRH::evaluate(&self.parameters, message)?.into_affine();
         let mut res = vec![];
         h.x.write(&mut res)?;
 
@@ -173,7 +173,7 @@ mod test {
 
         for i in 1..9000 {
             let mut res = vec![];
-            hasher.parameters.generators[i-1][0]
+            hasher.parameters.generators[i-1][0].into_affine()
                 .x
                 .write(&mut res)
                 .unwrap();
@@ -182,7 +182,7 @@ mod test {
             x_co.push(hex::encode(&res));
 
             let mut res = vec![];
-            hasher.parameters.generators[i-1][0]
+            hasher.parameters.generators[i-1][0].into_affine()
                 .y
                 .write(&mut res)
                 .unwrap();
