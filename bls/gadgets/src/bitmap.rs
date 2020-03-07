@@ -61,13 +61,10 @@ pub fn enforce_maximum_zeros_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
     use algebra::bls12_377::Fq;
+    use r1cs_std::test_constraint_system::TestConstraintSystem;
 
-    fn cs_enforce(
-        bitmap: &[bool],
-        max_zeros: u64,
-    ) -> TestConstraintSystem<Fq> {
+    fn cs_enforce(bitmap: &[bool], max_zeros: u64) -> TestConstraintSystem<Fq> {
         let mut cs = TestConstraintSystem::<Fq>::new();
         let bitmap = bitmap
             .into_iter()
@@ -96,5 +93,4 @@ mod tests {
     fn four_zeros_not_allowed() {
         assert!(!cs_enforce(&[false, false, true, false, false], 3).is_satisfied());
     }
-
 }

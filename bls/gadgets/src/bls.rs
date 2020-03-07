@@ -7,7 +7,7 @@ use r1cs_std::{
 };
 use std::marker::PhantomData;
 
-/// # BLS Signature Verification Pairing Gadget.
+/// BLS Signature Verification Pairing Gadget.
 ///
 /// Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
 /// in a Pairing-based SNARK.
