@@ -236,7 +236,7 @@ mod test {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
         let expected_hash_with_attempt = try_and_increment
-            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, &[0xFF], &[])
+            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, &[0xFE], &[])
             .unwrap();
 
         let (expected_hash, attempt) = (expected_hash_with_attempt.0.into_affine(), expected_hash_with_attempt.1);
@@ -253,7 +253,7 @@ mod test {
             Boolean::constant(true),
             Boolean::constant(true),
             Boolean::constant(true),
-            Boolean::constant(true),
+            Boolean::constant(false),
             Boolean::constant(false),
             Boolean::constant(false),
             Boolean::constant(false),
