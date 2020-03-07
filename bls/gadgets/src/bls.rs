@@ -1,7 +1,3 @@
-//! # BLS Signature Verification Pairing Gadget.
-//!
-//! Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
-//! in a Pairing-based SNARK.
 use crate::enforce_maximum_zeros_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{ConstraintSystem, SynthesisError};
@@ -11,7 +7,10 @@ use r1cs_std::{
 };
 use std::marker::PhantomData;
 
-/// Gadget for BLS Signature Verification. Must specify the Pairing Engine, Constraint Field
+/// # BLS Signature Verification Pairing Gadget.
+///
+/// Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
+/// in a Pairing-based SNARK.
 pub struct BlsVerifyGadget<E, F, P> {
     /// The curve being used
     pairing_engine_type: PhantomData<E>,
