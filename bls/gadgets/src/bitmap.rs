@@ -1,5 +1,3 @@
-pub mod bls;
-
 use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use r1cs_std::{
@@ -9,6 +7,7 @@ use r1cs_std::{
     Assignment,
 };
 
+/// Enforces that there are no more than `max_zeros` present in the provided bitmap
 pub fn enforce_maximum_zeros_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
     cs: &mut CS,
     bitmap: &[Boolean],
@@ -57,4 +56,41 @@ pub fn enforce_maximum_zeros_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use algebra::bls12_377::Fq;
+    use r1cs_std::test_constraint_system::TestConstraintSystem;
+
+    fn cs_enforce(bitmap: &[bool], max_zeros: u64) -> TestConstraintSystem<Fq> {
+        let mut cs = TestConstraintSystem::<Fq>::new();
+        let bitmap = bitmap
+            .into_iter()
+            .map(|b| Boolean::constant(*b))
+            .collect::<Vec<_>>();
+        enforce_maximum_zeros_in_bitmap(&mut cs, &bitmap, max_zeros).unwrap();
+        cs
+    }
+
+    #[test]
+    fn one() {
+        assert!(cs_enforce(&[true], 0).is_satisfied());
+    }
+
+    #[test]
+    fn no_zeros_allowed() {
+        assert!(!cs_enforce(&[false], 0).is_satisfied());
+    }
+
+    #[test]
+    fn three_zeros_allowed() {
+        assert!(cs_enforce(&[false, true, true, false, false], 3).is_satisfied());
+    }
+
+    #[test]
+    fn four_zeros_not_allowed() {
+        assert!(!cs_enforce(&[false, false, true, false, false], 3).is_satisfied());
+    }
 }

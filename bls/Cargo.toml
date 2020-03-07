@@ -1,6 +1,10 @@
 [workspace]
 
-members = [ "algebra", "snark"]
+members = [ 
+    "algebra", 
+    "snark",
+    "gadgets",
+]
 
 [profile.release]
 opt-level = 3
