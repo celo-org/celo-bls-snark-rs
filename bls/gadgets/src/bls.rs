@@ -2,7 +2,7 @@
 //!
 //! Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
 //! in a Pairing-based SNARK.
-use crate::gadgets::enforce_maximum_zeros_in_bitmap;
+use crate::enforce_maximum_zeros_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{

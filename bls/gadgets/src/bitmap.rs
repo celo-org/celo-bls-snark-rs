@@ -1,5 +1,3 @@
-pub mod bls;
-
 use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use r1cs_std::{

@@ -1,5 +1,4 @@
 pub mod encoding;
-pub mod gadgets;
 
 #[macro_use]
 extern crate log;
@@ -7,10 +6,10 @@ extern crate log;
 use bls_zexe::PublicKey;
 
 use std::{
-    os::raw::{c_ushort, c_uint, c_int},
-    slice,
-    fmt::Display,
     error::Error,
+    fmt::Display,
+    os::raw::{c_int, c_uint, c_ushort},
+    slice,
 };
 
 fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
@@ -35,8 +34,9 @@ pub extern "C" fn encode_epoch_block_to_bytes(
 ) -> bool {
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let aggregated_public_key = unsafe { &*in_aggregated_public_key };
-        let added_public_keys_ptrs =
-            unsafe { slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize) };
+        let added_public_keys_ptrs = unsafe {
+            slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
+        };
         let added_public_keys = added_public_keys_ptrs
             .to_vec()
             .into_iter()
