@@ -1,27 +1,25 @@
+use crate::curve::hash::HashToG1;
+
 use lru::LruCache;
 use lazy_static::lazy_static;
-use std::sync::Mutex;
-use std::hash::{Hash, Hasher};
-use std::collections::HashSet;
-
-use crate::curve::hash::{HashToG1};
+use std::{
+    sync::Mutex,
+    hash::{Hash, Hasher},
+    collections::HashSet,
+};
 
 use algebra::{
+    Zero, One,
     bytes::{
         FromBytes,
         ToBytes
     },
-    curves::{
-        bls12_377::{
-            Bls12_377, Bls12_377Parameters, g1::Bls12_377G1Parameters, g2::Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
-        },
-    AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve,
-    models::SWModelParameters,
-    }, fields::{
-        bls12_377::{Fq12, Fq, Fq2, Fr},
-        Field,
-        PrimeField,
-    }, SquareRootField,
+    bls12_377::{Fq12, Fq, Fq2, Fr,
+        Bls12_377, Parameters as Bls12_377Parameters, g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
+    },
+    AffineCurve, PairingEngine, ProjectiveCurve,
+    curves::SWModelParameters,
+    Field, PrimeField, SquareRootField,
     UniformRand,
 };
 use rand::Rng;
@@ -37,9 +35,10 @@ pub static POP_DOMAIN: &'static [u8] = b"ULforpop";
 /// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
 use std::{
     io::{self, Read, Result as IoResult, Write},
-    ops::{Mul, Neg},
+    ops::Neg,
 };
 
+#[derive(Clone)]
 pub struct PrivateKey {
     sk: Fr,
 }
@@ -70,12 +69,12 @@ impl PrivateKey {
         Ok(Signature::from_sig(
             &hash_to_g1
                 .hash::<Bls12_377Parameters>(domain, message, extra_data)?
-                .mul(&self.sk),
+                .mul(self.sk),
         ))
     }
 
     pub fn to_public(&self) -> PublicKey {
-        PublicKey::from_pk(&G2Projective::prime_subgroup_generator().mul(&self.sk))
+        PublicKey::from_pk(&G2Projective::prime_subgroup_generator().mul(self.sk))
     }
 }
 
@@ -113,7 +112,7 @@ impl Error for BLSError {
     }
 }
 
-#[derive(Eq)]
+#[derive(Clone, Eq)]
 pub struct PublicKey {
     pk: G2Projective,
 }
@@ -202,15 +201,15 @@ impl PublicKey {
     ) -> Result<(), Box<dyn Error>> {
         let pairing = Bls12_377::product_of_pairings(&vec![
             (
-                &signature.get_sig().into_affine().prepare(),
-                &G2Affine::prime_subgroup_generator().neg().prepare(),
+                signature.get_sig().into_affine().into(),
+                G2Affine::prime_subgroup_generator().neg().into(),
             ),
             (
-                &hash_to_g1
+                hash_to_g1
                     .hash::<Bls12_377Parameters>(domain, message, extra_data)?
                     .into_affine()
-                    .prepare(),
-                &self.pk.into_affine().prepare(),
+                    .into(),
+                self.pk.into_affine().into(),
             ),
         ]);
         if pairing == Fq12::one() {
@@ -270,6 +269,7 @@ impl FromBytes for PublicKey {
     }
 }
 
+#[derive(Clone)]
 pub struct Signature {
     sig: G1Projective,
 }
@@ -539,5 +539,27 @@ mod test {
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
+    }
+
+    #[test]
+    fn test_pop_single() {
+        init();
+
+        let direct_hasher = DirectHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&direct_hasher);
+
+        let sk_bytes = Fr::read(hex::decode("e3990a59d80a91429406be0000677a7eea8b96c5b429c70c71dabc3b7cf80d0a").unwrap().as_slice()).unwrap();
+        let sk = PrivateKey::from_sk(&sk_bytes);
+
+        let pk = sk.to_public();
+        let mut pk_bytes = vec![];
+        pk.write(&mut pk_bytes).unwrap();
+        println!("pk: {}", hex::encode(&pk_bytes));
+
+        let sig = sk.sign_pop(&hex::decode("a0Af2E71cECc248f4a7fD606F203467B500Dd53B").unwrap(), &try_and_increment).unwrap();
+        let mut sig_bytes = vec![];
+        sig.write(&mut sig_bytes).unwrap();
+
+        println!("sig: {}", hex::encode(&sig_bytes));
     }
 }

@@ -1,7 +1,7 @@
-use bls_zexe::{
-    bls::keys::PrivateKey,
-    curve::hash::try_and_increment::TryAndIncrement,
-    hash::direct::DirectHasher,
+use bls_crypto::{
+    PrivateKey,
+    TryAndIncrement,
+    DirectHasher,
 };
 
 use algebra::bytes::{ToBytes};
