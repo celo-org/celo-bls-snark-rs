@@ -1,4 +1,4 @@
-use bls_crypto::{
+use bls_zexe::{
     PrivateKey,
     TryAndIncrement,
     DirectHasher,

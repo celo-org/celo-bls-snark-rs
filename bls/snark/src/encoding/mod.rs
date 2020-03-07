@@ -1,17 +1,12 @@
 use algebra::{
-    fields::{
-        FpParameters,
-        PrimeField,
-        bls12_377::{
-            Fq,
-            FqParameters,
-        },
+    FpParameters, PrimeField, ProjectiveCurve, ToBytes,
+    bls12_377::{
+        Fq,
+        FqParameters,
     },
-    curves::ProjectiveCurve,
-    bytes::ToBytes,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
-use bls_zexe::bls::keys::PublicKey;
+use bls_zexe::PublicKey;
 use std::error::Error;
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
@@ -70,9 +65,15 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Er
         false
     };
 
-    let mut x_bytes = vec![];
-    x.write(&mut x_bytes)?;
-    let mut bits = bytes_to_bits(&x_bytes, FqParameters::MODULUS_BITS as usize);
+    let mut bits = vec![];
+    let mut x_bytes_c0 = vec![];
+    x.c0.write(&mut x_bytes_c0)?;
+    let bits_c0 = bytes_to_bits(&x_bytes_c0, FqParameters::MODULUS_BITS as usize);
+    bits.extend_from_slice(&bits_c0);
+    let mut x_bytes_c1 = vec![];
+    x.c1.write(&mut x_bytes_c1)?;
+    let bits_c1 = bytes_to_bits(&x_bytes_c1, FqParameters::MODULUS_BITS as usize);
+    bits.extend_from_slice(&bits_c1);
     bits.push(is_over_half);
 
     Ok(bits)
@@ -125,10 +126,7 @@ mod test {
     use rand::{Rng, SeedableRng};
     use crate::encoding::{bytes_to_bits, bits_to_bytes};
     use rand_xorshift::XorShiftRng;
-    use algebra::fields::{
-        FpParameters,
-        bls12_377::FqParameters,
-    };
+    use algebra::{FpParameters, bls12_377::FqParameters};
 
     #[test]
     fn test_bytes_to_bits() {

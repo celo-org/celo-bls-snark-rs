@@ -1,1 +1,60 @@
 pub mod bls;
+
+use algebra::PrimeField;
+use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
+use r1cs_std::{
+    bits::ToBitsGadget,
+    fields::{fp::FpGadget, FieldGadget},
+    prelude::*,
+    Assignment,
+};
+
+pub fn enforce_maximum_zeros_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
+    cs: &mut CS,
+    bitmap: &[Boolean],
+    max_zeros: u64,
+) -> Result<(), SynthesisError> {
+    // If we're in setup mode, we skip the bit counting part since the bitmap
+    // will be empty
+    let is_setup = bitmap.iter().all(|bit| bit.get_value().is_none());
+
+    // Calculate the number of zeros
+    let mut num_zeros = 0;
+    let mut num_zeros_lc = LinearCombination::zero();
+    // For each bit, increment the number of zeros
+    // if the bit was a 0. We calculate both the number of zeros
+    // and a linear combination over it, in order to do 2 things:
+    // 1. enforce that num_zeros < maximum_zeros
+    // 2. enforce that num_zeros was calculated correctly from the bitmap
+    for bit in bitmap {
+        // Update the constraints
+        num_zeros_lc += (F::one(), CS::one());
+        let zero_lc = bit.lc(CS::one(), F::one().neg());
+        num_zeros_lc = num_zeros_lc + zero_lc;
+
+        // Update our count
+        if !is_setup {
+            let is_zero = !bit.get_value().get()?;
+            num_zeros += is_zero as u8;
+        }
+    }
+    // Rebind `num_zeros` to a constraint
+    let num_zeros = FpGadget::alloc(&mut cs.ns(|| "num zeros"), || Ok(F::from(num_zeros)))?;
+
+    let num_zeros_bits = &num_zeros.to_bits(&mut cs.ns(|| "num zeros to bits"))?;
+    Boolean::enforce_smaller_or_equal_than::<_, _, F, _>(
+        &mut cs.ns(|| "enforce maximum number of zeros"),
+        num_zeros_bits,
+        F::from(max_zeros).into_repr(),
+    )?;
+
+    // Enforce that we have correctly counted the number of zeros
+    cs.enforce(
+        || "enforce num zeros lc equal to num",
+        |_| num_zeros_lc,
+        |lc| lc + (F::one(), CS::one()),
+        |lc| num_zeros.get_variable() + lc,
+    );
+
+    Ok(())
+}
