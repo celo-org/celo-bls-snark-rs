@@ -1,4 +1,4 @@
-use crate::enforce_maximum_zeros_in_bitmap;
+use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
@@ -151,7 +151,7 @@ where
         message_hash: &P::G1Gadget,
         maximum_non_signers: u64,
     ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
-        enforce_maximum_zeros_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers)?;
+        enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
         let prepared_message_hash =
             P::prepare_g1(cs.ns(|| "prepared message hash"), &message_hash)?;
