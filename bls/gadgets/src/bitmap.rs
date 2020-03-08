@@ -17,6 +17,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
 ) -> Result<(), SynthesisError> {
     let mut value_fp = F::one();
     if !value {
+        // using the opposite value if we are counting 0s
         value_fp = value_fp.neg();
     }
     // If we're in setup mode, we skip the bit counting part since the bitmap
