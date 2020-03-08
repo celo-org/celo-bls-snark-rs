@@ -25,20 +25,19 @@ use algebra::{
 };
 use bls_zexe::{
     bls::keys::SIG_DOMAIN,
+    curve::hash::try_and_increment::get_point_from_x_g1,
     hash::composite::{CompositeHasher, CRH},
 };
 use crypto_primitives::{
-    crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as PedersenGadget,
-    FixedLengthCRHGadget,
+    crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
 };
 use r1cs_std::edwards_sw6::EdwardsSWGadget;
 
-/// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
-type EdwardsPedersen = PedersenGadget<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
-
 use crate::YToBitGadget;
 
-use bls_zexe::curve::hash::try_and_increment::get_point_from_x_g1;
+/// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
+type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
+
 /// Hash to curve requires 378 bits (377 for field element, 1 for y)
 ///
 /// Parameters for Blake2x as specified in: https://blake2.net/blake2x.pdf
@@ -61,7 +60,7 @@ fn blake2xs_params(
         depth: 0,
         leaf_length: 32,
         node_offset: offset,
-        xof_digest_length: hash_length / 8, // need to convert to bits
+        xof_digest_length: hash_length / 8, // need to convert to bytes
         node_depth: 0,
         inner_length: 32,
         salt: [0; 8],
@@ -91,6 +90,8 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         // Hash to bits
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
+        // We want 378 random bits for hashing to curve, so we get 512 from the hash and will
+        // discard any unneeded ones
         let xof_bits =
             Self::hash_to_bits(cs.ns(|| "hash to bits"), &crh_bits, 512, personalization)?;
 
@@ -105,28 +106,24 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         input: &[UInt8],
     ) -> Result<Vec<Boolean>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
-        let crh_params =
-            <EdwardsPedersen as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc(
-                cs.ns(|| "pedersen parameters"),
-                || CompositeHasher::setup_crh().ok().get(),
-            )?;
+        let crh_params = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc(
+            cs.ns(|| "pedersen parameters"),
+            || CompositeHasher::setup_crh().ok().get(),
+        )?;
 
-        let pedersen_hash =
-            <EdwardsPedersen as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
-                &mut cs.ns(|| "pedersen evaluation"),
-                &crh_params,
-                &input,
-            )?;
+        let pedersen_hash = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "pedersen evaluation"),
+            &crh_params,
+            &input,
+        )?;
 
-        // The hash must be padded to the nearest multiple of 8 for the LE encoding
         let mut crh_bits = pedersen_hash.x.to_bits(cs.ns(|| "crh bits")).unwrap();
-        // pad the front with 0s
+        // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
         loop {
-            if crh_bits.len() % 8 != 0 {
-                crh_bits.insert(0, Boolean::constant(false));
-            } else {
+            if crh_bits.len() % 8 == 0 {
                 break;
             }
+            crh_bits.insert(0, Boolean::constant(false));
         }
         Ok(crh_bits)
     }
@@ -138,18 +135,25 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
     /// This uses Blake2s under the hood and is expensive for large messages.
     /// Consider reducing the input size by passing it through a Collision Resistant Hash function
     /// such as Pedersen.
+    ///
+    /// # Panics
+    ///
+    /// If the provided hash_length is not a multiple of 256.
     pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
         mut cs: CS,
         message: &[Boolean],
         hash_length: u16,
         personalization: [u8; 8],
     ) -> Result<Vec<Boolean>, SynthesisError> {
+        // Blake2s outputs 256 bit hashes so the desired output hash length
+        // must be a multiple of that.
+        assert_eq!(hash_length % 256, 0, "invalid hash length size");
+        let iterations = hash_length / 256;
+
         // Reverse the message to LE
         let mut message = message.to_vec();
         message.reverse();
 
-        // Blake2 outputs 256 bit hashes
-        let iterations = hash_length / 256;
         let mut xof_bits = Vec::new();
         // Run Blake on the message N times, each time offset by `i`
         // to get a `hash_length` hash. The hash is in LE.
