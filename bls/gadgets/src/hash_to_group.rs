@@ -1,23 +1,44 @@
+#[allow(unused)]
+#[allow(dead_code)]
 use std::{borrow::Borrow, marker::PhantomData};
 
-use algebra::curves::models::bls12::Bls12Parameters;
 use algebra::{
-    curves::{bls12::G1Projective, short_weierstrass_jacobian::GroupProjective, SWModelParameters},
+    curves::{
+        bls12::G1Projective, models::bls12::Bls12Parameters,
+        short_weierstrass_jacobian::GroupProjective, SWModelParameters,
+    },
     AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
 };
 use crypto_primitives::prf::{
     blake2s::constraints::blake2s_gadget_with_parameters, Blake2sWithParameterBlock,
 };
-
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     alloc::AllocGadget, bits::ToBitsGadget, boolean::Boolean, groups::bls12::G1Gadget,
-    groups::GroupGadget, Assignment,
+    groups::GroupGadget, uint8::UInt8, Assignment,
 };
 
-use crate::YToBitGadget;
-use bls_zexe::curve::hash::try_and_increment::get_point_from_x_g1;
+// Imported for the BLS12-377 API
+use algebra::{
+    bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
+    edwards_sw6::EdwardsProjective,
+};
+use bls_zexe::{
+    bls::keys::SIG_DOMAIN,
+    hash::composite::{CompositeHasher, CRH},
+};
+use crypto_primitives::{
+    crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as PedersenGadget,
+    FixedLengthCRHGadget,
+};
+use r1cs_std::edwards_sw6::EdwardsSWGadget;
 
+/// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
+type EdwardsPedersen = PedersenGadget<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
+
+use crate::YToBitGadget;
+
+use bls_zexe::curve::hash::try_and_increment::get_point_from_x_g1;
 /// Hash to curve requires 378 bits (377 for field element, 1 for y)
 ///
 /// Parameters for Blake2x as specified in: https://blake2.net/blake2x.pdf
@@ -48,11 +69,76 @@ fn blake2xs_params(
     }
 }
 
-pub struct HashToBitsGadget;
+pub struct HashToGroupGadget<P> {
+    parameters_type: PhantomData<P>,
+}
 
-impl HashToBitsGadget {
+// If we're on Bls12-377, we can have a nice public API for the whole hash to group operation
+// by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards SW6
+// and then hashing it to bits and to group
+impl HashToGroupGadget<Bls12_377_Parameters> {
+    pub fn enforce_hash_to_group<CS: ConstraintSystem<Bls12_377_Fq>>(
+        cs: &mut CS,
+        counter: UInt8,
+        message: &[UInt8],
+    ) -> Result<G1Gadget<Bls12_377_Parameters>, SynthesisError> {
+        // combine the counter with the message
+        let mut input = vec![counter];
+        input.extend_from_slice(message);
+        // compress the input
+        let crh_bits = Self::pedersen_hash(cs, &input)?;
+
+        // Hash to bits
+        let mut personalization = [0; 8];
+        personalization.copy_from_slice(SIG_DOMAIN);
+        let xof_bits =
+            Self::hash_to_bits(cs.ns(|| "hash to bits"), &crh_bits, 512, personalization)?;
+
+        let hash = Self::hash_to_group(cs.ns(|| "hash to group"), &xof_bits)?;
+
+        Ok(hash)
+    }
+
+    /// Compress the input by passing it through a Pedersen hash
+    pub fn pedersen_hash<CS: ConstraintSystem<Bls12_377_Fq>>(
+        cs: &mut CS,
+        input: &[UInt8],
+    ) -> Result<Vec<Boolean>, SynthesisError> {
+        // We setup by getting the Parameters over the provided CRH
+        let crh_params =
+            <EdwardsPedersen as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc(
+                cs.ns(|| "pedersen parameters"),
+                || CompositeHasher::setup_crh().ok().get(),
+            )?;
+
+        let pedersen_hash =
+            <EdwardsPedersen as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
+                &mut cs.ns(|| "pedersen evaluation"),
+                &crh_params,
+                &input,
+            )?;
+
+        // The hash must be padded to the nearest multiple of 8 for the LE encoding
+        let mut crh_bits = pedersen_hash.x.to_bits(cs.ns(|| "crh bits")).unwrap();
+        // pad the front with 0s
+        loop {
+            if crh_bits.len() % 8 != 0 {
+                crh_bits.insert(0, Boolean::constant(false));
+            } else {
+                break;
+            }
+        }
+        Ok(crh_bits)
+    }
+}
+
+impl<P: Bls12Parameters> HashToGroupGadget<P> {
     /// Hashes the message to produce a `hash_length` hash with the provided personalization
-    pub fn hash_to_bits<P: Bls12Parameters, F: PrimeField, CS: ConstraintSystem<F>>(
+    ///
+    /// This uses Blake2s under the hood and is expensive for large messages.
+    /// Consider reducing the input size by passing it through a Collision Resistant Hash function
+    /// such as Pedersen.
+    pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
         mut cs: CS,
         message: &[Boolean],
         hash_length: u16,
@@ -84,22 +170,9 @@ impl HashToBitsGadget {
             xof_bits.extend_from_slice(&xof_bits_i);
         }
 
-        // TODO: Should we re-arrange the chunks?
-        // let xof_bits = [
-        //     &xof_bits[..<F::Params as FpParameters>::MODULUS_BITS as usize],
-        //     &[xof_bits[<F::Params as FpParameters>::MODULUS_BITS as usize]][..],
-        // ]
-        // .concat();
-
         Ok(xof_bits)
     }
-}
 
-pub struct HashToGroupGadget<P> {
-    parameters_type: PhantomData<P>,
-}
-
-impl<P: Bls12Parameters> HashToGroupGadget<P> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
     // get the hash
@@ -133,9 +206,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                // TODO: Figure out why this fails here.
-                let p = get_point_from_x_g1::<P>(x, greatest).unwrap();
-                // .ok_or(SynthesisError::AssignmentMissing)?;
+                let p = get_point_from_x_g1::<P>(x, greatest)
+                    .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
             })?;
@@ -210,128 +282,52 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
 mod test {
     use super::*;
 
-    use algebra::{bls12_377, ProjectiveCurve};
-    use r1cs_std::{
-        boolean::Boolean, groups::GroupGadget, test_constraint_system::TestConstraintSystem,
-    };
+    use algebra::bls12_377;
+    use r1cs_std::{groups::GroupGadget, test_constraint_system::TestConstraintSystem};
 
-    use bls_zexe::{
-        bls::keys::SIG_DOMAIN,
-        curve::hash::try_and_increment::TryAndIncrement,
-        hash::composite::CompositeHasher,
-    };
-
-    use crypto_primitives::FixedLengthCRHGadget;
-    use bls_zexe::hash::composite::CRH;
-    use r1cs_std::edwards_sw6::EdwardsSWGadget;
-    use algebra::edwards_sw6::EdwardsProjective;
-    use algebra::edwards_sw6::Fq as Fr;
+    use bls_zexe::{bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement};
     use r1cs_std::bits::uint8::UInt8;
-    use crypto_primitives::crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget;
-
-    type CRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsSWGadget>;
+    use rand::{thread_rng, RngCore};
 
     #[test]
     fn test_hash_to_group() {
+        let mut rng = thread_rng();
+        // test for various input sizes
+        for length in &[10, 25, 50, 100, 200, 300] {
+            // fill a buffer with random elements
+            let mut input = vec![0; *length];
+            rng.fill_bytes(&mut input);
+            // check that they get hashed properly
+            hash_to_group(&input);
+        }
+    }
+
+    fn hash_to_group(input: &[u8]) {
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let expected_hash_with_attempt = try_and_increment
-            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, &[0xFE], &[])
+        let (expected_hash, attempt) = try_and_increment
+            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, input, &[])
             .unwrap();
-
-        let (expected_hash, attempt) = (expected_hash_with_attempt.0.into_affine(), expected_hash_with_attempt.1);
-        assert_eq!(attempt, 0);
-            
-        let message = [
-            // The counter is 0
-
-            // bit representation of 0xFE (11111110)
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(true),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-            Boolean::constant(false),
-        ];
 
         let mut cs = TestConstraintSystem::<bls12_377::Fq>::new();
 
-        let input_bytes: Vec<UInt8> = message.into_iter().map(|b| b.clone()).rev().collect::<Vec<_>>().chunks(8).map(|chunk| {
-                let mut chunk_padded = chunk.clone().to_vec();
-                if chunk_padded.len() < 8 {
-                    chunk_padded.resize(8, Boolean::constant(false));
-                }
-                UInt8::from_bits_le(&chunk_padded)
-            }).collect();
+        let counter = UInt8::alloc(&mut cs.ns(|| "alloc counter"), || Ok(attempt as u8)).unwrap();
+        let input = input
+            .iter()
+            .enumerate()
+            .map(|(i, num)| {
+                UInt8::alloc(&mut cs.ns(|| format!("input {}", i)), || Ok(num)).unwrap()
+            })
+            .collect::<Vec<_>>();
 
-        let crh_params =
-        <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::ParametersGadget::alloc(
-            &mut cs.ns(|| "pedersen parameters"),
-            || {
-                match CompositeHasher::setup_crh() {
-                    Ok(x) => Ok(x),
-                    Err(e) => {
-                        println!("error: {}", e);
-                        Err(SynthesisError::AssignmentMissing)
-                    },
-                }
-            }
-        ).unwrap();
-
-        let crh_result = <CRHGadget as FixedLengthCRHGadget<CRH, Fr>>::check_evaluation_gadget(
-            &mut cs.ns(|| "pedersen evaluation"),
-            &crh_params,
-            &input_bytes,
-        ).unwrap();
-
-        let crh_bits = crh_result.x.to_bits(
-            cs.ns(|| "crh bits"),
-        ).unwrap();
-
-        let crh_bits_len = crh_bits.len();
-        let crh_bits_len_rounded = ((crh_bits_len + 7) / 8) * 8;
-
-        let mut first_bits = crh_bits[0..8 - (crh_bits_len_rounded - crh_bits_len)].to_vec();
-        first_bits.reverse();
-        let mut crh_bits = crh_bits[8 - (crh_bits_len_rounded - crh_bits_len)..].to_vec();
-
-        crh_bits.reverse();
-        crh_bits.extend_from_slice(&first_bits);
-        for _ in 0..(crh_bits_len_rounded - crh_bits_len) {
-            crh_bits.push(Boolean::constant(false));
-        }
-
-        let crh_bits = crh_bits.iter().rev().map(|b| b.clone()).collect::<Vec<_>>();
-
-        let mut personalization = [0; 8];
-        personalization.copy_from_slice(SIG_DOMAIN);
-        let xof_bits = HashToBitsGadget::hash_to_bits::<bls12_377::Parameters, _, _>(
-            cs.ns(|| "hash to bits"),
-            &crh_bits,
-            512,
-            personalization,
-        )
-        .unwrap();
-        assert_eq!(xof_bits.len(), 512);
-
-        let hash = HashToGroupGadget::<bls12_377::Parameters>::hash_to_group(
-            cs.ns(|| "hash to group"),
-            //xof_bits.into_iter().map(|x| x.clone()).rev().collect::<Vec<_>>().as_slice(),
-            &xof_bits,
+        let hash = HashToGroupGadget::<bls12_377::Parameters>::enforce_hash_to_group(
+            &mut cs.ns(|| "hash to group"),
+            counter,
+            &input,
         )
         .unwrap();
 
         assert!(cs.is_satisfied());
-        assert_eq!(expected_hash, hash.get_value().unwrap().into_affine());
+        assert_eq!(expected_hash, hash.get_value().unwrap());
     }
 }
