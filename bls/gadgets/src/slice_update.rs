@@ -1,12 +1,8 @@
-use algebra::{PrimeField, Group};
-use r1cs_core::{ConstraintSystem, SynthesisError};
-use r1cs_std::{
-    boolean::Boolean,
-};
-use std::marker::PhantomData;
-
 use crate::enforce_maximum_occurrences_in_bitmap;
-use r1cs_std::groups::GroupGadget;
+use algebra::{Group, PrimeField};
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::{boolean::Boolean, groups::GroupGadget};
+use std::marker::PhantomData;
 
 /// Gadget for checking that slice diffs are computed correctly
 pub struct SliceUpdateGadget<G, F, GG> {
@@ -15,13 +11,14 @@ pub struct SliceUpdateGadget<G, F, GG> {
     gadget_type: PhantomData<GG>,
 }
 
-impl<G, F, GG> SliceUpdateGadget<G, F, GG> where 
+impl<G, F, GG> SliceUpdateGadget<G, F, GG>
+where
     G: Group,
     F: PrimeField,
-    GG: GroupGadget<G, F>
- {
+    GG: GroupGadget<G, F>,
+{
     /// Enforces that the old slice's elements are replaced by the new slice's elements
-    /// at the indexes where the bitmap is set to 1, and that no more than 
+    /// at the indexes where the bitmap is set to 1, and that no more than
     /// `maximum_removed` elements were changed.
     ///
     /// # Panics
@@ -38,21 +35,11 @@ impl<G, F, GG> SliceUpdateGadget<G, F, GG> where
         assert_eq!(new_elements.len(), bitmap.len());
         // check that no more than `maximum_removed` 1s exist in
         // the provided bitmap
-        enforce_maximum_occurrences_in_bitmap(
-            &mut cs,
-            bitmap,
-            maximum_removed,
-            true,
-        )?;
+        enforce_maximum_occurrences_in_bitmap(&mut cs, bitmap, maximum_removed, true)?;
 
         // check that the new_elements are correctly computed from the
         // bitmap and the old slice
-        Self::enforce_slice_update(
-            &mut cs,
-            old_elements,
-            new_elements,
-            bitmap,
-        )
+        Self::enforce_slice_update(&mut cs, old_elements, new_elements, bitmap)
     }
 
     /// Checks that if the i_th bit in the provided bitmap is set to 1:
@@ -65,11 +52,7 @@ impl<G, F, GG> SliceUpdateGadget<G, F, GG> where
         bitmap: &[Boolean],
     ) -> Result<Vec<GG>, SynthesisError> {
         let mut updated_elements = Vec::with_capacity(old_elements.len());
-        for (i, (pk, bit)) in old_elements
-            .iter()
-            .zip(bitmap)
-            .enumerate()
-        {
+        for (i, (pk, bit)) in old_elements.iter().zip(bitmap).enumerate() {
             // if the bit is 1, the element is replaced
             let new_element = GG::conditionally_select(
                 cs.ns(|| format!("cond_select {}", i)),
@@ -94,9 +77,7 @@ mod test {
         PairingEngine, ProjectiveCurve, UniformRand,
     };
     use r1cs_std::{
-        alloc::AllocGadget,
-        groups::bls12::G2Gadget,
-        boolean::Boolean,
+        alloc::AllocGadget, boolean::Boolean, groups::bls12::G2Gadget,
         test_constraint_system::TestConstraintSystem,
     };
 
@@ -132,8 +113,7 @@ mod test {
         )
         .unwrap();
         assert_eq!(cs.is_satisfied(), satisfied);
-        res
-            .into_iter()
+        res.into_iter()
             .map(|x| x.get_value().unwrap())
             .collect::<Vec<_>>()
     }

@@ -68,6 +68,7 @@ fn blake2xs_params(
     }
 }
 
+/// Gadget for checking that hashes to group are computed correctly
 pub struct HashToGroupGadget<P> {
     parameters_type: PhantomData<P>,
 }
