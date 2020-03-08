@@ -10,4 +10,4 @@ mod y_to_bit;
 pub use y_to_bit::YToBitGadget;
 
 mod hash_to_group;
-pub use hash_to_group::{HashToBitsGadget, HashToGroupGadget};
+pub use hash_to_group::HashToGroupGadget;
