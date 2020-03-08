@@ -1,82 +1,85 @@
-use algebra::curves::models::bls12::Bls12Parameters;
+use algebra::{PrimeField, Group};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    boolean::Boolean, groups::curves::short_weierstrass::bls12::G2Gadget, select::CondSelectGadget,
+    boolean::Boolean,
 };
 use std::marker::PhantomData;
 
 use crate::enforce_maximum_occurrences_in_bitmap;
+use r1cs_std::groups::GroupGadget;
 
-/// Gadget for checking that validator diffs are computed correctly
-pub struct ValidatorUpdateGadget<P: Bls12Parameters> {
-    parameters_type: PhantomData<P>,
+/// Gadget for checking that slice diffs are computed correctly
+pub struct SliceUpdateGadget<G, F, GG> {
+    group_type: PhantomData<G>,
+    field_type: PhantomData<F>,
+    gadget_type: PhantomData<GG>,
 }
 
-impl<P: Bls12Parameters> ValidatorUpdateGadget<P> {
-    /// Enforces that the validator set is transitioned correctly according to the bitmap
-    /// and that no more than `maximum_removed_validators` pubkeys were removed.
-    ///
-    /// Notes:
-    /// - We assume that the number of validators **does not** change over time.
-    /// - A 1 in the bitmap means that the old validator is replaced by the new one
+impl<G, F, GG> SliceUpdateGadget<G, F, GG> where 
+    G: Group,
+    F: PrimeField,
+    GG: GroupGadget<G, F>
+ {
+    /// Enforces that the old slice's elements are replaced by the new slice's elements
+    /// at the indexes where the bitmap is set to 1, and that no more than 
+    /// `maximum_removed` elements were changed.
     ///
     /// # Panics
-    /// - If `old_pub_keys.len() != `removed_validators_bitmap.len()`
-    /// - If `new_pub_keys.len() != `removed_validators_bitmap.len()`
-    pub fn update<CS: ConstraintSystem<P::Fp>>(
+    /// - If `old_elements.len()` != `bitmap.len()`
+    /// - If `new_elements.len()` != `bitmap.len()`
+    pub fn update<CS: ConstraintSystem<F>>(
         mut cs: CS,
-        old_pub_keys: &[G2Gadget<P>],
-        new_pub_keys: &[G2Gadget<P>],
-        removed_validators_bitmap: &[Boolean],
-        maximum_removed_validators: u64,
-    ) -> Result<Vec<G2Gadget<P>>, SynthesisError> {
-        assert_eq!(old_pub_keys.len(), removed_validators_bitmap.len());
-        assert_eq!(new_pub_keys.len(), removed_validators_bitmap.len());
-        // check that no more than `maximum_removed_validators` 1s exist in
+        old_elements: &[GG],
+        new_elements: &[GG],
+        bitmap: &[Boolean],
+        maximum_removed: u64,
+    ) -> Result<Vec<GG>, SynthesisError> {
+        assert_eq!(old_elements.len(), bitmap.len());
+        assert_eq!(new_elements.len(), bitmap.len());
+        // check that no more than `maximum_removed` 1s exist in
         // the provided bitmap
         enforce_maximum_occurrences_in_bitmap(
             &mut cs,
-            removed_validators_bitmap,
-            maximum_removed_validators,
+            bitmap,
+            maximum_removed,
             true,
         )?;
 
-        // check that the new_pub_keys are correctly computed from the
-        // bitmap and the old pubkeys
-        let new_validator_set = Self::enforce_validator_set(
+        // check that the new_elements are correctly computed from the
+        // bitmap and the old slice
+        Self::enforce_slice_update(
             &mut cs,
-            old_pub_keys,
-            new_pub_keys,
-            removed_validators_bitmap,
-        )?;
-        Ok(new_validator_set)
+            old_elements,
+            new_elements,
+            bitmap,
+        )
     }
 
     /// Checks that if the i_th bit in the provided bitmap is set to 1:
-    /// the i_th validator in the old pubkeys array is replaced
-    /// with the i_th validator in the new pubkeys array
-    fn enforce_validator_set<CS: ConstraintSystem<P::Fp>>(
+    /// the i_th element in the old slice is replaced
+    /// with the i_th element in the new slice
+    fn enforce_slice_update<CS: ConstraintSystem<F>>(
         cs: &mut CS,
-        old_pub_keys: &[G2Gadget<P>],
-        new_pub_keys: &[G2Gadget<P>],
-        removed_validators_bitmap: &[Boolean],
-    ) -> Result<Vec<G2Gadget<P>>, SynthesisError> {
-        let mut new_validator_set = Vec::with_capacity(old_pub_keys.len());
-        for (i, (pk, bit)) in old_pub_keys
+        old_elements: &[GG],
+        new_elements: &[GG],
+        bitmap: &[Boolean],
+    ) -> Result<Vec<GG>, SynthesisError> {
+        let mut updated_elements = Vec::with_capacity(old_elements.len());
+        for (i, (pk, bit)) in old_elements
             .iter()
-            .zip(removed_validators_bitmap)
+            .zip(bitmap)
             .enumerate()
         {
-            // if the bit is 1, the validator is replaced
-            let new_pub_key = G2Gadget::<P>::conditionally_select(
+            // if the bit is 1, the element is replaced
+            let new_element = GG::conditionally_select(
                 cs.ns(|| format!("cond_select {}", i)),
                 bit,
-                &new_pub_keys[i],
+                &new_elements[i],
                 pk,
             )?;
-            new_validator_set.push(new_pub_key);
+            updated_elements.push(new_element);
         }
-        Ok(new_validator_set)
+        Ok(updated_elements)
     }
 }
 
@@ -91,10 +94,13 @@ mod test {
         PairingEngine, ProjectiveCurve, UniformRand,
     };
     use r1cs_std::{
-        alloc::AllocGadget, boolean::Boolean, groups::GroupGadget,
+        alloc::AllocGadget,
+        groups::bls12::G2Gadget,
+        boolean::Boolean,
         test_constraint_system::TestConstraintSystem,
     };
 
+    // We run a test where we assume the slice elements are validator pubkeys
     fn cs_update<E: PairingEngine, P: Bls12Parameters>(
         old_pubkeys: &[E::G2Projective],
         new_pubkeys: &[E::G2Projective],
@@ -117,7 +123,7 @@ mod test {
             .collect::<Vec<_>>();
 
         // check the result and return the inner data
-        let gadget: Vec<G2Gadget<P>> = ValidatorUpdateGadget::<P>::update::<_>(
+        let res = SliceUpdateGadget::update(
             cs.ns(|| "validator update"),
             &old_pub_keys,
             &new_pub_keys,
@@ -126,7 +132,7 @@ mod test {
         )
         .unwrap();
         assert_eq!(cs.is_satisfied(), satisfied);
-        gadget
+        res
             .into_iter()
             .map(|x| x.get_value().unwrap())
             .collect::<Vec<_>>()

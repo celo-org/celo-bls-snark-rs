@@ -13,4 +13,4 @@ mod hash_to_group;
 pub use hash_to_group::HashToGroupGadget;
 
 mod validator;
-pub use validator::ValidatorUpdateGadget;
+pub use validator::SliceUpdateGadget;
