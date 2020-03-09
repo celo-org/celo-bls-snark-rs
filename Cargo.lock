@@ -453,6 +453,7 @@ dependencies = [
  "bench-utils",
  "blake2s_simd",
  "bls-crypto",
+ "bls-gadgets",
  "byteorder",
  "crypto-primitives",
  "groth16",

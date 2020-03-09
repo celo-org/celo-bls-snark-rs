@@ -1,4 +1,5 @@
 pub mod encoding;
+pub mod gadgets;
 
 #[macro_use]
 extern crate log;

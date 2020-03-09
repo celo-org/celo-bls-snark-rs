@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 bls-crypto = { path = "../bls-crypto" }
+bls-gadgets = { path = "../bls-gadgets" }
 
 algebra = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "sw6", "edwards_sw6", "edwards_bls12"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe" }

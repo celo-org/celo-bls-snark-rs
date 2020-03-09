@@ -1,5 +1,5 @@
-use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{Group, PrimeField};
+use bls_gadgets::enforce_maximum_occurrences_in_bitmap;
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{boolean::Boolean, groups::GroupGadget};
 use std::marker::PhantomData;

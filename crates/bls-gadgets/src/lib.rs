@@ -11,6 +11,3 @@ pub use y_to_bit::YToBitGadget;
 
 mod hash_to_group;
 pub use hash_to_group::HashToGroupGadget;
-
-mod slice_update;
-pub use slice_update::SliceUpdateGadget;
