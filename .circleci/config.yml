@@ -29,8 +29,21 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/app
-      - run: rustup install 1.36.0
+      - run:
+          name: Install Rust & Tooling
+          command: |
+            rustup install 1.36.0
+            cargo install cargo-audit
+            rustup component add clippy
       - run: cargo build --release && cargo test --release
+      - run:
+          name: Check Style
+          command: |
+            cargo fmt --all -- --check
+            cargo clippy --all-targets --all-features -- -D warnings
+      - run:
+          name: Audit Dependencies
+          command: cargo audit
       - persist_to_workspace:
           root: .
           paths: target/release
