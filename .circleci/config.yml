@@ -30,10 +30,10 @@ jobs:
       - attach_workspace:
           at: ~/app
       - run: rustup install 1.36.0
-      - run: cd bls && cargo build --release && cargo test --release
+      - run: cargo build --release && cargo test --release
       - persist_to_workspace:
           root: .
-          paths: bls/target/release
+          paths: target/release
 
   go-module-tests:
     <<: *go_defaults
@@ -45,14 +45,6 @@ jobs:
           at: ~/app
       - run: cd ~/app/go/cmd/example && go run main.go
       - run: cd ~/app/go && go test
-
-#  zexe-tests:
-#    <<: *rust_defaults
-#    steps:
-#      - attach_workspace:
-#          at: ~/app
-#      - run: rustup install nightly
-#      - run: cd zexe && cargo +nightly test --release
 
 workflows:
   version: 2
@@ -66,6 +58,3 @@ workflows:
           requires:
             - checkout-repo
             - bls-tests
-#      - zexe-tests:
-#          requires:
-#            - checkout-repo
