@@ -4,23 +4,22 @@ extern crate criterion;
 use criterion::{Criterion, ParameterizedBenchmark};
 
 use algebra::{
+    bls12_377::{G2Projective, Parameters as Bls12_377Parameters},
     ProjectiveCurve,
-    bls12_377::{
-        Parameters as Bls12_377Parameters,
-        G2Projective
-    }
 };
 
-use bls_zexe::curve::cofactor::{scale_by_cofactor_scott, scale_by_cofactor_fuentes};
+use bls_zexe::curve::cofactor::{scale_by_cofactor_fuentes, scale_by_cofactor_scott};
 
 use rand::{Rng, SeedableRng};
-use rand_xorshift::{XorShiftRng};
+use rand_xorshift::XorShiftRng;
 
 fn bench_scale_by_cofactor(c: &mut Criterion) {
-
-    let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+    let mut rng = XorShiftRng::from_seed([
+        0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06,
+        0x54,
+    ]);
     let mut points: Vec<G2Projective> = vec![];
-    const SAMPLES: usize =  3;
+    const SAMPLES: usize = 3;
     for _i in 0..SAMPLES {
         points.push(rng.gen());
     }
@@ -44,13 +43,25 @@ fn bench_scale_by_cofactor(c: &mut Criterion) {
     */
     c.bench(
         "cofactor",
-        ParameterizedBenchmark::new("naive", |b, i| b.iter(|| {
-            (*i).into_affine().scale_by_cofactor();
-        }), points).with_function("scott", |b, i| b.iter(|| {
-            scale_by_cofactor_scott::<Bls12_377Parameters>(i);
-        })).with_function("fuentes", |b, i| b.iter(|| {
-            scale_by_cofactor_fuentes::<Bls12_377Parameters>(i);
-        }))
+        ParameterizedBenchmark::new(
+            "naive",
+            |b, i| {
+                b.iter(|| {
+                    (*i).into_affine().scale_by_cofactor();
+                })
+            },
+            points,
+        )
+        .with_function("scott", |b, i| {
+            b.iter(|| {
+                scale_by_cofactor_scott::<Bls12_377Parameters>(i);
+            })
+        })
+        .with_function("fuentes", |b, i| {
+            b.iter(|| {
+                scale_by_cofactor_fuentes::<Bls12_377Parameters>(i);
+            })
+        }),
     );
 }
 

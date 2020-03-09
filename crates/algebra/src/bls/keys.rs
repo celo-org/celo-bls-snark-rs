@@ -1,32 +1,29 @@
 use crate::curve::hash::HashToG1;
 
-use lru::LruCache;
 use lazy_static::lazy_static;
+use lru::LruCache;
 use std::{
-    sync::Mutex,
-    hash::{Hash, Hasher},
     collections::HashSet,
+    hash::{Hash, Hasher},
+    sync::Mutex,
 };
 
 use algebra::{
-    Zero, One,
-    bytes::{
-        FromBytes,
-        ToBytes
+    bls12_377::{
+        g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters,
+        Bls12_377, Fq, Fq12, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective,
+        Parameters as Bls12_377Parameters,
     },
-    bls12_377::{Fq12, Fq, Fq2, Fr,
-        Bls12_377, Parameters as Bls12_377Parameters, g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters, G1Affine, G1Projective, G2Affine, G2Projective,
-    },
-    AffineCurve, PairingEngine, ProjectiveCurve,
+    bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
-    Field, PrimeField, SquareRootField,
-    UniformRand,
+    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField,
+    UniformRand, Zero,
 };
 use rand::Rng;
 
 use std::{
-    fmt::{self, Display},
     error::Error,
+    fmt::{self, Display},
 };
 
 pub static SIG_DOMAIN: &[u8] = b"ULforxof";
@@ -56,16 +53,30 @@ impl PrivateKey {
         self.sk.clone()
     }
 
-    pub fn sign<H: HashToG1>(&self, message: &[u8], extra_data: &[u8], hash_to_g1: &H) -> Result<Signature, Box<dyn Error>> {
+    pub fn sign<H: HashToG1>(
+        &self,
+        message: &[u8],
+        extra_data: &[u8],
+        hash_to_g1: &H,
+    ) -> Result<Signature, Box<dyn Error>> {
         self.sign_message(SIG_DOMAIN, message, extra_data, hash_to_g1)
     }
 
-    pub fn sign_pop<H: HashToG1>(&self, message: &[u8], hash_to_g1: &H) -> Result<Signature, Box<dyn Error>> {
+    pub fn sign_pop<H: HashToG1>(
+        &self,
+        message: &[u8],
+        hash_to_g1: &H,
+    ) -> Result<Signature, Box<dyn Error>> {
         self.sign_message(POP_DOMAIN, &message, &[], hash_to_g1)
     }
 
-
-    fn sign_message<H: HashToG1>(&self, domain: &[u8], message: &[u8], extra_data: &[u8], hash_to_g1: &H) -> Result<Signature, Box<dyn  Error>> {
+    fn sign_message<H: HashToG1>(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+        hash_to_g1: &H,
+    ) -> Result<Signature, Box<dyn Error>> {
         Ok(Signature::from_sig(
             &hash_to_g1
                 .hash::<Bls12_377Parameters>(domain, message, extra_data)?
@@ -101,7 +112,7 @@ pub enum BLSError {
 impl Display for BLSError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BLSError::VerificationFailed => write!(f, "signature verification failed")
+            BLSError::VerificationFailed => write!(f, "signature verification failed"),
         }
     }
 }
@@ -147,9 +158,10 @@ impl PublicKey {
         let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
             &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
         );
-        let y = x3b.sqrt().ok_or(
-            io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
-        )?;
+        let y = x3b.sqrt().ok_or(io::Error::new(
+            io::ErrorKind::NotFound,
+            "couldn't find square root for x",
+        ))?;
 
         let y_c0_big = y.c0.into_repr();
         let y_c1_big = y.c1.into_repr();
@@ -223,8 +235,8 @@ impl PublicKey {
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
         // This byte-level equality operator differs from the (much slower) semantic
-        // equality operator in G2Projective.  We require byte-level equality here 
-        // for HashSet to work correctly.  HashSet requires that item equality 
+        // equality operator in G2Projective.  We require byte-level equality here
+        // for HashSet to work correctly.  HashSet requires that item equality
         // implies hash equality.
         self.pk.x == other.pk.x && self.pk.y == other.pk.y && self.pk.z == other.pk.z
     }
@@ -322,9 +334,10 @@ impl FromBytes for Signature {
         let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
             &((x.square() * &x) + &<Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
         );
-        let y = x3b.sqrt().ok_or(
-            io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
-        )?;
+        let y = x3b.sqrt().ok_or(io::Error::new(
+            io::ErrorKind::NotFound,
+            "couldn't find square root for x",
+        ))?;
         let negy = -y;
         let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
         let sig = G1Affine::new(x, chosen_y, false);
@@ -333,13 +346,13 @@ impl FromBytes for Signature {
 }
 
 struct AggregateCacheState {
-    keys : HashSet<PublicKey>,
-    combined : G2Projective,
+    keys: HashSet<PublicKey>,
+    combined: G2Projective,
 }
 
 lazy_static! {
     static ref FROM_VEC_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
-    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState{
+    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState {
         keys: HashSet::new(),
         combined: G2Projective::zero().clone()
     });
@@ -363,7 +376,10 @@ impl PublicKeyCache {
         if cached_result.is_none() {
             // cache miss
             let generated_result = PublicKey::from_vec(data)?;
-            FROM_VEC_CACHE.lock().unwrap().put(data.to_owned(), generated_result.clone());
+            FROM_VEC_CACHE
+                .lock()
+                .unwrap()
+                .put(data.to_owned(), generated_result.clone());
             Ok(generated_result)
         } else {
             // cache hit
@@ -379,7 +395,7 @@ impl PublicKeyCache {
     pub fn aggregate(public_keys: &[&PublicKey]) -> PublicKey {
         // The set of validators changes slowly, so for speed we will compute the
         // difference from the last call and do an incremental update
-        let mut keys : HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
+        let mut keys: HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
         for key in public_keys.iter() {
             keys.insert((*key).clone());
         }
@@ -404,10 +420,8 @@ impl PublicKeyCache {
 mod test {
     use super::*;
     use crate::{
-        curve::hash::try_and_increment::TryAndIncrement, hash::{
-            direct::DirectHasher,
-            composite::CompositeHasher,
-        },
+        curve::hash::try_and_increment::TryAndIncrement,
+        hash::{composite::CompositeHasher, direct::DirectHasher},
     };
     use rand::thread_rng;
 
@@ -432,7 +446,8 @@ mod test {
 
             let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
             let pk = sk.to_public();
-            pk.verify(&message[..], &[], &sig, &try_and_increment).unwrap();
+            pk.verify(&message[..], &[], &sig, &try_and_increment)
+                .unwrap();
             let message2 = b"goodbye";
             pk.verify(&message2[..], &[], &sig, &try_and_increment)
                 .unwrap_err();
@@ -456,7 +471,8 @@ mod test {
 
             let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
             let pk = sk.to_public();
-            pk.verify(&message[..], &[], &sig, &try_and_increment).unwrap();
+            pk.verify(&message[..], &[], &sig, &try_and_increment)
+                .unwrap();
             let message2 = b"goodbye";
             pk.verify(&message2[..], &[], &sig, &try_and_increment)
                 .unwrap_err();
@@ -501,7 +517,8 @@ mod test {
 
         let apk = PublicKeyCache::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
         let asig = Signature::aggregate(&[&sig1, &sig2]);
-        apk.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
+        apk.verify(&message[..], &[], &asig, &try_and_increment)
+            .unwrap();
         apk.verify(&message[..], &[], &sig1, &try_and_increment)
             .unwrap_err();
         sk1.to_public()
@@ -512,16 +529,22 @@ mod test {
             .unwrap_err();
 
         let apk2 = PublicKeyCache::aggregate(&[&sk1.to_public()]);
-        apk2.verify(&message[..], &[], &asig, &try_and_increment).unwrap_err();
-        apk2.verify(&message[..], &[], &sig1, &try_and_increment).unwrap();
+        apk2.verify(&message[..], &[], &asig, &try_and_increment)
+            .unwrap_err();
+        apk2.verify(&message[..], &[], &sig1, &try_and_increment)
+            .unwrap();
 
         let apk3 = PublicKeyCache::aggregate(&[&sk2.to_public(), &sk1.to_public()]);
-        apk3.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
-        apk3.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
+        apk3.verify(&message[..], &[], &asig, &try_and_increment)
+            .unwrap();
+        apk3.verify(&message[..], &[], &sig1, &try_and_increment)
+            .unwrap_err();
 
         let apk4 = PublicKey::aggregate(&[&sk1.to_public(), &sk2.to_public()]);
-        apk4.verify(&message[..], &[], &asig, &try_and_increment).unwrap();
-        apk4.verify(&message[..], &[], &sig1, &try_and_increment).unwrap_err();
+        apk4.verify(&message[..], &[], &asig, &try_and_increment)
+            .unwrap();
+        apk4.verify(&message[..], &[], &sig1, &try_and_increment)
+            .unwrap_err();
     }
 
     #[test]
@@ -548,7 +571,12 @@ mod test {
         let direct_hasher = DirectHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&direct_hasher);
 
-        let sk_bytes = Fr::read(hex::decode("e3990a59d80a91429406be0000677a7eea8b96c5b429c70c71dabc3b7cf80d0a").unwrap().as_slice()).unwrap();
+        let sk_bytes = Fr::read(
+            hex::decode("e3990a59d80a91429406be0000677a7eea8b96c5b429c70c71dabc3b7cf80d0a")
+                .unwrap()
+                .as_slice(),
+        )
+        .unwrap();
         let sk = PrivateKey::from_sk(&sk_bytes);
 
         let pk = sk.to_public();
@@ -556,7 +584,12 @@ mod test {
         pk.write(&mut pk_bytes).unwrap();
         println!("pk: {}", hex::encode(&pk_bytes));
 
-        let sig = sk.sign_pop(&hex::decode("a0Af2E71cECc248f4a7fD606F203467B500Dd53B").unwrap(), &try_and_increment).unwrap();
+        let sig = sk
+            .sign_pop(
+                &hex::decode("a0Af2E71cECc248f4a7fD606F203467B500Dd53B").unwrap(),
+                &try_and_increment,
+            )
+            .unwrap();
         let mut sig_bytes = vec![];
         sig.write(&mut sig_bytes).unwrap();
 

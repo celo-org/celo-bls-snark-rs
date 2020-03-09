@@ -1,17 +1,10 @@
-use bls_zexe::{
-    PrivateKey,
-    TryAndIncrement,
-    DirectHasher,
-};
+use bls_zexe::{DirectHasher, PrivateKey, TryAndIncrement};
 
-use algebra::bytes::{ToBytes};
+use algebra::bytes::ToBytes;
 
 use clap::{App, Arg};
 use rand::thread_rng;
-use std::{
-    io::Write,
-    fs::File
-};
+use std::{fs::File, io::Write};
 
 fn main() {
     let matches = App::new("BLS Proof of Possession test vectors")
@@ -52,8 +45,18 @@ fn main() {
         let mut sk_bytes = vec![];
         sk.write(&mut sk_bytes).unwrap();
 
-        pk.verify_pop(&address_bytes, &pop, &try_and_increment).unwrap();
+        pk.verify_pop(&address_bytes, &pop, &try_and_increment)
+            .unwrap();
 
-        file.write_all(format!("{},{},{}\n", hex::encode(sk_bytes), hex::encode(pk_bytes), hex::encode(pop_bytes)).as_bytes()).unwrap();
+        file.write_all(
+            format!(
+                "{},{},{}\n",
+                hex::encode(sk_bytes),
+                hex::encode(pk_bytes),
+                hex::encode(pop_bytes)
+            )
+            .as_bytes(),
+        )
+        .unwrap();
     }
 }

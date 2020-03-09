@@ -3,28 +3,36 @@ extern crate hex;
 use crate::hash::XOF;
 
 use blake2s_simd::Params;
-use byteorder::{WriteBytesExt, LittleEndian};
+use byteorder::{LittleEndian, WriteBytesExt};
 use std::error::Error;
 
-pub struct DirectHasher {
-}
+pub struct DirectHasher {}
 
 impl DirectHasher {
     pub fn new() -> Result<DirectHasher, Box<dyn Error>> {
         Ok(DirectHasher {})
     }
-
 }
 
-fn xof_digest_length_to_node_offset(node_offset: u64, xof_digest_length: usize) -> Result<u64, Box<dyn Error>> {
+fn xof_digest_length_to_node_offset(
+    node_offset: u64,
+    xof_digest_length: usize,
+) -> Result<u64, Box<dyn Error>> {
     let mut xof_digest_length_bytes: [u8; 2] = [0; 2];
     (&mut xof_digest_length_bytes[..]).write_u16::<LittleEndian>(xof_digest_length as u16)?;
-    let offset = node_offset as u64 | ((xof_digest_length_bytes[0] as u64) << 32) | ((xof_digest_length_bytes[1] as u64) << 40);
+    let offset = node_offset as u64
+        | ((xof_digest_length_bytes[0] as u64) << 32)
+        | ((xof_digest_length_bytes[1] as u64) << 40);
     Ok(offset)
 }
 
 impl XOF for DirectHasher {
-    fn crh(&self, domain: &[u8], message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn crh(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        xof_digest_length: usize,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
         let hash_result = Params::new()
             .hash_length(32)
             .node_offset(xof_digest_length_to_node_offset(0, xof_digest_length)?)
@@ -37,7 +45,12 @@ impl XOF for DirectHasher {
         Ok(hash_result.to_vec())
     }
 
-    fn xof(&self, domain: &[u8], hashed_message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn xof(
+        &self,
+        domain: &[u8],
+        hashed_message: &[u8],
+        xof_digest_length: usize,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
         if domain.len() > 8 {
             return Err(format!("domain length is too large: {}", domain.len()).into());
         }
@@ -45,7 +58,11 @@ impl XOF for DirectHasher {
 
         let mut result = vec![];
         for i in 0..num_hashes {
-            let hash_length = if i == num_hashes - 1 && (xof_digest_length % 32 != 0) { xof_digest_length % 32 } else { 32 };
+            let hash_length = if i == num_hashes - 1 && (xof_digest_length % 32 != 0) {
+                xof_digest_length % 32
+            } else {
+                32
+            };
             let mut hash_result = Params::new()
                 .hash_length(hash_length)
                 .max_leaf_length(32)
@@ -53,7 +70,10 @@ impl XOF for DirectHasher {
                 .fanout(0)
                 .max_depth(0)
                 .personal(domain)
-                .node_offset(xof_digest_length_to_node_offset(i as u64, xof_digest_length)?)
+                .node_offset(xof_digest_length_to_node_offset(
+                    i as u64,
+                    xof_digest_length,
+                )?)
                 .to_state()
                 .update(hashed_message)
                 .finalize()
@@ -66,7 +86,12 @@ impl XOF for DirectHasher {
     }
 
     // Implements blake2x as described in: https://blake2.net/blake2x.pdf
-    fn hash(&self, domain: &[u8], message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn hash(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        xof_digest_length: usize,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
         let prepared_message = self.crh(domain, message, xof_digest_length)?;
         self.xof(domain, &prepared_message, xof_digest_length)
     }
@@ -83,24 +108,30 @@ mod test {
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
         let hasher = Hasher::new().unwrap();
-        let _result = hasher.crh(&[],&msg, 96).unwrap();
+        let _result = hasher.crh(&[], &msg, 96).unwrap();
     }
 
     #[test]
     fn test_crh_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.crh(&[],&msg, 96).unwrap();
+        let _result = hasher.crh(&[], &msg, 96).unwrap();
     }
 
     #[test]
     fn test_xof_random_96() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -112,7 +143,10 @@ mod test {
     #[test]
     fn test_hash_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -134,7 +168,13 @@ mod test {
             "bfec8b58ee2e2e32008eb9d7d304914ea756ecb31879eb2318e066c182b0e77e6a518e366f345692e29f497515f799895983200f0d7dafa65c83a7506c03e8e5eee387cffdb27a0e6f5f3e9cb0ccbcfba827984586f608769f08f6b1a84872",
         )];
         for test_vector in &test_vectors {
-            let bytes = hasher.hash(b"", &hex::decode(test_vector.0).unwrap(), test_vector.1.len()/2).unwrap();
+            let bytes = hasher
+                .hash(
+                    b"",
+                    &hex::decode(test_vector.0).unwrap(),
+                    test_vector.1.len() / 2,
+                )
+                .unwrap();
             assert_eq!(hex::encode(&bytes), test_vector.1);
         }
     }

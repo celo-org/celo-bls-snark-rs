@@ -1,10 +1,6 @@
-use bls_zexe::{
-    PrivateKey, PublicKey, Signature,
-    TryAndIncrement,
-    CompositeHasher,
-};
+use bls_zexe::{CompositeHasher, PrivateKey, PublicKey, Signature, TryAndIncrement};
 
-use algebra::{ToBytes, to_bytes};
+use algebra::{to_bytes, ToBytes};
 
 use clap::{App, Arg};
 use rand::thread_rng;
@@ -42,11 +38,17 @@ fn main() {
 
     println!("Starting!\n\n");
 
-    let sig1 = sk1.sign(&message.as_bytes(), &[], &try_and_increment).unwrap();
+    let sig1 = sk1
+        .sign(&message.as_bytes(), &[], &try_and_increment)
+        .unwrap();
     println!("sig1: {}", hex::encode(to_bytes!(sig1.get_sig()).unwrap()));
-    let sig2 = sk2.sign(&message.as_bytes(), &[], &try_and_increment).unwrap();
+    let sig2 = sk2
+        .sign(&message.as_bytes(), &[], &try_and_increment)
+        .unwrap();
     println!("sig2: {}", hex::encode(to_bytes!(sig2.get_sig()).unwrap()));
-    let sig3 = sk3.sign(&message.as_bytes(), &[], &try_and_increment).unwrap();
+    let sig3 = sk3
+        .sign(&message.as_bytes(), &[], &try_and_increment)
+        .unwrap();
     println!("sig3: {}", hex::encode(to_bytes!(sig3.get_sig()).unwrap()));
 
     let apk = PublicKey::aggregate(&[

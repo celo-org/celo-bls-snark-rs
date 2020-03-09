@@ -1,6 +1,4 @@
-use bls_zexe::{
-    PrivateKey, TryAndIncrement, DirectHasher,
-};
+use bls_zexe::{DirectHasher, PrivateKey, TryAndIncrement};
 
 use algebra::bytes::{FromBytes, ToBytes};
 

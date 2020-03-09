@@ -1,13 +1,13 @@
 extern crate hex;
 
-use crate::hash::XOF;
 use super::direct::DirectHasher;
+use crate::hash::XOF;
 
 use algebra::{bytes::ToBytes, edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
-    pedersen::PedersenWindow,
     bowe_hopwood::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenParameters},
+    pedersen::PedersenWindow,
     FixedLengthCRH,
 };
 use rand::{Rng, SeedableRng};
@@ -35,7 +35,7 @@ impl CompositeHasher {
     pub fn new() -> Result<CompositeHasher, Box<dyn Error>> {
         Ok(CompositeHasher {
             parameters: CompositeHasher::setup_crh()?,
-            direct_hasher: DirectHasher{},
+            direct_hasher: DirectHasher {},
         })
     }
     fn prng() -> Result<impl Rng, Box<dyn Error>> {
@@ -47,7 +47,7 @@ impl CompositeHasher {
             .finalize()
             .as_ref()
             .to_vec();
-        let mut seed = [0;32];
+        let mut seed = [0; 32];
         seed.copy_from_slice(&hash_result[..32]);
         Ok(ChaChaRng::from_seed(seed))
     }
@@ -65,14 +65,24 @@ impl XOF for CompositeHasher {
         h.x.write(&mut res)?;
 
         Ok(res)
-
     }
 
-    fn xof(&self, domain: &[u8], hashed_message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        self.direct_hasher.xof(domain, hashed_message, xof_digest_length)
+    fn xof(
+        &self,
+        domain: &[u8],
+        hashed_message: &[u8],
+        xof_digest_length: usize,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        self.direct_hasher
+            .xof(domain, hashed_message, xof_digest_length)
     }
 
-    fn hash(&self, domain: &[u8], message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn hash(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        xof_digest_length: usize,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
         let prepared_message = self.crh(domain, message, xof_digest_length)?;
         self.xof(domain, &prepared_message, xof_digest_length)
     }
@@ -96,18 +106,24 @@ mod test {
     #[test]
     fn test_crh_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.crh(&[],  &msg, 96).unwrap();
+        let _result = hasher.crh(&[], &msg, 96).unwrap();
     }
 
     #[test]
     fn test_xof_random_768() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -119,7 +135,10 @@ mod test {
     #[test]
     fn test_xof_random_769() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x0d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x0d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -131,7 +150,10 @@ mod test {
     #[test]
     fn test_xof_random_96() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 32];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -143,7 +165,10 @@ mod test {
     #[test]
     fn test_hash_random() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 9820 * 4 / 8];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -155,7 +180,10 @@ mod test {
     #[should_panic]
     fn test_invalid_message() {
         let hasher = Hasher::new().unwrap();
-        let mut rng = XorShiftRng::from_seed([0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let mut msg: Vec<u8> = vec![0; 100_000];
         for i in msg.iter_mut() {
             *i = rng.gen();
@@ -223,12 +251,12 @@ mod test {
         let hasher = CompositeHasher::new().unwrap();
 
         let hex_msg = hex::encode(&[0b10]);
-        println!("{}",  hex_msg.to_string());
+        println!("{}", hex_msg.to_string());
         let to_hash = hex::decode(&hex_msg).unwrap();
         println!("{:?}", to_hash);
         let mut test_hash = hasher.crh(&[], &to_hash, 96).unwrap();
         test_hash.reverse();
         let hex_hash = hex::encode(&test_hash);
-        println!("{}", hex_hash.to_string() );
+        println!("{}", hex_hash.to_string());
     }
 }

@@ -4,7 +4,7 @@ pub mod curve;
 pub mod hash;
 
 // Clean public API
-pub use bls::keys::{PublicKey, PrivateKey, Signature};
+pub use bls::keys::{PrivateKey, PublicKey, Signature};
 pub use curve::hash::try_and_increment::TryAndIncrement;
 pub use hash::{composite::CompositeHasher, direct::DirectHasher};
 
@@ -12,32 +12,25 @@ use lazy_static::lazy_static;
 use log::error;
 
 use crate::{
-    bls::keys::{PublicKeyCache, SIG_DOMAIN, POP_DOMAIN},
+    bls::keys::{PublicKeyCache, POP_DOMAIN, SIG_DOMAIN},
     curve::hash::HashToG1,
 };
-use algebra::{ProjectiveCurve, AffineCurve, FromBytes, ToBytes, bls12_377::{Parameters as Bls12_377Parameters, G1Affine, G2Affine, Fq, Fq2}};
-use rand::thread_rng;
-use std::{
-    fmt::Display,
-    error::Error,
+use algebra::{
+    bls12_377::{Fq, Fq2, G1Affine, G2Affine, Parameters as Bls12_377Parameters},
+    AffineCurve, FromBytes, ProjectiveCurve, ToBytes,
 };
+use rand::thread_rng;
 use std::os::raw::c_int;
 use std::slice;
-
+use std::{error::Error, fmt::Display};
 
 lazy_static! {
-    static ref COMPOSITE_HASHER: CompositeHasher = {
-        CompositeHasher::new().unwrap()
-    };
-    static ref DIRECT_HASHER: DirectHasher = {
-        DirectHasher::new().unwrap()
-    };
-    static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> = {
-        TryAndIncrement::new(&*COMPOSITE_HASHER)
-    };
-    static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> = {
-        TryAndIncrement::new(&*DIRECT_HASHER)
-    };
+    static ref COMPOSITE_HASHER: CompositeHasher = { CompositeHasher::new().unwrap() };
+    static ref DIRECT_HASHER: DirectHasher = { DirectHasher::new().unwrap() };
+    static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> =
+        { TryAndIncrement::new(&*COMPOSITE_HASHER) };
+    static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> =
+        { TryAndIncrement::new(&*DIRECT_HASHER) };
 }
 
 fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
@@ -51,7 +44,7 @@ fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool 
 }
 
 #[no_mangle]
-/// Initializes the lazily evaluated hashers. Should 
+/// Initializes the lazily evaluated hashers. Should
 pub extern "C" fn init() {
     &*COMPOSITE_HASH_TO_G1;
     &*DIRECT_HASH_TO_G1;
@@ -147,7 +140,8 @@ pub extern "C" fn sign_message(
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
+        let extra_data =
+            unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
         let signature = if should_use_composite {
             private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G1)?
         } else {
@@ -171,7 +165,7 @@ pub extern "C" fn sign_pop(
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let private_key = unsafe { &*in_private_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let signature = private_key.sign_pop( message, &*DIRECT_HASH_TO_G1)?;
+        let signature = private_key.sign_pop(message, &*DIRECT_HASH_TO_G1)?;
         unsafe {
             *out_signature = Box::into_raw(Box::new(signature));
         }
@@ -218,8 +212,10 @@ pub extern "C" fn hash_composite(
 ) -> bool {
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let hash = COMPOSITE_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, extra_data)?;
+        let extra_data =
+            unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
+        let hash =
+            COMPOSITE_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, extra_data)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
@@ -358,12 +354,17 @@ pub extern "C" fn verify_signature(
     convert_result_to_bool::<_, std::io::Error, _>(|| {
         let public_key = unsafe { &*in_public_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let extra_data = unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
+        let extra_data =
+            unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
         let signature = unsafe { &*in_signature };
         let verified = if should_use_composite {
-            public_key.verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G1).is_ok()
+            public_key
+                .verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G1)
+                .is_ok()
         } else {
-            public_key.verify(message, extra_data, signature, &*DIRECT_HASH_TO_G1).is_ok()
+            public_key
+                .verify(message, extra_data, signature, &*DIRECT_HASH_TO_G1)
+                .is_ok()
         };
         unsafe { *out_verified = verified };
 
@@ -383,7 +384,9 @@ pub extern "C" fn verify_pop(
         let public_key = unsafe { &*in_public_key };
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let signature = unsafe { &*in_signature };
-        let verified = public_key.verify_pop(message, signature, &*DIRECT_HASH_TO_G1).is_ok();
+        let verified = public_key
+            .verify_pop(message, signature, &*DIRECT_HASH_TO_G1)
+            .is_ok();
         unsafe { *out_verified = verified };
 
         Ok(())
@@ -431,7 +434,7 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .collect::<Vec<&PublicKey>>();
         let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
         let prepared_aggregated_public_key = PublicKey::from_pk(
-            &(aggregated_public_key.get_pk() - aggregated_public_key_to_subtract.get_pk())
+            &(aggregated_public_key.get_pk() - aggregated_public_key_to_subtract.get_pk()),
         );
         unsafe {
             *out_public_key = Box::into_raw(Box::new(prepared_aggregated_public_key));

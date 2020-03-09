@@ -1,12 +1,11 @@
+use algebra::{One, Zero};
 use std::ops::{Div, Neg};
-use algebra::{Zero, One};
 
 use algebra::{
     biginteger::BigInteger,
-    bls12::{Bls12Parameters, G2Affine, G1Projective, G2Projective},
-    ModelParameters,
-    AffineCurve, ProjectiveCurve,
+    bls12::{Bls12Parameters, G1Projective, G2Affine, G2Projective},
     fields::{fp12_2over3over2::Fp12, fp6_3over2::Fp6, BitIterator, Field, Fp2, PrimeField},
+    AffineCurve, ModelParameters, ProjectiveCurve,
 };
 
 /// The sextic twist is constructed the quadratic and cubic non-residue, called w in Fp12.
@@ -133,18 +132,16 @@ pub fn scale_by_cofactor_g1<P: Bls12Parameters>(p: &G1Projective<P>) -> G1Projec
 
 #[cfg(test)]
 mod test {
-    use rand_xorshift::XorShiftRng;
     use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
     use std::str::FromStr;
 
     use super::{curve_x, psi, scale_by_cofactor_fuentes, scale_by_cofactor_scott};
 
     use algebra::{
-        Zero,
-        PrimeField, FpParameters, ModelParameters, ProjectiveCurve, BigInteger,
+        bls12_377::{Fr, G2Projective, Parameters as Bls12_377Parameters},
         curves::bls12::Bls12Parameters,
-        bls12_377::{G2Projective, Fr, Parameters as Bls12_377Parameters},
-        BitIterator,
+        BigInteger, BitIterator, FpParameters, ModelParameters, PrimeField, ProjectiveCurve, Zero,
     };
 
     fn curve_r_modulus<P: Bls12Parameters>() -> <P::G2Parameters as ModelParameters>::ScalarField {
@@ -162,7 +159,10 @@ mod test {
 
     #[test]
     fn test_twist_untwist() {
-        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
 
         let p: G2Projective = rng.gen();
         assert_eq!(psi::<Bls12_377Parameters>(&p, 0), p);
@@ -170,7 +170,10 @@ mod test {
 
     #[test]
     fn test_scale_by_cofactor_scott() {
-        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
 
         for _i in 0..5 {
             let p: G2Projective = rng.gen();
@@ -186,7 +189,10 @@ mod test {
 
     #[test]
     fn test_scale_by_cofactor_fuentes() {
-        let mut rng = XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         let x = curve_x::<Bls12_377Parameters>();
 
         for _i in 0..5 {
@@ -202,5 +208,4 @@ mod test {
             assert!(fuentes_cofactor.mul(modulus).is_zero());
         }
     }
-
 }
