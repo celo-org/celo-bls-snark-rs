@@ -3,7 +3,7 @@ pub mod encoding;
 #[macro_use]
 extern crate log;
 
-use bls_zexe::PublicKey;
+use bls_crypto::PublicKey;
 
 use std::{
     error::Error,

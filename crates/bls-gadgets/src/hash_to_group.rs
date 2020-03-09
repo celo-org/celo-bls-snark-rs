@@ -21,7 +21,7 @@ use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     edwards_sw6::EdwardsProjective,
 };
-use bls_zexe::{
+use bls_crypto::{
     bls::keys::SIG_DOMAIN,
     curve::hash::try_and_increment::get_point_from_x_g1,
     hash::composite::{CompositeHasher, CRH},
@@ -288,7 +288,7 @@ mod test {
     use algebra::bls12_377;
     use r1cs_std::{groups::GroupGadget, test_constraint_system::TestConstraintSystem};
 
-    use bls_zexe::{bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement};
+    use bls_crypto::{bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement};
     use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
 

@@ -3,6 +3,6 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../target/i686-unknown-linux-gnu/release -lbls_zexe -lbls_snark -ldl -lm
+#cgo LDFLAGS: -L../target/i686-unknown-linux-gnu/release -lbls_crypto -lbls_snark -ldl -lm
 */
 import "C"

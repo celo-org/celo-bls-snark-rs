@@ -129,26 +129,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bls-snark"
-version = "0.1.0"
-dependencies = [
- "algebra",
- "bench-utils",
- "blake2s_simd",
- "bls-zexe",
- "byteorder",
- "crypto-primitives",
- "groth16",
- "hex",
- "log",
- "r1cs-core",
- "r1cs-std",
- "rand",
- "rand_xorshift",
-]
-
-[[package]]
-name = "bls-zexe"
+name = "bls-crypto"
 version = "0.1.0"
 dependencies = [
  "algebra",
@@ -166,6 +147,19 @@ dependencies = [
  "lru",
  "rand",
  "rand_chacha",
+ "rand_xorshift",
+]
+
+[[package]]
+name = "bls-gadgets"
+version = "0.1.0"
+dependencies = [
+ "algebra",
+ "bls-crypto",
+ "crypto-primitives",
+ "r1cs-core",
+ "r1cs-std",
+ "rand",
  "rand_xorshift",
 ]
 
@@ -452,6 +446,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "epoch-snark"
+version = "0.1.0"
+dependencies = [
+ "algebra",
+ "bench-utils",
+ "blake2s_simd",
+ "bls-crypto",
+ "byteorder",
+ "crypto-primitives",
+ "groth16",
+ "hex",
+ "log",
+ "r1cs-core",
+ "r1cs-std",
+ "rand",
+ "rand_xorshift",
+]
+
+[[package]]
 name = "ff-fft"
 version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#d190054f587791da790d372be62867809e251f12"
@@ -466,19 +479,6 @@ name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
-
-[[package]]
-name = "gadgets"
-version = "0.1.0"
-dependencies = [
- "algebra",
- "bls-zexe",
- "crypto-primitives",
- "r1cs-core",
- "r1cs-std",
- "rand",
- "rand_xorshift",
-]
 
 [[package]]
 name = "generic-array"

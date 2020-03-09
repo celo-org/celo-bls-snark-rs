@@ -3,6 +3,6 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../target/x86_64-apple-darwin/release -L../target/release -lbls_zexe -lbls_snark -ldl -lm
+#cgo LDFLAGS: -L../target/x86_64-apple-darwin/release -L../target/release -lbls_crypto -lbls_snark -ldl -lm
 */
 import "C"

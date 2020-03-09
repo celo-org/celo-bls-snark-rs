@@ -10,35 +10,7 @@ All Rust crates live under the `crates/` directory. You can import them in your 
 
 ### Go and FFI
 
-A Go package consuming the library exists in the `go` directory. 
-
-#### Example
-
-Consuming the `go` code is works as follows (assume a `main.go` file example)
-
-```go
-package main
-
-import "github.com/celo-org/bls-zexe/go"
-
-fn main() {
-    bls.initCrypto()
-    // do something
-}
-```
-
-If building on Linux:
-```
-cargo build --release --lib
-LDFLAGS: -L./target/release -lbls_zexe -lbls_snark -ldl -lm
-```
-
-For other architectures (listed below), you need to use different build flags both for `cargo` and for `LDFLAGS` when linking to the library. Go's supported architectures and operating systems are listed [here](https://github.com/golang/go/blob/ad366fdbe40eea7f4fbdc75e8a27304c696793f1/src/cmd/dist/build.go#L54-L82).
-
-```
-cargo build --release --target=$ARCH --lib
-LDFLAGS: -L./target/$ARCH/release -lbls_zexe -lbls_snark -ldl -lm
-```
+A Go package consuming the library exists in the `go` directory, using `cgo`.
 
 ## Quick start
 

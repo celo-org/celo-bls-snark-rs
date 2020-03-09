@@ -2,7 +2,7 @@ use algebra::{
     bls12_377::{Fq, FqParameters},
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
-use bls_zexe::PublicKey;
+use bls_crypto::PublicKey;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::error::Error;
 

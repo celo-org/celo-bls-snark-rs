@@ -1,11 +1,11 @@
 [package]
-name = "bls-snark"
+name = "epoch-snark"
 version = "0.1.0"
 authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org>"]
 edition = "2018"
 
 [dependencies]
-bls-zexe = { path = "../algebra" }
+bls-crypto = { path = "../bls-crypto" }
 
 algebra = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "sw6", "edwards_sw6", "edwards_bls12"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe" }

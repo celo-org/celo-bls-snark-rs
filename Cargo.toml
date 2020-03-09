@@ -1,9 +1,9 @@
 [workspace]
 
 members = [ 
-    "crates/algebra", 
-    "crates/snark",
-    "crates/gadgets",
+    "crates/bls-crypto", 
+    "crates/bls-gadgets",
+    "crates/epoch-snark",
 ]
 
 [profile.release]

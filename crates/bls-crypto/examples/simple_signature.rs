@@ -1,4 +1,4 @@
-use bls_zexe::{CompositeHasher, PrivateKey, PublicKey, Signature, TryAndIncrement};
+use bls_crypto::{CompositeHasher, PrivateKey, PublicKey, Signature, TryAndIncrement};
 
 use algebra::{to_bytes, ToBytes};
 
