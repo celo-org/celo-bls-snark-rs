@@ -34,7 +34,7 @@ impl XOF for DirectHasher {
             .finalize()
             .as_ref()
             .to_vec();
-        return Ok(hash_result.to_vec());
+        Ok(hash_result.to_vec())
     }
 
     fn xof(&self, domain: &[u8], hashed_message: &[u8], xof_digest_length: usize) -> Result<Vec<u8>, Box<dyn Error>> {

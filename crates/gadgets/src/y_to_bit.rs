@@ -1,3 +1,5 @@
+#![allow(clippy::op_ref)] // clippy throws a false positive around field ops
+
 use algebra::{curves::bls12::Bls12Parameters, One, PrimeField};
 use r1cs_core::SynthesisError;
 use r1cs_std::{
@@ -92,15 +94,9 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
             if pk.y.c1.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
-                if pk.y.c1.get_value().get()?.into_repr() > half {
-                    Ok(true)
-                } else if pk.y.c1.get_value().get()?.into_repr() == half
-                    && pk.y.c0.get_value().get()?.into_repr() > half
-                {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
+                let y_c1 = pk.y.c1.get_value().get()?.into_repr();
+                let y_c0 = pk.y.c1.get_value().get()?.into_repr();
+                Ok(y_c1 > half || (y_c1 == half && y_c0 > half))
             } else {
                 Err(SynthesisError::AssignmentMissing)
             }

@@ -81,7 +81,7 @@ mod tests {
     ) -> TestConstraintSystem<Fq> {
         let mut cs = TestConstraintSystem::<Fq>::new();
         let bitmap = bitmap
-            .into_iter()
+            .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
         enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, max_number, is_one).unwrap();

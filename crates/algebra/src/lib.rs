@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 pub mod bls;
 pub mod curve;
 pub mod hash;
@@ -26,20 +27,16 @@ use std::slice;
 
 lazy_static! {
     static ref COMPOSITE_HASHER: CompositeHasher = {
-        let composite_hasher = CompositeHasher::new().unwrap();
-        composite_hasher
+        CompositeHasher::new().unwrap()
     };
     static ref DIRECT_HASHER: DirectHasher = {
-        let direct_hasher = DirectHasher::new().unwrap();
-        direct_hasher
+        DirectHasher::new().unwrap()
     };
     static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> = {
-        let try_and_increment = TryAndIncrement::new(&*COMPOSITE_HASHER);
-        try_and_increment
+        TryAndIncrement::new(&*COMPOSITE_HASHER)
     };
     static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> = {
-        let try_and_increment = TryAndIncrement::new(&*DIRECT_HASHER);
-        try_and_increment
+        TryAndIncrement::new(&*DIRECT_HASHER)
     };
 }
 
@@ -54,6 +51,7 @@ fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool 
 }
 
 #[no_mangle]
+/// Initializes the lazily evaluated hashers. Should 
 pub extern "C" fn init() {
     &*COMPOSITE_HASH_TO_G1;
     &*DIRECT_HASH_TO_G1;
@@ -67,7 +65,7 @@ pub extern "C" fn generate_private_key(out_private_key: *mut *mut PrivateKey) ->
         *out_private_key = Box::into_raw(Box::new(key));
     }
 
-    return true;
+    true
 }
 
 fn deserialize<T: FromBytes>(in_bytes: *const u8, in_bytes_len: c_int, out: *mut *mut T) -> bool {
@@ -192,9 +190,10 @@ pub extern "C" fn hash_direct(
 ) -> bool {
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let hash = match use_pop {
-            true => DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?, 
-            _ => DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?, 
+        let hash = if use_pop {
+            DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?
+        } else {
+            DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?
         };
         let mut obj_bytes = vec![];
         hash.into_affine().write(&mut obj_bytes)?;
@@ -432,7 +431,7 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .collect::<Vec<&PublicKey>>();
         let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
         let prepared_aggregated_public_key = PublicKey::from_pk(
-            &(aggregated_public_key.get_pk() - &aggregated_public_key_to_subtract.get_pk())
+            &(aggregated_public_key.get_pk() - aggregated_public_key_to_subtract.get_pk())
         );
         unsafe {
             *out_public_key = Box::into_raw(Box::new(prepared_aggregated_public_key));

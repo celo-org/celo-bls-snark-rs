@@ -243,7 +243,7 @@ mod verify_one_message {
         secret_keys: &[E::Fr],
     ) -> (Vec<E::G1Projective>, E::G1Projective) {
         let sigs = secret_keys
-            .into_iter()
+            .iter()
             .map(|key| message_hash.mul(*key))
             .collect::<Vec<_>>();
         let asig = sigs
@@ -267,14 +267,14 @@ mod verify_one_message {
         let signature_var = P::G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
 
         let pub_keys = pub_keys
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, pub_key)| {
                 P::G2Gadget::alloc(cs.ns(|| format!("pub_key_{}", i)), || Ok(pub_key)).unwrap()
             })
             .collect::<Vec<_>>();
         let bitmap = bitmap
-            .into_iter()
+            .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
 

@@ -99,7 +99,7 @@ mod test {
         let old_pub_keys = pubkeys_to_constraints::<P, E>(&mut cs, old_pubkeys, "old");
         let new_pub_keys = pubkeys_to_constraints::<P, E>(&mut cs, new_pubkeys, "new");
         let bitmap = bitmap
-            .into_iter()
+            .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
 

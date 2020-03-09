@@ -1,5 +1,3 @@
-#[allow(unused)]
-#[allow(dead_code)]
 use std::{borrow::Borrow, marker::PhantomData};
 
 use algebra::{
@@ -266,7 +264,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
     {
         // get the cofactor's bits
         let mut x_bits = BitIterator::new(P::G1Parameters::COFACTOR)
-            .map(|b| Boolean::constant(b))
+            .map(Boolean::constant)
             .collect::<Vec<Boolean>>();
 
         // Zexe's mul_bits requires that inputs _MUST_ be in LE form, so we have to reverse

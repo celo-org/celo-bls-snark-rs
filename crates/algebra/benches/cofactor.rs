@@ -3,10 +3,10 @@ extern crate criterion;
 
 use criterion::{Criterion, ParameterizedBenchmark};
 
-use algebra::curves::{
+use algebra::{
     ProjectiveCurve,
     bls12_377::{
-        Bls12_377Parameters,
+        Parameters as Bls12_377Parameters,
         G2Projective
     }
 };
