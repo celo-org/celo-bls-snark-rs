@@ -1,7 +1,17 @@
 mod epoch_data;
 pub use epoch_data::EpochData;
 
+mod hash_to_bits;
+pub use hash_to_bits::HashToBits;
+
 pub mod single_update;
+
+mod pack;
+pub use pack::MultipackGadget;
+
+mod proof_of_compression;
+pub use proof_of_compression::ProofOfCompression;
+
 // some helpers
 use algebra::{bls12_377::Parameters, sw6::Fr, Field};
 use r1cs_std::prelude::*;
