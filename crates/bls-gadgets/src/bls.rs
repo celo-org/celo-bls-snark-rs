@@ -290,7 +290,7 @@ mod verify_one_message {
         // verify them all in 1 call
         let batch_size = 5;
         let num_keys = 7;
-        let mut rng = &mut rand::thread_rng();
+        let rng = &mut rand::thread_rng();
 
         // generate some random messages
         let messages = (0..batch_size)
