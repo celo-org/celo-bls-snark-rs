@@ -23,6 +23,7 @@ rand_xorshift = { version = "0.2" }
 bench-utils = { git = "https://github.com/scipr-lab/zexe" }
 hex = "0.3.2"
 blake2s_simd = "0.5.8"
+bls-gadgets = { path = "../bls-gadgets", features = ["test-helpers"] }
 
 [features]
 print-trace = [ "bench-utils/print-trace" ]

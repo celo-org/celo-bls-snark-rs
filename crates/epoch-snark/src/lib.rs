@@ -1,4 +1,4 @@
-pub mod encoding;
+mod encoding;
 pub mod gadgets;
 
 #[macro_use]

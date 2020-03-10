@@ -73,14 +73,7 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Er
     Ok(bits)
 }
 
-pub fn encode_zero_value_public_key() -> Result<Vec<bool>, Box<dyn Error>> {
-    // x coordinate and a y bit
-    Ok(std::iter::repeat(false)
-        .take(Fq::size_in_bits() + 1)
-        .collect::<Vec<_>>())
-}
-
-pub fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
+fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
     let mut bytes = vec![];
     bytes.write_u16::<LittleEndian>(num)?;
     let bits = bytes
@@ -91,7 +84,7 @@ pub fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
     Ok(bits)
 }
 
-pub fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
+fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
     let mut bytes = vec![];
     bytes.write_u32::<LittleEndian>(num)?;
     let bits = bytes
