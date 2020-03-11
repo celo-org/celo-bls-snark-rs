@@ -1,7 +1,7 @@
 use algebra::{
-    bls12_377::{Bls12_377, Fr as BlsFr, FrParameters},
-    sw6::Fr,
-    FpParameters,
+    bls12_377::{Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters},
+    sw6::{Fr, FrParameters},
+    BigInteger, FpParameters, PrimeField,
 };
 use r1cs_std::bls12_377::PairingGadget;
 use r1cs_std::prelude::*;
@@ -23,6 +23,9 @@ use crypto_primitives::{
 use groth16::{Proof, VerifyingKey};
 
 pub static OUT_DOMAIN: &[u8] = b"ULforout";
+
+use r1cs_std::fields::fp::FpGadget;
+type FrGadget = FpGadget<Fr>;
 
 use crate::gadgets::{HashToBits, MultipackGadget};
 
@@ -48,7 +51,10 @@ impl ProofOfCompression {
         Ok(())
     }
 
-    fn verify_edges<CS: ConstraintSystem<Fr>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn verify_edges<CS: ConstraintSystem<Fr>>(
+        &self,
+        cs: &mut CS,
+    ) -> Result<Vec<FrGadget>, SynthesisError> {
         // Verify the edges
         let mut xof_bits = vec![];
         let first_and_last_bits = [self.first_epoch_bits.clone(), self.last_epoch_bits.clone()];
@@ -88,14 +94,15 @@ impl ProofOfCompression {
         }
 
         // Make the edges public inputs
-        MultipackGadget::pack(
+        // packed over SW6 Fr.
+        let packed = MultipackGadget::pack(
             cs.ns(|| "pack output hash"),
             &xof_bits,
             FrParameters::CAPACITY as usize,
             true,
         )?;
 
-        Ok(())
+        Ok(packed)
     }
 
     /// Ensure that the intermediate BH and Blake2 hashes match
@@ -117,8 +124,8 @@ impl ProofOfCompression {
 
         // The public inputs are the CRH and XOF bits split in `Fr::CAPACITY` chunks
         // encoded in LE
-        let packed_crh_bits = le_chunks(&self.crh_bits, FrParameters::CAPACITY);
-        let packed_xof_bits = le_chunks(&self.xof_bits, FrParameters::CAPACITY);
+        let packed_crh_bits = le_chunks(&self.crh_bits, BlsFrParameters::CAPACITY);
+        let packed_xof_bits = le_chunks(&self.xof_bits, BlsFrParameters::CAPACITY);
 
         let public_inputs: Vec<Vec<Boolean>> = [packed_crh_bits, packed_xof_bits].concat();
 
@@ -144,4 +151,83 @@ fn le_chunks(iter: &[Boolean], chunk_size: u32) -> Vec<Vec<Boolean>> {
             b
         })
         .collect::<Vec<_>>()
+}
+
+use crate::encoding::bytes_to_bits;
+use blake2s_simd::Params;
+
+/// Blake2 hash of the input personalized to `OUT_DOMAIN`
+pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
+    let hash = Params::new()
+        .hash_length(32)
+        .personal(OUT_DOMAIN)
+        .to_state()
+        .update(&bytes)
+        .finalize()
+        .as_ref()
+        .to_vec();
+    let mut bits = bytes_to_bits(&hash, 256);
+    bits.reverse();
+    bits
+}
+
+pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
+    values
+        .chunks(P::CAPACITY as usize)
+        .map(|c| {
+            let b = F::BigInt::from_bits(c);
+            F::from_repr(b)
+        })
+        .collect::<Vec<_>>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::encoding::bytes_to_bits;
+    use rand::RngCore;
+
+    use r1cs_std::test_constraint_system::TestConstraintSystem;
+
+    fn to_bool(iter: &[bool]) -> Vec<Boolean> {
+        iter.iter().map(|b| Boolean::constant(*b)).collect()
+    }
+
+    #[test]
+    fn correct_blake2_hash() {
+        let rng = &mut rand::thread_rng();
+        let mut first_bytes = vec![0; 32];
+        rng.fill_bytes(&mut first_bytes);
+        let mut last_bytes = vec![0; 32];
+        rng.fill_bytes(&mut last_bytes);
+
+        let both_blake_bits = [first_bytes.clone(), last_bytes.clone()]
+            .iter()
+            .map(|b| hash_to_bits(b))
+            .flatten()
+            .collect::<Vec<bool>>();
+
+        // encode each epoch's bytes to LE and pas them to the constraint system
+        let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
+        let last_epoch_bits = bytes_to_bits(&last_bytes, 256);
+        let poc = ProofOfCompression {
+            crh_bits: vec![],
+            xof_bits: vec![],
+            first_epoch_bits: to_bool(&first_epoch_bits),
+            last_epoch_bits: to_bool(&last_epoch_bits),
+        };
+
+        let mut cs = TestConstraintSystem::<Fr>::new();
+        let packed = poc.verify_edges(&mut cs).unwrap();
+        assert!(cs.is_satisfied());
+
+        // get the inner packed value
+        let inner = packed
+            .into_iter()
+            .map(|i| i.get_value().unwrap())
+            .collect::<Vec<_>>();
+        // pack our bits to Fr as well, and see if they match
+        let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits);
+        assert_eq!(inner, public_inputs);
+    }
 }

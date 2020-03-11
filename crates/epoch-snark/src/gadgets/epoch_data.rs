@@ -46,12 +46,12 @@ pub struct ConstrainedEpochData {
 
 impl<E: PairingEngine> EpochData<E> {
     // Initializes an empty epoch, to be used for the setup
-    pub fn new() -> Self {
+    pub fn empty(num_validators: usize) -> Self {
         EpochData::<E> {
             index: None,
             maximum_non_signers: None,
             aggregated_pub_key: None,
-            public_keys: Vec::new(),
+            public_keys: vec![None; num_validators],
         }
     }
 }

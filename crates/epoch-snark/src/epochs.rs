@@ -38,6 +38,22 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub verifying_key: Option<VerifyingKey<E>>,
 }
 
+impl<E: PairingEngine> ValidatorSetUpdate<E> {
+    pub fn empty(num_validators: usize, num_epochs: usize, vk: VerifyingKey<E>) -> Self {
+        let empty_update = SingleUpdate::empty(num_validators);
+        let empty_hash_proof = Proof::<E>::default();
+
+        ValidatorSetUpdate {
+            initial_epoch: EpochData::empty(num_validators),
+            num_validators: num_validators as u32,
+            proof: Some(empty_hash_proof),
+            epochs: vec![empty_update; num_epochs],
+            verifying_key: Some(vk),
+            aggregated_signature: None,
+        }
+    }
+}
+
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     // Enforce that the signatures over the epochs have been calculated
     // correctly, and then compress the public inputs

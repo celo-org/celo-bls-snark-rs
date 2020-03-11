@@ -1,5 +1,5 @@
 use algebra::{
-    bls12_377::{Fr as BlsFr, FrParameters},
+    bls12_377::{Fr, FrParameters},
     FpParameters,
 };
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
@@ -22,8 +22,18 @@ pub struct HashToBits {
     pub message_bits: Vec<Vec<Option<bool>>>,
 }
 
-impl ConstraintSynthesizer<BlsFr> for HashToBits {
-    fn generate_constraints<CS: ConstraintSystem<BlsFr>>(
+impl HashToBits {
+    /// To be used when generating the trusted setup parameters
+    pub fn empty<P: FpParameters>(num_epochs: usize) -> Self {
+        let modulus_bit_rounded = (((P::MODULUS_BITS + 7)/8)*8) as usize;
+        HashToBits {
+            message_bits: vec![vec![None; modulus_bit_rounded]; num_epochs],
+        }
+    }
+}
+
+impl ConstraintSynthesizer<Fr> for HashToBits {
+    fn generate_constraints<CS: ConstraintSystem<Fr>>(
         self,
         cs: &mut CS,
     ) -> Result<(), SynthesisError> {

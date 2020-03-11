@@ -22,11 +22,11 @@ pub struct SingleUpdate<E: PairingEngine> {
     pub signed_bitmap: Vec<Option<bool>>,
 }
 
-impl<E: PairingEngine> Default for SingleUpdate<E> {
-    fn default() -> Self {
+impl<E: PairingEngine> SingleUpdate<E> {
+    pub fn empty(num_validators: usize) -> Self {
         Self {
-            epoch_data: EpochData::<E>::new(),
-            signed_bitmap: Vec::new(),
+            epoch_data: EpochData::<E>::empty(num_validators),
+            signed_bitmap: vec![None; num_validators],
         }
     }
 }
