@@ -250,9 +250,9 @@ mod tests {
                 let mut epoch_signers_filtered = Vec::new();
                 let epoch_signers = &signers[i];
                 let epoch_bitmap = bitmaps[i];
-                for j in 0..epoch_signers.len() {
+                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
                     if epoch_bitmap[j] {
-                        epoch_signers_filtered.push(epoch_signers[i]);
+                        epoch_signers_filtered.push(*epoch_signer);
                     }
                 }
                 signers_filtered.push(epoch_signers_filtered);

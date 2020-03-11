@@ -4,7 +4,16 @@ use algebra::{
 };
 use bls_crypto::PublicKey;
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::error::Error;
+use thiserror::Error;
+
+use algebra::serialize::SerializationError;
+#[derive(Debug, Error)]
+pub enum EncodingError {
+    #[error("Zexe Error: {0}")]
+    ZexeSerialization(#[from] SerializationError),
+    #[error("I/O Error: {0}")]
+    IoError(#[from] std::io::Error),
+}
 
 /// If bytes is a little endian representation of a number, this would return the bits of the
 /// number in descending order
@@ -48,7 +57,7 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
 
 /// The function assumes that the public key is not the point in infinity, which is true for
 /// BLS public keys
-pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Error>> {
+pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingError> {
     let pk_affine = public_key.get_pk().into_affine();
     let x = pk_affine.x;
     let y = pk_affine.y;
@@ -73,7 +82,8 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, Box<dyn Er
     Ok(bits)
 }
 
-fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
+/// LE Encodes a U16 to **bits**
+pub(crate) fn encode_u16(num: u16) -> Result<Vec<bool>, EncodingError> {
     let mut bytes = vec![];
     bytes.write_u16::<LittleEndian>(num)?;
     let bits = bytes
@@ -84,7 +94,8 @@ fn encode_u16(num: u16) -> Result<Vec<bool>, Box<dyn Error>> {
     Ok(bits)
 }
 
-fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
+/// LE Encodes a U32 to **bits**
+pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
     let mut bytes = vec![];
     bytes.write_u32::<LittleEndian>(num)?;
     let bits = bytes
@@ -93,39 +104,6 @@ fn encode_u32(num: u32) -> Result<Vec<bool>, Box<dyn Error>> {
         .flatten()
         .collect::<Vec<_>>();
     Ok(bits)
-}
-
-/// The goal of the validator diff encoding is to be a constant-size encoding so it would be
-/// more easily processable in SNARKs
-pub fn encode_epoch_block_to_bits(
-    epoch_index: u16,
-    maximum_non_signers: u32,
-    aggregated_public_key: &PublicKey,
-    new_public_keys: &[&PublicKey],
-) -> Result<Vec<bool>, Box<dyn Error>> {
-    let mut epoch_bits = vec![];
-
-    epoch_bits.extend_from_slice(&encode_u16(epoch_index)?);
-    epoch_bits.extend_from_slice(&encode_u32(maximum_non_signers)?);
-    epoch_bits.extend_from_slice(encode_public_key(&aggregated_public_key)?.as_slice());
-    for added_public_key in new_public_keys {
-        epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
-    }
-    Ok(epoch_bits)
-}
-
-pub fn encode_epoch_block_to_bytes(
-    epoch_index: u16,
-    maximum_non_signers: u32,
-    aggregated_public_key: &PublicKey,
-    added_public_keys: &[&PublicKey],
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(bits_to_bytes(&encode_epoch_block_to_bits(
-        epoch_index,
-        maximum_non_signers,
-        aggregated_public_key,
-        added_public_keys,
-    )?))
 }
 
 #[cfg(test)]

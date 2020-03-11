@@ -1,7 +1,7 @@
 use algebra::{
     bls12_377::{Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters},
     sw6::{Fr, FrParameters},
-    BigInteger, FpParameters, PrimeField,
+    FpParameters,
 };
 use r1cs_std::bls12_377::PairingGadget;
 use r1cs_std::prelude::*;
@@ -153,40 +153,14 @@ fn le_chunks(iter: &[Boolean], chunk_size: u32) -> Vec<Vec<Boolean>> {
         .collect::<Vec<_>>()
 }
 
-use crate::encoding::bytes_to_bits;
-use blake2s_simd::Params;
-
-/// Blake2 hash of the input personalized to `OUT_DOMAIN`
-pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let hash = Params::new()
-        .hash_length(32)
-        .personal(OUT_DOMAIN)
-        .to_state()
-        .update(&bytes)
-        .finalize()
-        .as_ref()
-        .to_vec();
-    let mut bits = bytes_to_bits(&hash, 256);
-    bits.reverse();
-    bits
-}
-
-pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
-    values
-        .chunks(P::CAPACITY as usize)
-        .map(|c| {
-            let b = F::BigInt::from_bits(c);
-            F::from_repr(b)
-        })
-        .collect::<Vec<_>>()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::encoding::bytes_to_bits;
     use rand::RngCore;
 
+    use crate::epoch_block::hash_to_bits;
+    use crate::gadgets::pack;
     use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     fn to_bool(iter: &[bool]) -> Vec<Boolean> {

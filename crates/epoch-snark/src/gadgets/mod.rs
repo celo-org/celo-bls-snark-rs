@@ -16,7 +16,7 @@ mod epochs;
 pub use epochs::ValidatorSetUpdate;
 
 // some helpers
-use algebra::{bls12_377::Parameters, sw6::Fr, Field};
+use algebra::{bls12_377::Parameters, sw6::Fr, BigInteger, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
 use r1cs_std::{bls12_377::G2Gadget, fields::fp::FpGadget, Assignment};
 
@@ -28,7 +28,7 @@ use r1cs_core::{ConstraintSystem, SynthesisError};
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
-    use crate::encoding::encode_epoch_block_to_bytes;
+    use crate::epoch_block::EpochBlock;
     use algebra::{bls12_377::G1Projective, Bls12_377};
     use bls_crypto::{bls::keys::SIG_DOMAIN, CompositeHasher, PublicKey, TryAndIncrement};
 
@@ -44,12 +44,13 @@ pub mod test_helpers {
         let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = encode_epoch_block_to_bytes(
+        let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
             &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
             &pubkeys,
         )
+        .encode_to_bytes()
         .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
@@ -59,6 +60,16 @@ pub mod test_helpers {
 
         hash
     }
+}
+
+pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
+    values
+        .chunks(P::CAPACITY as usize)
+        .map(|c| {
+            let b = F::BigInt::from_bits(c);
+            F::from_repr(b)
+        })
+        .collect::<Vec<_>>()
 }
 
 pub fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(

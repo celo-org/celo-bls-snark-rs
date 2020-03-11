@@ -194,7 +194,7 @@ mod tests {
     use r1cs_core::ConstraintSystem;
     use r1cs_std::test_constraint_system::TestConstraintSystem;
 
-    use crate::encoding::{encode_epoch_block_to_bits, encode_epoch_block_to_bytes};
+    use crate::epoch_block::EpochBlock;
     use bls_crypto::PublicKey;
 
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
@@ -232,12 +232,13 @@ mod tests {
         let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = encode_epoch_block_to_bytes(
+        let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
             &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
             &pubkeys,
         )
+        .encode_to_bytes()
         .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
@@ -279,12 +280,13 @@ mod tests {
         let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // calculate the bits from our helper function
-        let bits = encode_epoch_block_to_bits(
+        let bits = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
             &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
             &pubkeys,
         )
+        .encode_to_bits()
         .unwrap();
 
         // calculate the bits from the epoch
