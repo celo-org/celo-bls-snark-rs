@@ -25,7 +25,7 @@ pub struct HashToBits {
 impl HashToBits {
     /// To be used when generating the trusted setup parameters
     pub fn empty<P: FpParameters>(num_epochs: usize) -> Self {
-        let modulus_bit_rounded = (((P::MODULUS_BITS + 7)/8)*8) as usize;
+        let modulus_bit_rounded = (((P::MODULUS_BITS + 7) / 8) * 8) as usize;
         HashToBits {
             message_bits: vec![vec![None; modulus_bit_rounded]; num_epochs],
         }

@@ -12,6 +12,9 @@ pub use pack::MultipackGadget;
 mod proof_of_compression;
 pub use proof_of_compression::ProofOfCompression;
 
+mod epochs;
+pub use epochs::ValidatorSetUpdate;
+
 // some helpers
 use algebra::{bls12_377::Parameters, sw6::Fr, Field};
 use r1cs_std::prelude::*;
