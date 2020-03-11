@@ -1,8 +1,7 @@
-use super::encoding::{
-    bits_to_bytes, bytes_to_bits, encode_public_key, encode_u16, encode_u32, EncodingError,
-};
+use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
 use blake2s_simd::Params;
 use bls_crypto::PublicKey;
+use bls_gadgets::{bits_to_bytes, bytes_to_bits};
 
 pub static OUT_DOMAIN: &[u8] = b"ULforout";
 

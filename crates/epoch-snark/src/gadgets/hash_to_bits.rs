@@ -49,6 +49,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
                 &bits,
                 512,
                 personalization,
+                true,
             )?;
             all_bits.extend_from_slice(&bits);
             xof_bits.extend_from_slice(&hash);

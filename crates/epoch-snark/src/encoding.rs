@@ -3,6 +3,7 @@ use algebra::{
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
 use bls_crypto::PublicKey;
+use bls_gadgets::bytes_to_bits;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
 
@@ -13,46 +14,6 @@ pub enum EncodingError {
     ZexeSerialization(#[from] SerializationError),
     #[error("I/O Error: {0}")]
     IoError(#[from] std::io::Error),
-}
-
-/// If bytes is a little endian representation of a number, this would return the bits of the
-/// number in descending order
-pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
-    let mut bits = vec![];
-    for b in bytes {
-        let mut byte = *b;
-        for _ in 0..8 {
-            bits.push((byte & 1) == 1);
-            byte >>= 1;
-        }
-    }
-
-    bits.into_iter()
-        .take(bits_to_take)
-        .collect::<Vec<bool>>()
-        .into_iter()
-        .rev()
-        .collect()
-}
-
-pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
-    let mut bytes = vec![];
-    let reversed_bits = {
-        let mut tmp = bits.to_owned();
-        tmp.reverse();
-        tmp
-    };
-    for chunk in reversed_bits.chunks(8) {
-        let mut byte = 0;
-        let mut twoi: u64 = 1;
-        for c in chunk {
-            byte += (twoi * (*c as u64)) as u8;
-            twoi *= 2;
-        }
-        bytes.push(byte);
-    }
-
-    bytes
 }
 
 /// The function assumes that the public key is not the point in infinity, which is true for
@@ -108,8 +69,9 @@ pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
 
 #[cfg(test)]
 mod test {
-    use crate::encoding::{bits_to_bytes, bytes_to_bits};
+    use super::*;
     use algebra::{bls12_377::FqParameters, FpParameters};
+    use bls_gadgets::bits_to_bytes;
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;

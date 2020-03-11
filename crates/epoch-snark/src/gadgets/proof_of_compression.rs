@@ -156,7 +156,7 @@ fn le_chunks(iter: &[Boolean], chunk_size: u32) -> Vec<Vec<Boolean>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::bytes_to_bits;
+    use bls_gadgets::bytes_to_bits;
     use rand::RngCore;
 
     use crate::epoch_block::hash_to_bits;

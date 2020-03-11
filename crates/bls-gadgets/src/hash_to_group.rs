@@ -24,20 +24,21 @@ use algebra::{
 use bls_crypto::{
     bls::keys::SIG_DOMAIN,
     curve::hash::try_and_increment::get_point_from_x_g1,
-    hash::composite::{CompositeHasher, CRH},
+    hash::{
+        composite::{CompositeHasher, CRH},
+        XOF,
+    },
 };
 use crypto_primitives::{
     crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
 };
 use r1cs_std::edwards_sw6::EdwardsSWGadget;
 
-use crate::YToBitGadget;
+use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, YToBitGadget};
 
 /// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
 type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
 
-/// Hash to curve requires 378 bits (377 for field element, 1 for y)
-///
 /// Parameters for Blake2x as specified in: https://blake2.net/blake2x.pdf
 /// • “Key length” is set to 0 (even if the root hash was keyed)
 /// • “Fanout” is set to 0 (unlimited)
@@ -75,8 +76,10 @@ pub struct HashToGroupGadget<P> {
 // by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards SW6
 // and then hashing it to bits and to group
 impl HashToGroupGadget<Bls12_377_Parameters> {
-    /// Returns the G1 constrained hash of the message with the provided counter along with auxiliary
-    /// data which can be used by consumers to split the calculation in 2 SNARKs as detailed in ... TODO
+    /// Returns the G1 constrained hash of the message with the provided counter.
+    /// We do not generate constraints for the CRH -> XOF conversion in this case,
+    /// because it is expensive to do inside SW6. We provide auxiliary date which can be
+    /// used to generate an outer proof that ensures this calculation is done correctly
     #[allow(clippy::type_complexity)]
     pub fn enforce_hash_to_group<CS: ConstraintSystem<Bls12_377_Fq>>(
         cs: &mut CS,
@@ -93,8 +96,14 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
         // We want 378 random bits for hashing to curve, so we get 512 from the hash and will
-        // discard any unneeded ones
-        let xof_bits = hash_to_bits(cs.ns(|| "hash to bits"), &crh_bits, 512, personalization)?;
+        // discard any unneeded ones. We do not generate constraints.
+        let xof_bits = hash_to_bits(
+            cs.ns(|| "hash to bits"),
+            &crh_bits,
+            512,
+            personalization,
+            false,
+        )?;
 
         let hash = Self::hash_to_group(cs.ns(|| "hash to group"), &xof_bits)?;
 
@@ -144,35 +153,48 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
     message: &[Boolean],
     hash_length: u16,
     personalization: [u8; 8],
+    generate_constraints: bool,
 ) -> Result<Vec<Boolean>, SynthesisError> {
-    // Blake2s outputs 256 bit hashes so the desired output hash length
-    // must be a multiple of that.
-    assert_eq!(hash_length % 256, 0, "invalid hash length size");
-    let iterations = hash_length / 256;
-
-    // Reverse the message to LE
-    let mut message = message.to_vec();
-    message.reverse();
-
-    let mut xof_bits = Vec::new();
-    // Run Blake on the message N times, each time offset by `i`
-    // to get a `hash_length` hash. The hash is in LE.
-    for i in 0..iterations {
-        // calculate the hash
-        let blake2s_parameters = blake2xs_params(hash_length, i.into(), personalization);
-        let xof_result = blake2s_gadget_with_parameters(
-            cs.ns(|| format!("xof result {}", i)),
-            &message,
-            &blake2s_parameters.parameters(),
-        )?;
-        // convert hash result to LE bits
-        let xof_bits_i = xof_result
-            .into_iter()
-            .map(|n| n.to_bits_le())
-            .flatten()
-            .collect::<Vec<Boolean>>();
-        xof_bits.extend_from_slice(&xof_bits_i);
-    }
+    let xof_bits = if generate_constraints {
+        // Reverse the message to LE
+        let mut message = message.to_vec();
+        message.reverse();
+        // Blake2s outputs 256 bit hashes so the desired output hash length
+        // must be a multiple of that.
+        assert_eq!(hash_length % 256, 0, "invalid hash length size");
+        let iterations = hash_length / 256;
+        let mut xof_bits = Vec::new();
+        // Run Blake on the message N times, each time offset by `i`
+        // to get a `hash_length` hash. The hash is in LE.
+        for i in 0..iterations {
+            // calculate the hash (Vec<Boolean>)
+            let blake2s_parameters = blake2xs_params(hash_length, i.into(), personalization);
+            let xof_result = blake2s_gadget_with_parameters(
+                cs.ns(|| format!("xof result {}", i)),
+                &message,
+                &blake2s_parameters.parameters(),
+            )?;
+            // convert hash result to LE bits
+            let xof_bits_i = xof_result
+                .into_iter()
+                .map(|n| n.to_bits_le())
+                .flatten()
+                .collect::<Vec<Boolean>>();
+            xof_bits.extend_from_slice(&xof_bits_i);
+        }
+        xof_bits
+    } else {
+        let message = message
+            .iter()
+            .map(|m| m.get_value().get())
+            .collect::<Result<Vec<_>, _>>()?;
+        let message = bits_to_bytes(&message);
+        let hasher = bls_crypto::DirectHasher::new().unwrap();
+        let hash_result = hasher.xof(&personalization, &message, 64).unwrap();
+        let mut bits = bytes_to_bits(&hash_result, 512);
+        bits.reverse();
+        constrain_bool(&mut cs.ns(|| "xof result no constraints"), &bits)?
+    };
 
     Ok(xof_bits)
 }
@@ -303,6 +325,7 @@ mod test {
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
             // check that they get hashed properly
+            dbg!(length);
             hash_to_group(&input);
         }
     }
