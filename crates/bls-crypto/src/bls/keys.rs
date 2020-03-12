@@ -292,7 +292,7 @@ impl Signature {
     }
 
     pub fn get_sig(&self) -> G1Projective {
-        self.sig.clone()
+        self.sig
     }
 
     pub fn aggregate(signatures: &[&Signature]) -> Signature {
