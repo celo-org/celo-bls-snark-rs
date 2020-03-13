@@ -34,7 +34,7 @@ use crypto_primitives::{
 };
 use r1cs_std::edwards_sw6::EdwardsSWGadget;
 
-use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, YToBitGadget};
+use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 
 /// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
 type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
@@ -184,16 +184,21 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
         }
         xof_bits
     } else {
-        let message = message
-            .iter()
-            .map(|m| m.get_value().get())
-            .collect::<Result<Vec<_>, _>>()?;
-        let message = bits_to_bytes(&message);
-        let hasher = bls_crypto::DirectHasher::new().unwrap();
-        let hash_result = hasher.xof(&personalization, &message, 64).unwrap();
-        let mut bits = bytes_to_bits(&hash_result, 512);
-        bits.reverse();
-        constrain_bool(&mut cs.ns(|| "xof result no constraints"), &bits)?
+        let bits = if is_setup(&message) {
+            vec![false; 512]
+        } else {
+            let message = message
+                .iter()
+                .map(|m| m.get_value().get())
+                .collect::<Result<Vec<_>, _>>()?;
+            let message = bits_to_bytes(&message);
+            let hasher = bls_crypto::DirectHasher::new().unwrap();
+            let hash_result = hasher.xof(&personalization, &message, 64).unwrap();
+            let mut bits = bytes_to_bits(&hash_result, 512);
+            bits.reverse();
+            bits
+        };
+        constrain_bool(&mut cs, &bits)?
     };
 
     Ok(xof_bits)
@@ -207,16 +212,16 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         mut cs: CS,
         xof_bits: &[Boolean],
     ) -> Result<G1Gadget<P>, SynthesisError> {
-        // if we're in setup mode, just return an error
-        if xof_bits.iter().any(|x| x.get_value().is_none()) {
-            return Err(SynthesisError::AssignmentMissing);
-        }
-
-        let x_bits = &xof_bits[..377];
-        let greatest = xof_bits[377];
-
         let expected_point_before_cofactor =
             G1Gadget::<P>::alloc(cs.ns(|| "expected point before cofactor"), || {
+                // if we're in setup mode, just return an error
+                if is_setup(&xof_bits) {
+                    return Err(SynthesisError::AssignmentMissing);
+                }
+
+                let x_bits = &xof_bits[..377];
+                let greatest = xof_bits[377];
+
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
                 let mut bits = x_bits
