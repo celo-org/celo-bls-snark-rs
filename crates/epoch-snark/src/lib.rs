@@ -1,3 +1,4 @@
+pub mod api;
 mod encoding;
 pub mod epoch_block;
 pub mod gadgets;

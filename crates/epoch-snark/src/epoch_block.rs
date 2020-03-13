@@ -1,9 +1,24 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
 use blake2s_simd::Params;
-use bls_crypto::PublicKey;
+use bls_crypto::{PublicKey, Signature};
 use bls_gadgets::{bits_to_bytes, bytes_to_bits};
 
 pub static OUT_DOMAIN: &[u8] = b"ULforout";
+
+/// A header as parsed after being fetched from the Celo Blockchain
+/// It contains information about the new epoch, as well as an aggregated
+/// signature and bitmap from the validators from the previous block that
+/// signed on it
+#[derive(Clone)]
+pub struct EpochTransition {
+    /// The new epoch block which is being processed
+    pub block: EpochBlock,
+    /// The aggregate signature produced over the `EpochBlock`
+    /// by the validators of the previous epoch
+    pub aggregate_signature: Signature,
+    /// The bitmap which determined the state transition
+    pub bitmap: Vec<bool>,
+}
 
 #[derive(Clone)]
 pub struct EpochBlock {
