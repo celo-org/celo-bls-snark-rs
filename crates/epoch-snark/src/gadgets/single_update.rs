@@ -4,7 +4,6 @@ use r1cs_std::{
     bls12_377::{G1PreparedGadget, G2Gadget, G2PreparedGadget, PairingGadget},
     boolean::Boolean,
     fields::fp::FpGadget,
-    Assignment,
 };
 
 use super::{constrain_bool, EpochData};
@@ -78,7 +77,7 @@ impl SingleUpdate<Bls12_377> {
                 previous_pubkeys,
                 &signed_bitmap,
                 &epoch_data.message_hash,
-                self.epoch_data.maximum_non_signers.get()? as u64,
+                self.epoch_data.maximum_non_signers.map(u64::from),
             )?;
 
         Ok(ConstrainedEpoch {
@@ -170,7 +169,7 @@ mod tests {
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
-        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), prev_index).unwrap();
+        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
         let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
 
         // generate the update via the helper

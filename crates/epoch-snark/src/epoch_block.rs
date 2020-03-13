@@ -5,19 +5,20 @@ use bls_gadgets::{bits_to_bytes, bytes_to_bits};
 
 pub static OUT_DOMAIN: &[u8] = b"ULforout";
 
-pub struct EpochBlock<'a> {
-    index: u16,
-    maximum_non_signers: u32,
-    aggregated_public_key: &'a PublicKey, // TODO: This might be redundant.
-    new_public_keys: &'a [&'a PublicKey],
+#[derive(Clone)]
+pub struct EpochBlock {
+    pub index: u16,
+    pub maximum_non_signers: u32,
+    pub new_public_keys: Vec<PublicKey>,
+    pub aggregated_public_key: PublicKey, // TODO: This might be redundant.
 }
 
-impl<'a> EpochBlock<'a> {
+impl EpochBlock {
     pub fn new(
         index: u16,
         maximum_non_signers: u32,
-        aggregated_public_key: &'a PublicKey,
-        new_public_keys: &'a [&PublicKey],
+        aggregated_public_key: PublicKey,
+        new_public_keys: Vec<PublicKey>,
     ) -> Self {
         Self {
             index,
@@ -38,7 +39,7 @@ impl<'a> EpochBlock<'a> {
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         epoch_bits.extend_from_slice(encode_public_key(&self.aggregated_public_key)?.as_slice());
-        for added_public_key in self.new_public_keys {
+        for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
         }
         Ok(epoch_bits)

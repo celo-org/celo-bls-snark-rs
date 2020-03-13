@@ -15,7 +15,7 @@ use bls_crypto::{
     bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement,
     hash::composite::CompositeHasher,
 };
-use bls_gadgets::HashToGroupGadget;
+use bls_gadgets::{is_setup, HashToGroupGadget};
 
 use super::{fr_to_bits, g2_to_bits, to_fr};
 
@@ -84,14 +84,12 @@ impl EpochData<Bls12_377> {
         &self,
         cs: &mut CS,
     ) -> Result<(Vec<Boolean>, FrGadget, Vec<G2Gadget>), SynthesisError> {
-        let index = to_fr(&mut cs.ns(|| "index"), self.index.get()?)?;
+        let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
 
         let current_maximum_non_signers = {
-            let current_maximum_non_signers = to_fr(
-                &mut cs.ns(|| "max non signers"),
-                self.maximum_non_signers.get()?,
-            )?;
+            let current_maximum_non_signers =
+                to_fr(&mut cs.ns(|| "max non signers"), self.maximum_non_signers)?;
             fr_to_bits(
                 &mut cs.ns(|| "max non signers bits"),
                 &current_maximum_non_signers,
@@ -146,6 +144,8 @@ impl EpochData<Bls12_377> {
         let mut epoch_bits = epoch_bits.to_vec();
         epoch_bits.reverse();
 
+        let is_setup = is_setup(&epoch_bits);
+
         // Pack them to Uint8s
         let input_bytes_var: Vec<UInt8> = epoch_bits
             .chunks(8)
@@ -159,7 +159,9 @@ impl EpochData<Bls12_377> {
             .collect();
 
         // Get the inner values
-        let result = {
+        let counter = if is_setup {
+            0
+        } else {
             // find the counter value for the hash
             let composite_hasher = CompositeHasher::new().unwrap();
             let try_and_increment = TryAndIncrement::new(&composite_hasher);
@@ -170,17 +172,15 @@ impl EpochData<Bls12_377> {
             let (_, counter) = try_and_increment
                 .hash_with_attempt::<Parameters>(SIG_DOMAIN, &input_bytes, &[])
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
-
-            let counter_var =
-                UInt8::alloc(&mut cs.ns(|| "alloc counter"), || Ok(counter as u8)).unwrap();
-            HashToGroupGadget::<Parameters>::enforce_hash_to_group(
-                &mut cs.ns(|| "hash to group"),
-                counter_var,
-                &input_bytes_var,
-            )?
+            counter
         };
 
-        Ok(result)
+        let counter_var = UInt8::alloc(&mut cs.ns(|| "alloc counter"), || Ok(counter as u8))?;
+        HashToGroupGadget::<Parameters>::enforce_hash_to_group(
+            &mut cs.ns(|| "hash to group"),
+            counter_var,
+            &input_bytes_var,
+        )
     }
 }
 
@@ -215,7 +215,7 @@ mod tests {
     fn test_enforce() {
         let epoch = test_epoch(10);
         let mut cs = TestConstraintSystem::<Fr>::new();
-        let index = to_fr(&mut cs.ns(|| "index"), 9u32).unwrap();
+        let index = to_fr(&mut cs.ns(|| "index"), Some(9u32)).unwrap();
         epoch
             .constrain(&mut cs.ns(|| "constraint"), &index)
             .unwrap();
@@ -227,16 +227,15 @@ mod tests {
         let epoch = test_epoch(10);
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(&pk.unwrap()));
+            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
         }
-        let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
-            &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
-            &pubkeys,
+            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
+            pubkeys,
         )
         .encode_to_bytes()
         .unwrap();
@@ -262,8 +261,8 @@ mod tests {
             (100, 101, true),
         ] {
             let mut cs = TestConstraintSystem::<Fr>::new();
-            let epoch1 = to_fr(&mut cs.ns(|| "1"), *index1).unwrap();
-            let epoch2 = to_fr(&mut cs.ns(|| "2"), *index2).unwrap();
+            let epoch1 = to_fr(&mut cs.ns(|| "1"), Some(*index1)).unwrap();
+            let epoch2 = to_fr(&mut cs.ns(|| "2"), Some(*index2)).unwrap();
             EpochData::enforce_next_epoch(&mut cs, &epoch1, &epoch2).unwrap();
             assert_eq!(cs.is_satisfied(), *expected);
         }
@@ -272,19 +271,17 @@ mod tests {
     #[test]
     fn epoch_to_bits_ok() {
         let epoch = test_epoch(18);
-
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(&pk.unwrap()));
+            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
         }
-        let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
-            &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
-            &pubkeys,
+            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
+            pubkeys,
         )
         .encode_to_bits()
         .unwrap();

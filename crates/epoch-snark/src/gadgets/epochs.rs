@@ -33,9 +33,9 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     /// The aggregated signature of all the validators over all the epoch changes
     pub aggregated_signature: Option<E::G1Projective>,
     /// The Groth16 proof satisfying the statement
-    pub proof: Option<Proof<E>>,
+    pub proof: Proof<E>,
     /// The VK produced by the trusted setup
-    pub verifying_key: Option<VerifyingKey<E>>,
+    pub verifying_key: VerifyingKey<E>,
 }
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
@@ -46,10 +46,10 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
         ValidatorSetUpdate {
             initial_epoch: EpochData::empty(num_validators),
             num_validators: num_validators as u32,
-            proof: Some(empty_hash_proof),
             epochs: vec![empty_update; num_epochs],
-            verifying_key: Some(vk),
             aggregated_signature: None,
+            proof: empty_hash_proof,
+            verifying_key: vk,
         }
     }
 }
@@ -64,8 +64,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
         proof_of_compression.compress_public_inputs(
             &mut cs.ns(|| "compress public inputs"),
-            &self.proof.unwrap(), // TODO: remove the Unwraps
-            &self.verifying_key.unwrap(),
+            &self.proof,
+            &self.verifying_key,
         )?;
 
         Ok(())
@@ -267,13 +267,15 @@ mod tests {
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
             let aggregated_signature = sum(&asigs);
 
+            let proof = Proof::default();
+            let vk = VerifyingKey::default();
             let valset = ValidatorSetUpdate::<Curve> {
                 initial_epoch,
                 epochs,
                 num_validators,
                 aggregated_signature: Some(aggregated_signature),
-                proof: None,
-                verifying_key: None,
+                proof,
+                verifying_key: vk,
             };
 
             let mut cs = TestConstraintSystem::<Fr>::new();
