@@ -8,6 +8,7 @@ use fixtures::generate_test_data;
 fn main() {
     let rng = &mut rand::thread_rng();
     let mut args = env::args();
+    args.next().unwrap(); // discard the program name
     let num_validators = args
         .next()
         .expect("num validators was expected")

@@ -67,7 +67,7 @@ pub fn generate_test_data(
         };
         transitions.push(transition);
     }
-    let last_epoch = transitions[transitions.len()].block.clone();
+    let last_epoch = transitions[transitions.len() - 1].block.clone();
 
     (first_epoch, transitions, last_epoch)
 }
