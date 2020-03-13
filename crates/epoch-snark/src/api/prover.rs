@@ -50,8 +50,8 @@ pub fn prove(
         initial_epoch: to_epoch_data(initial_epoch),
         epochs,
         aggregated_signature: Some(asig),
-        num_validators: num_validators,
-        proof: hash_proof.clone(),
+        num_validators,
+        proof: hash_proof,
         verifying_key: parameters.vk().1.clone(),
     };
     let bls_proof = create_random_proof(circuit, &parameters.epochs, rng)?;

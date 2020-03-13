@@ -6,8 +6,8 @@ use fixtures::generate_test_data;
 #[test]
 fn prover_verifier_groth16() {
     let rng = &mut rand::thread_rng();
-    let num_epochs = 5;
-    let faults = 2;
+    let num_epochs = 1;
+    let faults = 1;
     let num_validators = 3 * faults + 1;
 
     // Trusted setup

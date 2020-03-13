@@ -1,6 +1,6 @@
 use algebra::{
     bls12_377::{Bls12_377, G1Projective},
-    ProjectiveCurve,
+    ProjectiveCurve, Zero,
 };
 
 use bls_crypto::{PublicKey, Signature};
@@ -44,20 +44,18 @@ pub fn generate_test_data(
     // sign each state transition
     let mut transitions = vec![];
     for (i, signers_epoch) in signers.iter().enumerate() {
-        let block = generate_block(i + 1, faults, &pubkeys[i]);
-        // TODO: Figure out how to hash the epoch.
-        let hash = G1Projective::prime_subgroup_generator();
+        let block: EpochBlock = generate_block(i + 1, faults, &pubkeys[i]);
+        let hash = block.hash_to_g1().unwrap();
 
         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
         let bitmap_epoch = &bitmaps[i];
         let asig = {
-            let mut asig = G1Projective::prime_subgroup_generator();
+            let mut asig = G1Projective::zero();
             for sk in signers_epoch {
                 if bitmap_epoch[i] {
                     asig += hash.mul(*sk)
                 }
             }
-            asig -= G1Projective::prime_subgroup_generator();
             asig
         };
         let asig = Signature::from_sig(asig);
@@ -71,7 +69,7 @@ pub fn generate_test_data(
     }
     let last_epoch = transitions[transitions.len()].block.clone();
 
-    (first_epoch.clone(), transitions, last_epoch)
+    (first_epoch, transitions, last_epoch)
 }
 
 fn generate_block(index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
@@ -89,8 +87,8 @@ fn generate_bitmaps(num_epochs: usize, num_validators: usize, faults: usize) -> 
     let mut ret = Vec::new();
     for _ in 0..num_epochs {
         let mut bitmap = vec![true; num_validators];
-        for i in 0..faults {
-            bitmap[i] = false;
+        for b in bitmap.iter_mut().take(faults) {
+            *b = false;
         }
         ret.push(bitmap)
     }
