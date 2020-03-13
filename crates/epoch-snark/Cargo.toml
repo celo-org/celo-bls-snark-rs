@@ -31,3 +31,7 @@ print-trace = [ "bench-utils/print-trace" ]
 
 [lib]
 crate-type = ["lib", "staticlib"]
+
+[[example]]
+name = "proof"
+path = "examples/proof.rs"

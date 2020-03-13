@@ -1,9 +1,28 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
+use algebra::{bls12_377::G1Projective, bls12_377::Parameters};
 use blake2s_simd::Params;
-use bls_crypto::PublicKey;
+use bls_crypto::{
+    bls::keys::SIG_DOMAIN, curve::hash::HashToG1, CompositeHasher, PublicKey, Signature,
+    TryAndIncrement,
+};
 use bls_gadgets::{bits_to_bytes, bytes_to_bits};
 
 pub static OUT_DOMAIN: &[u8] = b"ULforout";
+
+/// A header as parsed after being fetched from the Celo Blockchain
+/// It contains information about the new epoch, as well as an aggregated
+/// signature and bitmap from the validators from the previous block that
+/// signed on it
+#[derive(Clone)]
+pub struct EpochTransition {
+    /// The new epoch block which is being processed
+    pub block: EpochBlock,
+    /// The aggregate signature produced over the `EpochBlock`
+    /// by the validators of the previous epoch
+    pub aggregate_signature: Signature,
+    /// The bitmap which determined the state transition
+    pub bitmap: Vec<bool>,
+}
 
 #[derive(Clone)]
 pub struct EpochBlock {
@@ -26,6 +45,16 @@ impl EpochBlock {
             aggregated_public_key,
             new_public_keys,
         }
+    }
+
+    pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
+        let input = self.encode_to_bytes()?;
+        let composite_hasher = CompositeHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+        let expected_hash: G1Projective = try_and_increment
+            .hash::<Parameters>(SIG_DOMAIN, &input, &[])
+            .unwrap();
+        Ok(expected_hash)
     }
 
     pub fn blake2(&self) -> Result<Vec<bool>, EncodingError> {

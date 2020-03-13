@@ -43,9 +43,15 @@ jobs:
       - run:
           name: Build
           command: cargo build --release
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/release
+          key: v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run tests
           command: cargo test --release
+          no_output_timeout: 30m
       - run:
           name: Check Style
           command: |
@@ -54,11 +60,6 @@ jobs:
       - run:
           name: Audit Dependencies
           command: cargo audit --ignore RUSTSEC-2019-0019 # remove once https://github.com/scipr-lab/zexe/issues/135 is fixed
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target/release
-          key: v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - persist_to_workspace:
           root: .
           paths: target/release
