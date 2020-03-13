@@ -39,16 +39,15 @@ pub mod test_helpers {
     pub fn hash_epoch(epoch: &EpochData<Bls12_377>) -> G1Projective {
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(&pk.unwrap()));
+            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
         }
-        let pubkeys: Vec<&PublicKey> = pubkeys.iter().map(|x| x).collect();
 
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers.unwrap(),
-            &PublicKey::from_pk(&epoch.aggregated_pub_key.unwrap()),
-            &pubkeys,
+            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
+            pubkeys,
         )
         .encode_to_bytes()
         .unwrap();
@@ -74,9 +73,9 @@ pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
 
 pub fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
-    num: T,
+    num: Option<T>,
 ) -> Result<FrGadget, SynthesisError> {
-    FrGadget::alloc(cs, || Ok(Fr::from(num.into())))
+    FrGadget::alloc(cs, || Ok(Fr::from(num.get()?.into())))
 }
 
 pub fn fr_to_bits<CS: ConstraintSystem<Fr>>(

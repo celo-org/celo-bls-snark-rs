@@ -43,14 +43,14 @@ pub extern "C" fn encode_epoch_block_to_bytes(
         let added_public_keys = added_public_keys_ptrs
             .to_vec()
             .into_iter()
-            .map(|pk| unsafe { &*pk })
-            .collect::<Vec<&PublicKey>>();
+            .map(|pk| unsafe { &*pk }.clone())
+            .collect::<Vec<PublicKey>>();
 
         let mut encoded = EpochBlock::new(
             in_epoch_index as u16,
             in_maximum_non_signers as u32,
-            &aggregated_public_key,
-            &added_public_keys,
+            aggregated_public_key.clone(),
+            added_public_keys,
         )
         .encode_to_bytes()?;
         encoded.shrink_to_fit();

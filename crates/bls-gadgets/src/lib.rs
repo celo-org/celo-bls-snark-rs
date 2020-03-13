@@ -16,6 +16,12 @@ use algebra::Field;
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{alloc::AllocGadget, boolean::Boolean};
 
+/// Helper which _must_ be used before trying to the inner values
+/// of a boolean vector
+pub fn is_setup(message: &[Boolean]) -> bool {
+    message.iter().any(|m| m.get_value().is_none())
+}
+
 pub fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
     cs: &mut CS,
     input: &[bool],

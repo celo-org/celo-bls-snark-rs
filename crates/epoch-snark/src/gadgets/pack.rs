@@ -1,4 +1,5 @@
 use algebra::{BigInteger, FpParameters, PrimeField};
+use bls_gadgets::is_setup;
 use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
 
@@ -20,17 +21,16 @@ impl MultipackGadget {
                 FpGadget::<F>::alloc
             };
             let fp = alloc(cs.ns(|| format!("chunk {}", i)), || {
-                if chunk.iter().any(|x| x.get_value().is_none()) {
-                    Err(SynthesisError::AssignmentMissing)
-                } else {
-                    let fp_val = F::BigInt::from_bits(
-                        &chunk
-                            .iter()
-                            .map(|x| x.get_value().get())
-                            .collect::<Result<Vec<bool>, _>>()?,
-                    );
-                    Ok(F::from_repr(fp_val))
+                if is_setup(&chunk) {
+                    return Err(SynthesisError::AssignmentMissing);
                 }
+                let fp_val = F::BigInt::from_bits(
+                    &chunk
+                        .iter()
+                        .map(|x| x.get_value().get())
+                        .collect::<Result<Vec<bool>, _>>()?,
+                );
+                Ok(F::from_repr(fp_val))
             })?;
             let fp_bits = fp.to_bits(cs.ns(|| format!("chunk bits {}", i)))?;
             let chunk_len = chunk.len();

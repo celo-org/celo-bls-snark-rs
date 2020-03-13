@@ -1,3 +1,4 @@
+use crate::is_setup;
 use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use r1cs_std::{
@@ -12,7 +13,7 @@ use r1cs_std::{
 pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
     cs: &mut CS,
     bitmap: &[Boolean],
-    max_occurrences: u64,
+    max_occurrences: Option<u64>,
     value: bool,
 ) -> Result<(), SynthesisError> {
     let mut value_fp = F::one();
@@ -22,7 +23,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
     }
     // If we're in setup mode, we skip the bit counting part since the bitmap
     // will be empty
-    let is_setup = bitmap.iter().all(|bit| bit.get_value().is_none());
+    let is_setup = is_setup(&bitmap);
 
     let mut occurrences = 0;
     let mut occurrences_lc = LinearCombination::zero();
@@ -51,6 +52,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
     })?;
 
     let occurrences_bits = &occurrences.to_bits(&mut cs.ns(|| "num occurrences to bits"))?;
+    let max_occurrences = max_occurrences.unwrap_or_default();
     Boolean::enforce_smaller_or_equal_than::<_, _, F, _>(
         &mut cs.ns(|| "enforce maximum number of occurrences"),
         occurrences_bits,
@@ -84,7 +86,7 @@ mod tests {
             .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
-        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, max_number, is_one).unwrap();
+        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, Some(max_number), is_one).unwrap();
         cs
     }
 
