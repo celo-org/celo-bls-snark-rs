@@ -33,6 +33,8 @@ impl<E: PairingEngine> SingleUpdate<E> {
 pub struct ConstrainedEpoch {
     // The new validators for this epoch
     pub new_pubkeys: Vec<G2Gadget>,
+    // The new threshold needed for signatures
+    pub new_max_non_signers: FrGadget,
     /// The epoch's G1 Hash
     pub message_hash: G1PreparedGadget,
     /// The aggregate pubkey based on the bitmap of the validators
@@ -56,6 +58,7 @@ impl SingleUpdate<Bls12_377> {
         cs: &mut CS,
         previous_pubkeys: &[G2Gadget],
         previous_epoch_index: &FrGadget,
+        previous_max_non_signers: &FrGadget,
         num_validators: u32,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
         // the number of validators across all epochs must be consistent
@@ -77,11 +80,12 @@ impl SingleUpdate<Bls12_377> {
                 previous_pubkeys,
                 &signed_bitmap,
                 &epoch_data.message_hash,
-                self.epoch_data.maximum_non_signers as u64,
+                &previous_max_non_signers,
             )?;
 
         Ok(ConstrainedEpoch {
             new_pubkeys: epoch_data.pubkeys,
+            new_max_non_signers: epoch_data.maximum_non_signers,
             message_hash: prepared_message_hash,
             aggregate_pk: prepared_aggregated_public_key,
             index: epoch_data.index,
@@ -105,7 +109,7 @@ pub mod test_helpers {
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
-            maximum_non_signers,
+            maximum_non_signers_plus_one: maximum_non_signers,
             public_keys: to_option_iter(public_keys),
         };
 
@@ -166,8 +170,9 @@ mod tests {
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
-        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
         let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
+        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
+        let prev_max_non_signers = to_fr(&mut cs.ns(|| "prev index to fr"), Some(maximum_non_signers)).unwrap();
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
@@ -183,6 +188,7 @@ mod tests {
                 &mut cs.ns(|| "constrain epoch 2"),
                 &prev_validators,
                 &prev_index,
+                &prev_max_non_signers,
                 prev_n_validators as u32,
             )
             .unwrap()

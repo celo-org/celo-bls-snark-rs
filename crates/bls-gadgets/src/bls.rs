@@ -4,6 +4,7 @@ use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::FieldGadget, groups::GroupGadget,
     pairing::PairingGadget, select::CondSelectGadget,
+    fields::fp::FpGadget,
 };
 use std::marker::PhantomData;
 
@@ -40,7 +41,7 @@ where
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
         signature: &P::G1Gadget,
-        maximum_non_signers: u64,
+        maximum_non_signers: &FpGadget<F>,
     ) -> Result<(), SynthesisError> {
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
@@ -205,7 +206,7 @@ where
         pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
-        maximum_non_signers: u64,
+        maximum_non_signers: &FpGadget<F>,
     ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 

@@ -24,8 +24,8 @@ type FrGadget = FpGadget<Fr>;
 /// An epoch (either the first one or any in between)
 #[derive(Clone, Debug, Default)]
 pub struct EpochData<E: PairingEngine> {
-    /// The allowed non-signers for the epoch
-    pub maximum_non_signers: u32,
+    /// The allowed non-signers for the epoch + 1
+    pub maximum_non_signers_plus_one: u32,
     /// The index of the initial epoch
     pub index: Option<u16>,
     /// The public keys at the epoch
@@ -36,6 +36,7 @@ pub struct ConstrainedEpochData {
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
     pub index: FrGadget,
+    pub maximum_non_signers: FrGadget,
     pub message_hash: G1Gadget,
     pub pubkeys: Vec<G2Gadget>,
     pub crh_bits: Vec<Boolean>,
@@ -47,7 +48,7 @@ impl<E: PairingEngine> EpochData<E> {
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         EpochData::<E> {
             index: None,
-            maximum_non_signers: maximum_non_signers as u32,
+            maximum_non_signers_plus_one: maximum_non_signers as u32,
             public_keys: vec![None; num_validators],
         }
     }
@@ -59,7 +60,7 @@ impl EpochData<Bls12_377> {
         cs: &mut CS,
         previous_index: &FrGadget,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
-        let (bits, index, pubkeys) = self.to_bits(cs)?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
@@ -69,6 +70,7 @@ impl EpochData<Bls12_377> {
         Ok(ConstrainedEpochData {
             bits,
             index,
+            maximum_non_signers,
             pubkeys,
             message_hash,
             crh_bits,
@@ -80,24 +82,22 @@ impl EpochData<Bls12_377> {
     pub fn to_bits<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
-    ) -> Result<(Vec<Boolean>, FrGadget, Vec<G2Gadget>), SynthesisError> {
+    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
         let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
 
-        let current_maximum_non_signers = {
-            let current_maximum_non_signers = to_fr(
-                &mut cs.ns(|| "max non signers"),
-                Some(self.maximum_non_signers),
-            )?;
-            fr_to_bits(
-                &mut cs.ns(|| "max non signers bits"),
-                &current_maximum_non_signers,
-                32,
-            )?
-        };
+        let maximum_non_signers = to_fr(
+            &mut cs.ns(|| "max non signers"),
+            Some(self.maximum_non_signers_plus_one),
+        )?;
+        let maximum_non_signers_bits = fr_to_bits(
+            &mut cs.ns(|| "max non signers bits"),
+            &maximum_non_signers,
+            32,
+        )?;
 
         let mut epoch_bits: Vec<Boolean> =
-            [index_bits, current_maximum_non_signers].concat();
+            [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -111,7 +111,7 @@ impl EpochData<Bls12_377> {
             pubkey_vars.push(pk_var);
         }
 
-        Ok((epoch_bits, index, pubkey_vars))
+        Ok((epoch_bits, index, maximum_non_signers, pubkey_vars))
     }
 
     /// Enforces that `index = previous_index + 1`
@@ -196,7 +196,7 @@ mod tests {
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
-            maximum_non_signers: 12,
+            maximum_non_signers_plus_one: 12,
             public_keys: pubkeys,
         }
     }
@@ -223,7 +223,7 @@ mod tests {
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers,
+            epoch.maximum_non_signers_plus_one,
             pubkeys,
         )
         .encode_to_bytes(false)
@@ -268,7 +268,7 @@ mod tests {
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers,
+            epoch.maximum_non_signers_plus_one,
             pubkeys.clone(),
         )
         .encode_to_bits(false)
@@ -277,7 +277,7 @@ mod tests {
         // calculate wrong bits
         let bits_wrong = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers,
+            epoch.maximum_non_signers_plus_one,
             pubkeys,
         )
             .encode_to_bits(true)

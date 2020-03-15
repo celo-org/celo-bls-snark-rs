@@ -15,9 +15,6 @@ pub use proof_of_compression::ProofOfCompression;
 mod epochs;
 pub use epochs::ValidatorSetUpdate;
 
-mod smaller_than;
-pub use smaller_than::SmallerThanGadget;
-
 // some helpers
 use algebra::{bls12_377::Parameters, sw6::Fr, BigInteger, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
@@ -48,7 +45,7 @@ pub mod test_helpers {
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers,
+            epoch.maximum_non_signers_plus_one,
             pubkeys,
         )
         .encode_to_bytes(false)
