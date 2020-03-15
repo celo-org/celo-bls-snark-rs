@@ -40,7 +40,7 @@ where
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
         signature: &P::G1Gadget,
-        maximum_non_signers: Option<u64>,
+        maximum_non_signers: u64,
     ) -> Result<(), SynthesisError> {
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
@@ -177,7 +177,7 @@ where
         pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
-        maximum_non_signers: Option<u64>,
+        maximum_non_signers: u64,
     ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
@@ -277,7 +277,7 @@ mod verify_one_message {
             &bitmap,
             &message_hash_var,
             &signature_var,
-            Some(num_non_signers),
+            num_non_signers,
         )
         .unwrap();
 

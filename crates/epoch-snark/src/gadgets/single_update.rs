@@ -22,9 +22,9 @@ pub struct SingleUpdate<E: PairingEngine> {
 }
 
 impl<E: PairingEngine> SingleUpdate<E> {
-    pub fn empty(num_validators: usize) -> Self {
+    pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         Self {
-            epoch_data: EpochData::<E>::empty(num_validators),
+            epoch_data: EpochData::<E>::empty(num_validators, maximum_non_signers),
             signed_bitmap: vec![None; num_validators],
         }
     }
@@ -77,7 +77,7 @@ impl SingleUpdate<Bls12_377> {
                 previous_pubkeys,
                 &signed_bitmap,
                 &epoch_data.message_hash,
-                self.epoch_data.maximum_non_signers.map(u64::from),
+                self.epoch_data.maximum_non_signers as u64,
             )?;
 
         Ok(ConstrainedEpoch {
@@ -107,7 +107,7 @@ pub mod test_helpers {
         let aggregated_pubkey = sum(public_keys);
         let epoch_data = EpochData::<E> {
             index: Some(index),
-            maximum_non_signers: Some(maximum_non_signers),
+            maximum_non_signers,
             aggregated_pub_key: Some(aggregated_pubkey),
             public_keys: to_option_iter(public_keys),
         };
@@ -165,7 +165,7 @@ mod tests {
         n_validators: usize,
         prev_index: u16,
         index: u16,
-        max_non_signers: u32,
+        maximum_non_signers: u32,
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
@@ -175,7 +175,7 @@ mod tests {
         // generate the update via the helper
         let next_epoch = generate_single_update(
             index,
-            max_non_signers,
+            maximum_non_signers,
             &pubkeys::<Bls12_377>(n_validators),
             bitmap,
         );

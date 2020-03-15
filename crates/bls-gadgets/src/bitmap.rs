@@ -13,7 +13,7 @@ use r1cs_std::{
 pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
     cs: &mut CS,
     bitmap: &[Boolean],
-    max_occurrences: Option<u64>,
+    max_occurrences: u64,
     value: bool,
 ) -> Result<(), SynthesisError> {
     let mut value_fp = F::one();
@@ -52,7 +52,6 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
     })?;
 
     let occurrences_bits = &occurrences.to_bits(&mut cs.ns(|| "num occurrences to bits"))?;
-    let max_occurrences = max_occurrences.unwrap_or_default();
     Boolean::enforce_smaller_or_equal_than::<_, _, F, _>(
         &mut cs.ns(|| "enforce maximum number of occurrences"),
         occurrences_bits,
@@ -73,8 +72,72 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
 #[cfg(test)]
 mod tests {
     use super::*;
-    use algebra::bls12_377::Fq;
+    use algebra::{
+        bls12_377::{Fq, Fr},
+        Bls12_377,
+    };
+    use groth16::{
+        create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+    };
+    use r1cs_core::ConstraintSynthesizer;
     use r1cs_std::test_constraint_system::TestConstraintSystem;
+
+    #[test]
+    // "I know of a bitmap that has at most 2 zeros"
+    fn groth16_ok() {
+        let rng = &mut rand::thread_rng();
+
+        #[derive(Clone)]
+        struct BitmapGadget {
+            bitmap: Vec<Option<bool>>,
+            max_occurrences: u64,
+            value: bool,
+        }
+
+        impl ConstraintSynthesizer<Fr> for BitmapGadget {
+            fn generate_constraints<CS: ConstraintSystem<Fr>>(
+                self,
+                cs: &mut CS,
+            ) -> Result<(), SynthesisError> {
+                let bitmap = self
+                    .bitmap
+                    .iter()
+                    .enumerate()
+                    .map(|(i, b)| {
+                        Boolean::alloc(cs.ns(|| i.to_string()), || Ok(b.unwrap())).unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                enforce_maximum_occurrences_in_bitmap(cs, &bitmap, self.max_occurrences, self.value)
+            }
+        }
+
+        let params = {
+            let empty = BitmapGadget {
+                bitmap: vec![None; 10],
+                max_occurrences: 2,
+                value: false,
+            };
+            generate_random_parameters::<Bls12_377, _, _>(empty, rng).unwrap()
+        };
+
+        // all true bitmap, max occurences of 2 zeros allowed
+        let bitmap = vec![Some(true); 10];
+        let circuit = BitmapGadget {
+            bitmap,
+            max_occurrences: 2,
+            value: false,
+        };
+
+        // since our Test constraint system is satisfied, the groth16 proof
+        // should also work
+        let mut cs = TestConstraintSystem::<Fr>::new();
+        circuit.clone().generate_constraints(&mut cs).unwrap();
+        assert!(cs.is_satisfied());
+        let proof = create_random_proof(circuit, &params, rng).unwrap();
+
+        let pvk = prepare_verifying_key(&params.vk);
+        assert!(verify_proof(&pvk, &proof, &[]).unwrap());
+    }
 
     fn cs_enforce_value(
         bitmap: &[bool],
@@ -86,7 +149,7 @@ mod tests {
             .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
-        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, Some(max_number), is_one).unwrap();
+        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, max_number, is_one).unwrap();
         cs
     }
 

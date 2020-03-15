@@ -32,11 +32,13 @@ impl<CP: PairingEngine, BLS: PairingEngine> Parameters<CP, BLS> {
 pub fn trusted_setup<R: Rng>(
     num_validators: usize,
     num_epochs: usize,
+    maximum_non_signers: usize,
     rng: &mut R,
 ) -> Result<Parameters<CPCurve, BLSCurve>> {
     setup(
         num_validators,
         num_epochs,
+        maximum_non_signers,
         rng,
         |c, rng| generate_random_parameters(c, rng),
         |c, rng| generate_random_parameters(c, rng),
@@ -49,7 +51,7 @@ mod tests {
     #[test]
     fn runs_setup() {
         let rng = &mut rand::thread_rng();
-        assert!(trusted_setup(3, 2, rng).is_ok())
+        assert!(trusted_setup(3, 2, 1, rng).is_ok())
     }
 }
 
@@ -61,6 +63,7 @@ mod tests {
 fn setup<CP, BLS, F, G, R>(
     num_validators: usize,
     num_epochs: usize,
+    maximum_non_signers: usize,
     rng: &mut R,
     hash_to_bits_setup: F,
     validator_setup_fn: G,
@@ -75,8 +78,12 @@ where
     let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
     let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
 
-    let empty_epochs =
-        ValidatorSetUpdate::empty(num_validators, num_epochs, hash_to_bits.vk.clone());
+    let empty_epochs = ValidatorSetUpdate::empty(
+        num_validators,
+        num_epochs,
+        maximum_non_signers,
+        hash_to_bits.vk.clone(),
+    );
     let epochs = validator_setup_fn(empty_epochs, rng)?;
 
     Ok(Parameters {

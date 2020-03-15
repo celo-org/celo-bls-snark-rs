@@ -22,7 +22,7 @@ fn main() {
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
-    let params = setup::trusted_setup(num_validators, num_epochs, rng).unwrap();
+    let params = setup::trusted_setup(num_validators, num_epochs, faults, rng).unwrap();
 
     // Create the state to be proven (first - last and in between)
     // Note: This is all data which should be fetched via the Celo blockchain
