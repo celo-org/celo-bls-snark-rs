@@ -75,7 +75,7 @@ pub fn generate_test_data(
 fn generate_block(index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
     EpochBlock {
         index: index as u16,
-        maximum_non_signers_plus_one: non_signers as u32,
+        maximum_non_signers: non_signers as u32,
         new_public_keys: pubkeys.to_vec(),
     }
 }

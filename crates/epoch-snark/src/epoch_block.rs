@@ -27,7 +27,7 @@ pub struct EpochTransition {
 #[derive(Clone)]
 pub struct EpochBlock {
     pub index: u16,
-    pub maximum_non_signers_plus_one: u32,
+    pub maximum_non_signers: u32,
     pub new_public_keys: Vec<PublicKey>,
 }
 
@@ -35,7 +35,7 @@ impl EpochBlock {
     pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
-            maximum_non_signers_plus_one: maximum_non_signers,
+            maximum_non_signers: maximum_non_signers,
             new_public_keys,
         }
     }
@@ -64,7 +64,7 @@ impl EpochBlock {
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
-        epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers_plus_one)?);
+        epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
         }

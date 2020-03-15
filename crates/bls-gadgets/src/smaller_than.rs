@@ -27,6 +27,16 @@ impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
     }
 
     // the function assumes a and b are known to be <= (p-1)/2
+    pub fn is_smaller_than_or_equal_to<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        a: &FpGadget<ConstraintF>,
+        b: &FpGadget<ConstraintF>,
+    ) -> Result<Boolean, SynthesisError> {
+        let b_plus_one = b.add_constant(cs.ns(|| "plus one"), &ConstraintF::one())?;
+        Self::is_smaller_than(cs.ns(|| "is smaller than"), a, &b_plus_one)
+    }
+
+    // the function assumes a and b are known to be <= (p-1)/2
     pub fn enforce_smaller_than<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
         a: &FpGadget<ConstraintF>,
@@ -41,6 +51,16 @@ impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
         );
 
         Ok(())
+    }
+
+    // the function assumes a and b are known to be <= (p-1)/2
+    pub fn enforce_smaller_than_or_equal_to<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        a: &FpGadget<ConstraintF>,
+        b: &FpGadget<ConstraintF>,
+    ) -> Result<(), SynthesisError> {
+        let b_plus_one = b.add_constant(cs.ns(|| "plus one"), &ConstraintF::one())?;
+        Self::enforce_smaller_than(cs.ns(|| "enforce smaller than"), a, &b_plus_one)
     }
 
     pub fn enforce_smaller_than_strict<CS: ConstraintSystem<ConstraintF>>(
@@ -70,6 +90,15 @@ impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
         );
 
         Ok(())
+    }
+
+    pub fn enforce_smaller_than_or_equal_to_strict<CS: ConstraintSystem<ConstraintF>>(
+        mut cs: CS,
+        a: &FpGadget<ConstraintF>,
+        b: &FpGadget<ConstraintF>,
+    ) -> Result<(), SynthesisError> {
+        let b_plus_one = b.add_constant(cs.ns(|| "plus one"), &ConstraintF::one())?;
+        Self::enforce_smaller_than_strict(cs.ns(|| "enforce smaller than strict"), a, &b_plus_one)
     }
 }
 
@@ -115,9 +144,22 @@ mod test {
                     &b_var,
                 )
                 .unwrap();
+                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                    cs.ns(|| "smaller than test 2"),
+                    &a_var,
+                    &b_var,
+                )
+                .unwrap();
+
             } else {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
+                    &b_var,
+                    &a_var,
+                )
+                .unwrap();
+                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                    cs.ns(|| "smaller than test 2"),
                     &b_var,
                     &a_var,
                 )
@@ -144,9 +186,21 @@ mod test {
                     &b_var,
                 )
                 .unwrap();
-            } else {
+                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                    cs.ns(|| "smaller than test 2"),
+                    &a_var,
+                    &b_var,
+                )
+                .unwrap();
+            } else if a < b {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
+                    &b_var,
+                    &a_var,
+                )
+                .unwrap();
+                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to(
+                    cs.ns(|| "smaller than test 2"),
                     &b_var,
                     &a_var,
                 )
@@ -168,6 +222,20 @@ mod test {
             .unwrap();
 
             assert!(!cs.is_satisfied());
+        }
+
+        for _i in 0..10 {
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let a = rand_in_range(&mut rng);
+            let a_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "a"), || Ok(a)).unwrap();
+            SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to(
+                cs.ns(|| "smaller than or equal to test"),
+                &a_var,
+                &a_var,
+            )
+                .unwrap();
+
+            assert!(cs.is_satisfied());
         }
     }
 }

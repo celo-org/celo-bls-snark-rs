@@ -25,7 +25,7 @@ type FrGadget = FpGadget<Fr>;
 #[derive(Clone, Debug, Default)]
 pub struct EpochData<E: PairingEngine> {
     /// The allowed non-signers for the epoch + 1
-    pub maximum_non_signers_plus_one: u32,
+    pub maximum_non_signers: u32,
     /// The index of the initial epoch
     pub index: Option<u16>,
     /// The public keys at the epoch
@@ -48,7 +48,7 @@ impl<E: PairingEngine> EpochData<E> {
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         EpochData::<E> {
             index: None,
-            maximum_non_signers_plus_one: maximum_non_signers as u32,
+            maximum_non_signers: maximum_non_signers as u32,
             public_keys: vec![None; num_validators],
         }
     }
@@ -88,7 +88,7 @@ impl EpochData<Bls12_377> {
 
         let maximum_non_signers = to_fr(
             &mut cs.ns(|| "max non signers"),
-            Some(self.maximum_non_signers_plus_one),
+            Some(self.maximum_non_signers),
         )?;
         let maximum_non_signers_bits = fr_to_bits(
             &mut cs.ns(|| "max non signers bits"),
@@ -195,7 +195,7 @@ mod tests {
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
-            maximum_non_signers_plus_one: 12,
+            maximum_non_signers: 12,
             public_keys: pubkeys,
         }
     }
@@ -222,7 +222,7 @@ mod tests {
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers_plus_one,
+            epoch.maximum_non_signers,
             pubkeys,
         )
         .encode_to_bytes()
@@ -267,19 +267,19 @@ mod tests {
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers_plus_one,
+            epoch.maximum_non_signers,
             pubkeys.clone(),
         )
-        .encode_to_bits(false)
+        .encode_to_bits()
         .unwrap();
 
         // calculate wrong bits
         let bits_wrong = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers_plus_one,
+            epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_to_bits(true)
+        .encode_to_bits_with_aggregated_pk()
         .unwrap();
 
         // calculate the bits from the epoch

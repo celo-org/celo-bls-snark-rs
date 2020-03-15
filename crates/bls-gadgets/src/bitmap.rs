@@ -50,7 +50,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
         Ok(F::from(occurrences))
     })?;
 
-    SmallerThanGadget::<F>::enforce_smaller_than_strict(
+    SmallerThanGadget::<F>::enforce_smaller_than_or_equal_to_strict(
         &mut cs.ns(|| "enforce maximum number of occurrences"),
         &occurrences,
         &max_occurrences,
@@ -105,8 +105,8 @@ mod tests {
                         Boolean::alloc(cs.ns(|| i.to_string()), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
-                let max_occurrences_plus_one = FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || Ok(Fr::from(self.max_occurrences + 1))).unwrap();
-                enforce_maximum_occurrences_in_bitmap(cs, &bitmap, &max_occurrences_plus_one, self.value)
+                let max_occurrences= FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || Ok(Fr::from(self.max_occurrences))).unwrap();
+                enforce_maximum_occurrences_in_bitmap(cs, &bitmap, &max_occurrences, self.value)
             }
         }
 
@@ -148,8 +148,8 @@ mod tests {
             .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
-        let max_occurrences_plus_one = FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number + 1))).unwrap();
-        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, &max_occurrences_plus_one, is_one).unwrap();
+        let max_occurrences= FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number))).unwrap();
+        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, &max_occurrences, is_one).unwrap();
         cs
     }
 

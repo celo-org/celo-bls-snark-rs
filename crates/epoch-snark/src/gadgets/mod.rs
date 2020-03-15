@@ -45,7 +45,7 @@ pub mod test_helpers {
         // Calculate the hash from our to_bytes function
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.maximum_non_signers_plus_one,
+            epoch.maximum_non_signers,
             pubkeys,
         )
         .encode_to_bytes()

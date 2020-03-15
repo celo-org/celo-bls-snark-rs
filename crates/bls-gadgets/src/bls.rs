@@ -299,14 +299,14 @@ mod verify_one_message {
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
 
-        let max_occurrences_plus_one = &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers + 1))).unwrap();
+        let max_occurrences= &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers))).unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
             cs.ns(|| "verify sig"),
             &pub_keys,
             &bitmap,
             &message_hash_var,
             &signature_var,
-            &max_occurrences_plus_one,
+            &max_occurrences,
         )
         .unwrap();
 
