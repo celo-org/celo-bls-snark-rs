@@ -2,8 +2,8 @@ use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::FieldGadget, groups::GroupGadget,
-    pairing::PairingGadget, select::CondSelectGadget,
+    alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::fp::FpGadget, fields::FieldGadget,
+    groups::GroupGadget, pairing::PairingGadget, select::CondSelectGadget,
 };
 use std::marker::PhantomData;
 
@@ -40,7 +40,7 @@ where
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
         signature: &P::G1Gadget,
-        maximum_non_signers: u64,
+        maximum_non_signers: &FpGadget<F>,
     ) -> Result<(), SynthesisError> {
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
@@ -167,6 +167,34 @@ where
         Ok(prepared_aggregated_pk)
     }
 
+    /// Returns a gadget which checks that an aggregate pubkey is correctly calculated
+    /// by the sum of the pub keys
+    pub fn enforce_aggregated_all_pubkeys<CS: ConstraintSystem<F>>(
+        mut cs: CS,
+        pub_keys: &[P::G2Gadget],
+    ) -> Result<P::G2Gadget, SynthesisError> {
+        // Allocate the G2 Generator
+        let g2_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
+            Ok(E::G2Projective::prime_subgroup_generator())
+        })?;
+
+        // We initialize the Aggregate Public Key as a generator point, in order to
+        // calculate the sum of all keys.
+        // This is needed since we cannot add to a Zero.
+        // After the sum is calculated, we must subtract the generator to get the
+        // correct result
+        let mut aggregated_pk = g2_generator.clone();
+        for (i, pk) in pub_keys.iter().enumerate() {
+            // Add the pubkey to the sum
+            // aggregated_pk += pk
+            aggregated_pk = aggregated_pk.add(&mut cs.ns(|| format!("add pk {}", i)), pk)?;
+        }
+        // Subtract the generator to get the correct aggregate pubkey
+        aggregated_pk = aggregated_pk.sub(cs.ns(|| "add neg generator"), &g2_generator)?;
+
+        Ok(aggregated_pk)
+    }
+
     /// Enforces that the provided bitmap contains no more than `maximum_non_signers`
     /// 0s. Also returns a gadget of the prepared message hash and a gadget for the aggregate public key
     ///
@@ -177,7 +205,7 @@ where
         pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
-        maximum_non_signers: u64,
+        maximum_non_signers: &FpGadget<F>,
     ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
@@ -271,13 +299,16 @@ mod verify_one_message {
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
 
+        let max_occurrences =
+            &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers)))
+                .unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
             cs.ns(|| "verify sig"),
             &pub_keys,
             &bitmap,
             &message_hash_var,
             &signature_var,
-            num_non_signers,
+            &max_occurrences,
         )
         .unwrap();
 
@@ -343,7 +374,7 @@ mod verify_one_message {
             0,
         );
         assert!(cs.is_satisfied());
-        assert_eq!(cs.num_constraints(), 18281);
+        assert_eq!(cs.num_constraints(), 20516);
 
         // random sig fails
         let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(

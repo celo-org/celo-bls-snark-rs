@@ -30,14 +30,13 @@ fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool 
 pub extern "C" fn encode_epoch_block_to_bytes(
     in_epoch_index: c_ushort,
     in_maximum_non_signers: c_uint,
-    in_aggregated_public_key: *const PublicKey,
     in_added_public_keys: *const *const PublicKey,
     in_added_public_keys_len: c_int,
+    in_should_encode_aggregated_pk: bool,
     out_bytes: *mut *mut u8,
     out_len: *mut c_int,
 ) -> bool {
     convert_result_to_bool::<_, EncodingError, _>(|| {
-        let aggregated_public_key = unsafe { &*in_aggregated_public_key };
         let added_public_keys_ptrs = unsafe {
             slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
         };
@@ -47,13 +46,16 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
-        let mut encoded = EpochBlock::new(
+        let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
             in_maximum_non_signers as u32,
-            aggregated_public_key.clone(),
             added_public_keys,
-        )
-        .encode_to_bytes()?;
+        );
+        let mut encoded = if in_should_encode_aggregated_pk {
+            epoch_block.encode_to_bytes_with_aggregated_pk()?
+        } else {
+            epoch_block.encode_to_bytes()?
+        };
         encoded.shrink_to_fit();
         unsafe {
             *out_bytes = encoded.as_mut_ptr();

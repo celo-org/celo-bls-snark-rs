@@ -12,6 +12,9 @@ pub use y_to_bit::YToBitGadget;
 mod hash_to_group;
 pub use hash_to_group::{hash_to_bits, HashToGroupGadget};
 
+mod smaller_than;
+pub use smaller_than::SmallerThanGadget;
+
 use algebra::Field;
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{alloc::AllocGadget, boolean::Boolean};
@@ -78,15 +81,10 @@ pub mod test_helpers {
     use algebra::{Field, Group, PairingEngine, ProjectiveCurve, UniformRand, Zero};
     use r1cs_core::ConstraintSystem;
     use r1cs_std::groups::GroupGadget;
-    use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
 
     // Same RNG for all tests
-    pub fn rng() -> XorShiftRng {
-        XorShiftRng::from_seed([
-            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
-            0x06, 0x54,
-        ])
+    pub fn rng() -> rand::rngs::ThreadRng {
+        rand::thread_rng()
     }
 
     /// generate a keypair

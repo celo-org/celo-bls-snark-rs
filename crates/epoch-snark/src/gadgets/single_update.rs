@@ -33,6 +33,8 @@ impl<E: PairingEngine> SingleUpdate<E> {
 pub struct ConstrainedEpoch {
     // The new validators for this epoch
     pub new_pubkeys: Vec<G2Gadget>,
+    // The new threshold needed for signatures
+    pub new_max_non_signers: FrGadget,
     /// The epoch's G1 Hash
     pub message_hash: G1PreparedGadget,
     /// The aggregate pubkey based on the bitmap of the validators
@@ -56,6 +58,7 @@ impl SingleUpdate<Bls12_377> {
         cs: &mut CS,
         previous_pubkeys: &[G2Gadget],
         previous_epoch_index: &FrGadget,
+        previous_max_non_signers: &FrGadget,
         num_validators: u32,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
         // the number of validators across all epochs must be consistent
@@ -77,11 +80,12 @@ impl SingleUpdate<Bls12_377> {
                 previous_pubkeys,
                 &signed_bitmap,
                 &epoch_data.message_hash,
-                self.epoch_data.maximum_non_signers as u64,
+                &previous_max_non_signers,
             )?;
 
         Ok(ConstrainedEpoch {
             new_pubkeys: epoch_data.pubkeys,
+            new_max_non_signers: epoch_data.maximum_non_signers,
             message_hash: prepared_message_hash,
             aggregate_pk: prepared_aggregated_public_key,
             index: epoch_data.index,
@@ -96,7 +100,6 @@ impl SingleUpdate<Bls12_377> {
 pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
-    use bls_gadgets::test_helpers::sum;
 
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
@@ -104,11 +107,9 @@ pub mod test_helpers {
         public_keys: &[E::G2Projective],
         bitmap: &[bool],
     ) -> SingleUpdate<E> {
-        let aggregated_pubkey = sum(public_keys);
         let epoch_data = EpochData::<E> {
             index: Some(index),
             maximum_non_signers,
-            aggregated_pub_key: Some(aggregated_pubkey),
             public_keys: to_option_iter(public_keys),
         };
 
@@ -149,7 +150,7 @@ mod tests {
         single_update_enforce(&mut cs, 5, 5, 4, 5, 1, &[true, true, false, true, false]);
         assert!(!cs.is_satisfied());
         let not_satisfied = cs.which_is_unsatisfied();
-        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/Check that or of extra bits is zero/conditional_equals");
+        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than strict/enforce smaller than");
     }
 
     #[test]
@@ -169,8 +170,13 @@ mod tests {
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
-        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
         let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
+        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
+        let prev_max_non_signers = to_fr(
+            &mut cs.ns(|| "prev max non signers to fr"),
+            Some(maximum_non_signers),
+        )
+        .unwrap();
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
@@ -186,6 +192,7 @@ mod tests {
                 &mut cs.ns(|| "constrain epoch 2"),
                 &prev_validators,
                 &prev_index,
+                &prev_max_non_signers,
                 prev_n_validators as u32,
             )
             .unwrap()

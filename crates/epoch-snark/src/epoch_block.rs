@@ -29,20 +29,13 @@ pub struct EpochBlock {
     pub index: u16,
     pub maximum_non_signers: u32,
     pub new_public_keys: Vec<PublicKey>,
-    pub aggregated_public_key: PublicKey, // TODO: This might be redundant.
 }
 
 impl EpochBlock {
-    pub fn new(
-        index: u16,
-        maximum_non_signers: u32,
-        aggregated_public_key: PublicKey,
-        new_public_keys: Vec<PublicKey>,
-    ) -> Self {
+    pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
             maximum_non_signers,
-            aggregated_public_key,
             new_public_keys,
         }
     }
@@ -61,21 +54,35 @@ impl EpochBlock {
         Ok(hash_to_bits(&self.encode_to_bytes()?))
     }
 
+    pub fn blake2_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
+        Ok(hash_to_bits(&self.encode_to_bytes_with_aggregated_pk()?))
+    }
+
     /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
     /// more easily processable in SNARKs
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
-        epoch_bits.extend_from_slice(encode_public_key(&self.aggregated_public_key)?.as_slice());
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
         }
         Ok(epoch_bits)
     }
 
+    pub fn encode_to_bits_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
+        let mut epoch_bits = self.encode_to_bits()?;
+        let aggregated_pk = PublicKey::aggregate(&self.new_public_keys);
+        epoch_bits.extend_from_slice(encode_public_key(&aggregated_pk)?.as_slice());
+        Ok(epoch_bits)
+    }
+
     pub fn encode_to_bytes(&self) -> Result<Vec<u8>, EncodingError> {
         Ok(bits_to_bytes(&self.encode_to_bits()?))
+    }
+
+    pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(bits_to_bytes(&self.encode_to_bits_with_aggregated_pk()?))
     }
 }
 
@@ -86,7 +93,7 @@ pub fn hash_first_last_epoch_block(
     last: &EpochBlock,
 ) -> Result<Vec<bool>, EncodingError> {
     let h1 = first.blake2()?;
-    let h2 = last.blake2()?;
+    let h2 = last.blake2_with_aggregated_pk()?;
     Ok([h1, h2].concat())
 }
 

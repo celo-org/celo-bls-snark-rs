@@ -24,12 +24,10 @@ type FrGadget = FpGadget<Fr>;
 /// An epoch (either the first one or any in between)
 #[derive(Clone, Debug, Default)]
 pub struct EpochData<E: PairingEngine> {
-    /// The allowed non-signers for the epoch
+    /// The allowed non-signers for the epoch + 1
     pub maximum_non_signers: u32,
     /// The index of the initial epoch
     pub index: Option<u16>,
-    /// The aggregated pubkey of the epoch's validators
-    pub aggregated_pub_key: Option<E::G2Projective>,
     /// The public keys at the epoch
     pub public_keys: Vec<Option<E::G2Projective>>,
 }
@@ -38,6 +36,7 @@ pub struct ConstrainedEpochData {
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
     pub index: FrGadget,
+    pub maximum_non_signers: FrGadget,
     pub message_hash: G1Gadget,
     pub pubkeys: Vec<G2Gadget>,
     pub crh_bits: Vec<Boolean>,
@@ -50,7 +49,6 @@ impl<E: PairingEngine> EpochData<E> {
         EpochData::<E> {
             index: None,
             maximum_non_signers: maximum_non_signers as u32,
-            aggregated_pub_key: None,
             public_keys: vec![None; num_validators],
         }
     }
@@ -62,7 +60,7 @@ impl EpochData<Bls12_377> {
         cs: &mut CS,
         previous_index: &FrGadget,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
-        let (bits, index, pubkeys) = self.to_bits(cs)?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
@@ -72,6 +70,7 @@ impl EpochData<Bls12_377> {
         Ok(ConstrainedEpochData {
             bits,
             index,
+            maximum_non_signers,
             pubkeys,
             message_hash,
             crh_bits,
@@ -83,31 +82,21 @@ impl EpochData<Bls12_377> {
     pub fn to_bits<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
-    ) -> Result<(Vec<Boolean>, FrGadget, Vec<G2Gadget>), SynthesisError> {
+    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
         let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
 
-        let current_maximum_non_signers = {
-            let current_maximum_non_signers = to_fr(
-                &mut cs.ns(|| "max non signers"),
-                Some(self.maximum_non_signers),
-            )?;
-            fr_to_bits(
-                &mut cs.ns(|| "max non signers bits"),
-                &current_maximum_non_signers,
-                32,
-            )?
-        };
+        let maximum_non_signers = to_fr(
+            &mut cs.ns(|| "max non signers"),
+            Some(self.maximum_non_signers),
+        )?;
+        let maximum_non_signers_bits = fr_to_bits(
+            &mut cs.ns(|| "max non signers bits"),
+            &maximum_non_signers,
+            32,
+        )?;
 
-        let aggregated_key_bits = {
-            let aggregated_key = G2Gadget::alloc(cs.ns(|| "aggregated pub key"), || {
-                self.aggregated_pub_key.get()
-            })?;
-            g2_to_bits(&mut cs.ns(|| "aggregated pubkey to bits"), &aggregated_key)?
-        };
-
-        let mut epoch_bits: Vec<Boolean> =
-            [index_bits, current_maximum_non_signers, aggregated_key_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -121,7 +110,7 @@ impl EpochData<Bls12_377> {
             pubkey_vars.push(pk_var);
         }
 
-        Ok((epoch_bits, index, pubkey_vars))
+        Ok((epoch_bits, index, maximum_non_signers, pubkey_vars))
     }
 
     /// Enforces that `index = previous_index + 1`
@@ -201,14 +190,12 @@ mod tests {
 
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
         let rng = &mut rand::thread_rng();
-        let aggregated_pub_key = Some(Bls12_377G2Projective::rand(rng));
         let pubkeys = (0..10)
             .map(|_| Some(Bls12_377G2Projective::rand(rng)))
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
             maximum_non_signers: 12,
-            aggregated_pub_key,
             public_keys: pubkeys,
         }
     }
@@ -233,14 +220,9 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(
-            epoch.index.unwrap(),
-            epoch.maximum_non_signers,
-            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
-            pubkeys,
-        )
-        .encode_to_bytes()
-        .unwrap();
+        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+            .encode_to_bytes()
+            .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
         let (hash, _) = try_and_increment
@@ -282,11 +264,15 @@ mod tests {
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers,
-            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
-            pubkeys,
+            pubkeys.clone(),
         )
         .encode_to_bits()
         .unwrap();
+
+        // calculate wrong bits
+        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+            .encode_to_bits_with_aggregated_pk()
+            .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
@@ -298,6 +284,7 @@ mod tests {
             .iter()
             .map(|x| x.get_value().unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(bits_inner, bits,);
+        assert_eq!(bits_inner, bits);
+        assert_ne!(bits_inner, bits_wrong);
     }
 }

@@ -16,7 +16,7 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 use algebra::PairingEngine;
 use groth16::{Proof, VerifyingKey};
 
-use crate::gadgets::{single_update::SingleUpdate, EpochData, ProofOfCompression};
+use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochData, ProofOfCompression};
 
 use bls_gadgets::BlsVerifyGadget;
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
@@ -83,7 +83,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         cs: &mut CS,
     ) -> Result<ProofOfCompression, SynthesisError> {
         // Constrain the initial epoch and get its bits
-        let (first_epoch_bits, first_epoch_index, initial_pubkey_vars) =
+        let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
             self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
@@ -98,6 +98,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             &mut cs.ns(|| "verify epochs"),
             first_epoch_index,
             initial_pubkey_vars,
+            initial_maximum_non_signers,
         )?;
 
         // Verify the aggregate BLS signature
@@ -124,6 +125,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         cs: &mut CS,
         first_epoch_index: FrGadget,
         initial_pubkey_vars: Vec<G2Gadget>,
+        initial_max_non_signers: FrGadget,
     ) -> Result<
         (
             Vec<Boolean>,
@@ -139,6 +141,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         let mut last_epoch_bits = vec![];
         let mut previous_epoch_index = first_epoch_index;
         let mut previous_pubkey_vars = initial_pubkey_vars;
+        let mut previous_max_non_signers = initial_max_non_signers;
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
         for (i, epoch) in self.epochs.iter().enumerate() {
@@ -146,12 +149,14 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &mut cs.ns(|| format!("epoch {}", i)),
                 &previous_pubkey_vars,
                 &previous_epoch_index,
+                &previous_max_non_signers,
                 self.num_validators,
             )?;
 
             // Update the pubkeys for the next iteration
-            previous_pubkey_vars = constrained_epoch.new_pubkeys;
             previous_epoch_index = constrained_epoch.index;
+            previous_pubkey_vars = constrained_epoch.new_pubkeys;
+            previous_max_non_signers = constrained_epoch.new_max_non_signers;
 
             // Save the aggregated pubkey / message hash pair for the BLS batch verification
             prepared_aggregated_public_keys.push(constrained_epoch.aggregate_pk);
@@ -160,8 +165,15 @@ impl ValidatorSetUpdate<Bls12_377> {
             // Save the xof/crh and the last epoch's bits for compressing the public inputs
             all_crh_bits.extend_from_slice(&constrained_epoch.crh_bits);
             all_xof_bits.extend_from_slice(&constrained_epoch.xof_bits);
-            if i == self.epochs.len() {
+            if i == self.epochs.len() - 1 {
+                let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
+                    cs.ns(|| "last epoch aggregated pk"),
+                    &previous_pubkey_vars, // These are now the last epoch new pubkeys
+                )?;
+                let last_apk_bits =
+                    g2_to_bits(&mut cs.ns(|| "last epoch aggregated pk bits"), &last_apk)?;
                 last_epoch_bits = constrained_epoch.bits;
+                last_epoch_bits.extend_from_slice(&last_apk_bits);
             }
         }
 
