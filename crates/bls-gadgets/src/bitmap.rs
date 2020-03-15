@@ -105,7 +105,10 @@ mod tests {
                         Boolean::alloc(cs.ns(|| i.to_string()), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
-                let max_occurrences= FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || Ok(Fr::from(self.max_occurrences))).unwrap();
+                let max_occurrences = FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || {
+                    Ok(Fr::from(self.max_occurrences))
+                })
+                .unwrap();
                 enforce_maximum_occurrences_in_bitmap(cs, &bitmap, &max_occurrences, self.value)
             }
         }
@@ -148,7 +151,8 @@ mod tests {
             .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
-        let max_occurrences= FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number))).unwrap();
+        let max_occurrences =
+            FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number))).unwrap();
         enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, &max_occurrences, is_one).unwrap();
         cs
     }

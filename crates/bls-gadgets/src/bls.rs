@@ -299,7 +299,9 @@ mod verify_one_message {
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
 
-        let max_occurrences= &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers))).unwrap();
+        let max_occurrences =
+            &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers)))
+                .unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
             cs.ns(|| "verify sig"),
             &pub_keys,

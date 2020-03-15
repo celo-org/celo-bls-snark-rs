@@ -150,7 +150,6 @@ mod test {
                     &b_var,
                 )
                 .unwrap();
-
             } else {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
@@ -233,7 +232,7 @@ mod test {
                 &a_var,
                 &a_var,
             )
-                .unwrap();
+            .unwrap();
 
             assert!(cs.is_satisfied());
         }
