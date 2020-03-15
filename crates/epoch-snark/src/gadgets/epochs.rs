@@ -39,12 +39,17 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
 }
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
-    pub fn empty(num_validators: usize, num_epochs: usize, vk: VerifyingKey<E>) -> Self {
-        let empty_update = SingleUpdate::empty(num_validators);
+    pub fn empty(
+        num_validators: usize,
+        num_epochs: usize,
+        maximum_non_signers: usize,
+        vk: VerifyingKey<E>,
+    ) -> Self {
+        let empty_update = SingleUpdate::empty(num_validators, maximum_non_signers);
         let empty_hash_proof = Proof::<E>::default();
 
         ValidatorSetUpdate {
-            initial_epoch: EpochData::empty(num_validators),
+            initial_epoch: EpochData::empty(num_validators, maximum_non_signers),
             num_validators: num_validators as u32,
             epochs: vec![empty_update; num_epochs],
             aggregated_signature: None,

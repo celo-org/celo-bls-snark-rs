@@ -150,6 +150,6 @@ mod tests {
         };
 
         let pvk = prepare_verifying_key(&params.vk);
-        verify_proof(&pvk, &proof, &public_inputs).unwrap();
+        assert!(verify_proof(&pvk, &proof, &public_inputs).unwrap());
     }
 }

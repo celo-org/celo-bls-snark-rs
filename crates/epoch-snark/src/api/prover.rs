@@ -62,7 +62,7 @@ pub fn prove(
 fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
-        maximum_non_signers: Some(block.maximum_non_signers),
+        maximum_non_signers: block.maximum_non_signers,
         aggregated_pub_key: Some(block.aggregated_public_key.get_pk()),
         public_keys: block
             .new_public_keys
