@@ -157,6 +157,7 @@ dependencies = [
  "algebra",
  "bls-crypto",
  "crypto-primitives",
+ "groth16",
  "r1cs-core",
  "r1cs-std",
  "rand",
