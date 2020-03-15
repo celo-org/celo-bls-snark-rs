@@ -371,7 +371,7 @@ func AggregateSignatures(signatures []*Signature) (*Signature, error) {
 	return aggregatedSignature, nil
 }
 
-func EncodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublicKeys []*PublicKey, shouldEncodeAggregatedPublicKey bool) ([]byte, error) {
+func encodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublicKeys []*PublicKey, shouldEncodeAggregatedPublicKey bool) ([]byte, error) {
 	if len(addedPublicKeys) == 0 {
 		return nil, EmptySliceError
 	}
@@ -392,4 +392,12 @@ func EncodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublic
 	defer C.free_vec(bytes, size)
 
 	return C.GoBytes(unsafe.Pointer(bytes), size), nil
+}
+
+func EncodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublicKeys []*PublicKey) ([]byte, error) {
+	return encodeEpochToBytes(epochIndex, maximumNonSigners, addedPublicKeys, false)
+}
+
+func EncodeEpochToBytesWithAggregatedKey(epochIndex uint16, maximumNonSigners uint32, addedPublicKeys []*PublicKey) ([]byte, error) {
+	return encodeEpochToBytes(epochIndex, maximumNonSigners, addedPublicKeys, true)
 }

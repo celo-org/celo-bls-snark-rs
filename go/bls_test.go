@@ -112,19 +112,19 @@ func TestEncoding(t *testing.T) {
 	defer privateKey2.Destroy()
 	publicKey2, _ := privateKey2.ToPublic()
 
-	bytes, err := EncodeEpochToBytes(10, 20, []*PublicKey{publicKey, publicKey2}, false)
+	bytes, err := EncodeEpochToBytes(10, 20, []*PublicKey{publicKey, publicKey2})
 	if err != nil {
 		t.Fatalf("failed encoding epoch bytes")
 	}
 	t.Logf("encoding: %s\n", hex.EncodeToString(bytes))
-	bytesWithApk, err := EncodeEpochToBytes(10, 20, []*PublicKey{publicKey, publicKey2}, true)
+	bytesWithApk, err := EncodeEpochToBytesWithAggregatedKey(10, 20, []*PublicKey{publicKey, publicKey2})
 	if err != nil {
 		t.Fatalf("failed encoding epoch bytes")
 	}
 	t.Logf("encoding with aggregated public key: %s\n", hex.EncodeToString(bytes))
-  if len(bytesWithApk) <= len(bytes) {
+	if len(bytesWithApk) <= len(bytes) {
 		t.Fatalf("encoding with the aggregated public key should be larger")
-  }
+	}
 }
 
 func TestAggregatePublicKeysErrors(t *testing.T) {
@@ -171,19 +171,12 @@ func TestAggregateSignaturesErrors(t *testing.T) {
 
 func TestEncodeErrors(t *testing.T) {
 	InitBLSCrypto()
-	privateKey, _ := GeneratePrivateKey()
-	defer privateKey.Destroy()
-	publicKey, _ := privateKey.ToPublic()
 
-	privateKey2, _ := GeneratePrivateKey()
-	defer privateKey2.Destroy()
-	publicKey2, _ := privateKey2.ToPublic()
-
-  _, err := EncodeEpochToBytes(0, 0, []*PublicKey{}, false)
+	_, err := EncodeEpochToBytes(0, 0, []*PublicKey{})
 	if err != EmptySliceError {
 		t.Fatalf("should have been an empty slice")
 	}
-	_, err = EncodeEpochToBytes(0, 0, nil, false)
+	_, err = EncodeEpochToBytes(0, 0, nil)
 	if err != EmptySliceError {
 		t.Fatalf("should have been an empty slice")
 	}
