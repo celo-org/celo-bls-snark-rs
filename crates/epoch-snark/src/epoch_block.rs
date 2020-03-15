@@ -32,11 +32,7 @@ pub struct EpochBlock {
 }
 
 impl EpochBlock {
-    pub fn new(
-        index: u16,
-        maximum_non_signers: u32,
-        new_public_keys: Vec<PublicKey>,
-    ) -> Self {
+    pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
             maximum_non_signers_plus_one: maximum_non_signers,

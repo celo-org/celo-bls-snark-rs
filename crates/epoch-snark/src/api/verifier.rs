@@ -1,9 +1,9 @@
 use super::{BLSCurve, CPCurve, CPField, CPFrParams};
+use crate::encoding::EncodingError;
 use crate::epoch_block::{hash_first_last_epoch_block, EpochBlock};
 use crate::gadgets::pack;
 use groth16::{prepare_verifying_key, verify_proof, Proof, VerifyingKey};
 use r1cs_core::SynthesisError;
-use crate::encoding::EncodingError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

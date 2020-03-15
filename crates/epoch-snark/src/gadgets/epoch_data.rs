@@ -96,8 +96,7 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> =
-            [index_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -280,8 +279,8 @@ mod tests {
             epoch.maximum_non_signers_plus_one,
             pubkeys,
         )
-            .encode_to_bits(true)
-            .unwrap();
+        .encode_to_bits(true)
+        .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();

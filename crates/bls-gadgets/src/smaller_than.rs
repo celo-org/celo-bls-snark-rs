@@ -1,25 +1,17 @@
 use algebra::{Field, PrimeField};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    fields::{
-        FieldGadget,
-        fp::FpGadget,
-    },
     boolean::Boolean,
+    fields::{fp::FpGadget, FieldGadget},
     ToBitsGadget,
 };
 use std::marker::PhantomData;
 
-
-pub struct SmallerThanGadget<
-    ConstraintF: Field + PrimeField,
-> {
+pub struct SmallerThanGadget<ConstraintF: Field + PrimeField> {
     constraint_field_type: PhantomData<ConstraintF>,
 }
 
-impl<
-    ConstraintF: Field + PrimeField,
-> SmallerThanGadget<ConstraintF> {
+impl<ConstraintF: Field + PrimeField> SmallerThanGadget<ConstraintF> {
     // the function assumes a and b are known to be <= (p-1)/2
     pub fn is_smaller_than<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,
@@ -27,17 +19,9 @@ impl<
         b: &FpGadget<ConstraintF>,
     ) -> Result<Boolean, SynthesisError> {
         let two = ConstraintF::one() + &ConstraintF::one();
-        let d0 = a.sub(
-            cs.ns(|| "a - b"),
-            b
-        )?;
-        let d = d0.mul_by_constant(
-            cs.ns(|| "mul 2"),
-            &two,
-        )?;
-        let d_bits = d.to_bits_strict(
-            cs.ns(|| "d to bits"),
-        )?;
+        let d0 = a.sub(cs.ns(|| "a - b"), b)?;
+        let d = d0.mul_by_constant(cs.ns(|| "mul 2"), &two)?;
+        let d_bits = d.to_bits_strict(cs.ns(|| "d to bits"))?;
         let d_bits_len = d_bits.len();
         Ok(d_bits[d_bits_len - 1])
     }
@@ -48,11 +32,7 @@ impl<
         a: &FpGadget<ConstraintF>,
         b: &FpGadget<ConstraintF>,
     ) -> Result<(), SynthesisError> {
-        let is_smaller_than = Self::is_smaller_than(
-            cs.ns(|| "is smaller than"),
-            a,
-            b,
-        )?;
+        let is_smaller_than = Self::is_smaller_than(cs.ns(|| "is smaller than"), a, b)?;
         cs.enforce(
             || "enforce smaller than",
             |_| is_smaller_than.lc(CS::one(), ConstraintF::one()),
@@ -68,28 +48,20 @@ impl<
         a: &FpGadget<ConstraintF>,
         b: &FpGadget<ConstraintF>,
     ) -> Result<(), SynthesisError> {
-        let a_bits = a.to_bits(
-            cs.ns(|| "a to bits"),
-        )?;
+        let a_bits = a.to_bits(cs.ns(|| "a to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
             cs.ns(|| "enforce a smaller than modulus minus one div two"),
             &a_bits,
             ConstraintF::modulus_minus_one_div_two(),
         )?;
-        let b_bits = b.to_bits(
-            cs.ns(|| "b to bits"),
-        )?;
+        let b_bits = b.to_bits(cs.ns(|| "b to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, ConstraintF, _>(
             cs.ns(|| "enforce b smaller than modulus minus one div two"),
             &b_bits,
             ConstraintF::modulus_minus_one_div_two(),
         )?;
 
-        let is_smaller_than = Self::is_smaller_than(
-            cs.ns(|| "is smaller than"),
-            a,
-            b,
-        )?;
+        let is_smaller_than = Self::is_smaller_than(cs.ns(|| "is smaller than"), a, b)?;
         cs.enforce(
             || "enforce smaller than",
             |_| is_smaller_than.lc(CS::one(), ConstraintF::one()),
@@ -103,27 +75,21 @@ impl<
 
 #[cfg(test)]
 mod test {
-    use rand::{SeedableRng, Rng};
+    use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
-    use algebra::{
-        sw6::Fr as SW6Fr,
-        PrimeField,
-        UniformRand,
-    };
-    use r1cs_core::ConstraintSystem;
-    use r1cs_std::{
-        test_constraint_system::TestConstraintSystem,
-        alloc::AllocGadget,
-    };
     use super::SmallerThanGadget;
+    use algebra::{sw6::Fr as SW6Fr, PrimeField, UniformRand};
+    use r1cs_core::ConstraintSystem;
     use r1cs_std::fields::fp::FpGadget;
-
-
+    use r1cs_std::{alloc::AllocGadget, test_constraint_system::TestConstraintSystem};
 
     #[test]
     fn test_smaller_than() {
-        let mut rng = &mut XorShiftRng::from_seed([0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54]);
+        let mut rng = &mut XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
         fn rand_in_range<R: Rng>(rng: &mut R) -> SW6Fr {
             let pminusonedivtwo = SW6Fr::from_repr(SW6Fr::modulus_minus_one_div_two());
             let mut r;
@@ -138,28 +104,24 @@ mod test {
         for i in 0..10 {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let a = rand_in_range(&mut rng);
-            let a_var = FpGadget::<SW6Fr>::alloc(
-                cs.ns(|| "a"),
-                || Ok(a)
-            ).unwrap();
+            let a_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "a"), || Ok(a)).unwrap();
             let b = rand_in_range(&mut rng);
-            let b_var = FpGadget::<SW6Fr>::alloc(
-                cs.ns(|| "b"),
-                || Ok(b)
-            ).unwrap();
+            let b_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "b"), || Ok(b)).unwrap();
 
             if a < b {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
                     &a_var,
                     &b_var,
-                ).unwrap();
+                )
+                .unwrap();
             } else {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
                     &b_var,
                     &a_var,
-                ).unwrap();
+                )
+                .unwrap();
             }
 
             if i == 0 {
@@ -171,28 +133,24 @@ mod test {
         for _i in 0..10 {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let a = rand_in_range(&mut rng);
-            let a_var = FpGadget::<SW6Fr>::alloc(
-                cs.ns(|| "a"),
-                || Ok(a)
-            ).unwrap();
+            let a_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "a"), || Ok(a)).unwrap();
             let b = rand_in_range(&mut rng);
-            let b_var = FpGadget::<SW6Fr>::alloc(
-                cs.ns(|| "b"),
-                || Ok(b)
-            ).unwrap();
+            let b_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "b"), || Ok(b)).unwrap();
 
             if b < a {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
                     &a_var,
                     &b_var,
-                ).unwrap();
+                )
+                .unwrap();
             } else {
                 SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                     cs.ns(|| "smaller than test"),
                     &b_var,
                     &a_var,
-                ).unwrap();
+                )
+                .unwrap();
             }
 
             assert!(!cs.is_satisfied());
@@ -201,15 +159,13 @@ mod test {
         for _i in 0..10 {
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
             let a = rand_in_range(&mut rng);
-            let a_var = FpGadget::<SW6Fr>::alloc(
-                cs.ns(|| "a"),
-                || Ok(a)
-            ).unwrap();
+            let a_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "a"), || Ok(a)).unwrap();
             SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
                 cs.ns(|| "smaller than test"),
                 &a_var,
                 &a_var,
-            ).unwrap();
+            )
+            .unwrap();
 
             assert!(!cs.is_satisfied());
         }

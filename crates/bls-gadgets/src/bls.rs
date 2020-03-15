@@ -2,9 +2,8 @@ use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::FieldGadget, groups::GroupGadget,
-    pairing::PairingGadget, select::CondSelectGadget,
-    fields::fp::FpGadget,
+    alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::fp::FpGadget, fields::FieldGadget,
+    groups::GroupGadget, pairing::PairingGadget, select::CondSelectGadget,
 };
 use std::marker::PhantomData;
 

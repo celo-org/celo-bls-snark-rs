@@ -5,15 +5,14 @@ use crate::{
     gadgets::{single_update::SingleUpdate, EpochData, HashToBits, ValidatorSetUpdate},
 };
 use bls_crypto::{
-    bls::keys::SIG_DOMAIN,
-    curve::hash::try_and_increment::TryAndIncrement,
-    hash::composite::CRH, hash::XOF, CompositeHasher, PublicKey, Signature,
+    bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement, hash::composite::CRH,
+    hash::XOF, CompositeHasher, PublicKey, Signature,
 };
 use bls_gadgets::bytes_to_bits;
 
 use algebra::{bls12_377::G1Projective, Zero};
 use groth16::{create_random_proof, Proof as Groth16Proof};
-use r1cs_core::{SynthesisError, ConstraintSynthesizer};
+use r1cs_core::{ConstraintSynthesizer, SynthesisError};
 
 pub fn prove(
     parameters: &Parameters,
@@ -32,8 +31,11 @@ pub fn prove(
         let block = &transition.block;
         let epoch_bytes = block.encode_to_bytes(false).unwrap();
         let (_, counter) = try_and_increment
-            .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[]).unwrap();
-        let crh_bytes = composite_hasher.crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0).unwrap();
+            .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
+            .unwrap();
+        let crh_bytes = composite_hasher
+            .crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0)
+            .unwrap();
         // The verifier should run both the crh and the xof here to generate a
         // valid statement for the verify
         message_bits.push(
