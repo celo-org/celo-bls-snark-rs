@@ -220,13 +220,9 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(
-            epoch.index.unwrap(),
-            epoch.maximum_non_signers,
-            pubkeys,
-        )
-        .encode_to_bytes()
-        .unwrap();
+        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+            .encode_to_bytes()
+            .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
         let (hash, _) = try_and_increment
@@ -274,13 +270,9 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(
-            epoch.index.unwrap(),
-            epoch.maximum_non_signers,
-            pubkeys,
-        )
-        .encode_to_bits_with_aggregated_pk()
-        .unwrap();
+        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+            .encode_to_bits_with_aggregated_pk()
+            .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();

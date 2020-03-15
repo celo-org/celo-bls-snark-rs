@@ -58,7 +58,6 @@ impl EpochBlock {
         Ok(hash_to_bits(&self.encode_to_bytes_with_aggregated_pk()?))
     }
 
-
     /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
     /// more easily processable in SNARKs
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {

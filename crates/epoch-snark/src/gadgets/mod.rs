@@ -43,13 +43,9 @@ pub mod test_helpers {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(
-            epoch.index.unwrap(),
-            epoch.maximum_non_signers,
-            pubkeys,
-        )
-        .encode_to_bytes()
-        .unwrap();
+        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+            .encode_to_bytes()
+            .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
         let (hash, _) = try_and_increment

@@ -172,8 +172,11 @@ mod tests {
         // convert to constraints
         let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
         let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
-        let prev_max_non_signers =
-            to_fr(&mut cs.ns(|| "prev max non signers to fr"), Some(maximum_non_signers)).unwrap();
+        let prev_max_non_signers = to_fr(
+            &mut cs.ns(|| "prev max non signers to fr"),
+            Some(maximum_non_signers),
+        )
+        .unwrap();
 
         // generate the update via the helper
         let next_epoch = generate_single_update(

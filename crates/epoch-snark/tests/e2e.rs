@@ -4,7 +4,6 @@ mod fixtures;
 use fixtures::generate_test_data;
 
 #[test]
-#[ignore] // This test makes CI run out of memory and takes too long. It works though!
 fn prover_verifier_groth16() {
     let rng = &mut rand::thread_rng();
     let num_epochs = 2;
