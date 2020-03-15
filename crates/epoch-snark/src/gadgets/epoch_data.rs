@@ -225,7 +225,7 @@ mod tests {
             epoch.maximum_non_signers_plus_one,
             pubkeys,
         )
-        .encode_to_bytes(false)
+        .encode_to_bytes()
         .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);

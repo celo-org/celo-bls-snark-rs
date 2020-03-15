@@ -1,4 +1,4 @@
-use algebra::{Field, PrimeField};
+use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     boolean::Boolean,
@@ -7,11 +7,11 @@ use r1cs_std::{
 };
 use std::marker::PhantomData;
 
-pub struct SmallerThanGadget<ConstraintF: Field + PrimeField> {
+pub struct SmallerThanGadget<ConstraintF: PrimeField> {
     constraint_field_type: PhantomData<ConstraintF>,
 }
 
-impl<ConstraintF: Field + PrimeField> SmallerThanGadget<ConstraintF> {
+impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
     // the function assumes a and b are known to be <= (p-1)/2
     pub fn is_smaller_than<CS: ConstraintSystem<ConstraintF>>(
         mut cs: CS,

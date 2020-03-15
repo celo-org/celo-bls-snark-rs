@@ -29,7 +29,9 @@ pub fn prove(
     let mut epochs = Vec::with_capacity(transitions.len());
     for transition in transitions {
         let block = &transition.block;
-        let epoch_bytes = block.encode_to_bytes(false).unwrap();
+        let epoch_bytes = block.encode_to_bytes().unwrap();
+
+        // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
         let (_, counter) = try_and_increment
             .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();

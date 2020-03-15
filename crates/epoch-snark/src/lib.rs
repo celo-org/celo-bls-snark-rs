@@ -50,7 +50,7 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             in_maximum_non_signers as u32,
             added_public_keys,
         )
-        .encode_to_bytes(false)?;
+        .encode_to_bytes()?;
         encoded.shrink_to_fit();
         unsafe {
             *out_bytes = encoded.as_mut_ptr();
