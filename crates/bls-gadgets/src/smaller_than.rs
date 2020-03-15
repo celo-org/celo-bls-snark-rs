@@ -18,7 +18,7 @@ impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
         a: &FpGadget<ConstraintF>,
         b: &FpGadget<ConstraintF>,
     ) -> Result<Boolean, SynthesisError> {
-        let two = ConstraintF::one() + &ConstraintF::one();
+        let two = ConstraintF::one() + ConstraintF::one();
         let d0 = a.sub(cs.ns(|| "a - b"), b)?;
         let d = d0.mul_by_constant(cs.ns(|| "mul 2"), &two)?;
         let d_bits = d.to_bits_strict(cs.ns(|| "d to bits"))?;
@@ -106,6 +106,7 @@ impl<ConstraintF: PrimeField> SmallerThanGadget<ConstraintF> {
 mod test {
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
+    use std::cmp::Ordering;
 
     use super::SmallerThanGadget;
     use algebra::{sw6::Fr as SW6Fr, PrimeField, UniformRand};
@@ -137,32 +138,36 @@ mod test {
             let b = rand_in_range(&mut rng);
             let b_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "b"), || Ok(b)).unwrap();
 
-            if a < b {
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
-                    cs.ns(|| "smaller than test"),
-                    &a_var,
-                    &b_var,
-                )
-                .unwrap();
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
-                    cs.ns(|| "smaller than test 2"),
-                    &a_var,
-                    &b_var,
-                )
-                .unwrap();
-            } else {
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
-                    cs.ns(|| "smaller than test"),
-                    &b_var,
-                    &a_var,
-                )
-                .unwrap();
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
-                    cs.ns(|| "smaller than test 2"),
-                    &b_var,
-                    &a_var,
-                )
-                .unwrap();
+            match a.cmp(&b) {
+                Ordering::Less => {
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
+                        cs.ns(|| "smaller than test"),
+                        &a_var,
+                        &b_var,
+                    )
+                    .unwrap();
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                        cs.ns(|| "smaller than test 2"),
+                        &a_var,
+                        &b_var,
+                    )
+                    .unwrap();
+                }
+                Ordering::Greater => {
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
+                        cs.ns(|| "smaller than test"),
+                        &b_var,
+                        &a_var,
+                    )
+                    .unwrap();
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                        cs.ns(|| "smaller than test 2"),
+                        &b_var,
+                        &a_var,
+                    )
+                    .unwrap();
+                }
+                _ => {}
             }
 
             if i == 0 {
@@ -178,32 +183,36 @@ mod test {
             let b = rand_in_range(&mut rng);
             let b_var = FpGadget::<SW6Fr>::alloc(cs.ns(|| "b"), || Ok(b)).unwrap();
 
-            if b < a {
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
-                    cs.ns(|| "smaller than test"),
-                    &a_var,
-                    &b_var,
-                )
-                .unwrap();
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
-                    cs.ns(|| "smaller than test 2"),
-                    &a_var,
-                    &b_var,
-                )
-                .unwrap();
-            } else if a < b {
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
-                    cs.ns(|| "smaller than test"),
-                    &b_var,
-                    &a_var,
-                )
-                .unwrap();
-                SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to(
-                    cs.ns(|| "smaller than test 2"),
-                    &b_var,
-                    &a_var,
-                )
-                .unwrap();
+            match b.cmp(&a) {
+                Ordering::Less => {
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
+                        cs.ns(|| "smaller than test"),
+                        &a_var,
+                        &b_var,
+                    )
+                    .unwrap();
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to_strict(
+                        cs.ns(|| "smaller than test 2"),
+                        &a_var,
+                        &b_var,
+                    )
+                    .unwrap();
+                }
+                Ordering::Greater => {
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_strict(
+                        cs.ns(|| "smaller than test"),
+                        &b_var,
+                        &a_var,
+                    )
+                    .unwrap();
+                    SmallerThanGadget::<SW6Fr>::enforce_smaller_than_or_equal_to(
+                        cs.ns(|| "smaller than test 2"),
+                        &b_var,
+                        &a_var,
+                    )
+                    .unwrap();
+                }
+                _ => {}
             }
 
             assert!(!cs.is_satisfied());

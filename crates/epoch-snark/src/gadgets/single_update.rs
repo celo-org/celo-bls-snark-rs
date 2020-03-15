@@ -109,7 +109,7 @@ pub mod test_helpers {
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
-            maximum_non_signers: maximum_non_signers,
+            maximum_non_signers,
             public_keys: to_option_iter(public_keys),
         };
 

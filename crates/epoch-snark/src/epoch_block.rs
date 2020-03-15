@@ -35,7 +35,7 @@ impl EpochBlock {
     pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
-            maximum_non_signers: maximum_non_signers,
+            maximum_non_signers,
             new_public_keys,
         }
     }
