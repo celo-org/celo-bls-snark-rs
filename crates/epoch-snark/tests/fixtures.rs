@@ -51,8 +51,8 @@ pub fn generate_test_data(
         let bitmap_epoch = &bitmaps[i];
         let asig = {
             let mut asig = G1Projective::zero();
-            for sk in signers_epoch {
-                if bitmap_epoch[i] {
+            for (j, sk) in signers_epoch.iter().enumerate() {
+                if bitmap_epoch[j] {
                     asig += hash.mul(*sk)
                 }
             }
@@ -73,11 +73,9 @@ pub fn generate_test_data(
 }
 
 fn generate_block(index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
-    let aggregated_public_key = PublicKey::aggregate(&pubkeys);
     EpochBlock {
         index: index as u16,
         maximum_non_signers: non_signers as u32,
-        aggregated_public_key,
         new_public_keys: pubkeys.to_vec(),
     }
 }

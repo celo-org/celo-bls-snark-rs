@@ -28,8 +28,6 @@ pub struct EpochData<E: PairingEngine> {
     pub maximum_non_signers: u32,
     /// The index of the initial epoch
     pub index: Option<u16>,
-    /// The aggregated pubkey of the epoch's validators
-    pub aggregated_pub_key: Option<E::G2Projective>,
     /// The public keys at the epoch
     pub public_keys: Vec<Option<E::G2Projective>>,
 }
@@ -50,7 +48,6 @@ impl<E: PairingEngine> EpochData<E> {
         EpochData::<E> {
             index: None,
             maximum_non_signers: maximum_non_signers as u32,
-            aggregated_pub_key: None,
             public_keys: vec![None; num_validators],
         }
     }
@@ -99,15 +96,8 @@ impl EpochData<Bls12_377> {
             )?
         };
 
-        let aggregated_key_bits = {
-            let aggregated_key = G2Gadget::alloc(cs.ns(|| "aggregated pub key"), || {
-                self.aggregated_pub_key.get()
-            })?;
-            g2_to_bits(&mut cs.ns(|| "aggregated pubkey to bits"), &aggregated_key)?
-        };
-
         let mut epoch_bits: Vec<Boolean> =
-            [index_bits, current_maximum_non_signers, aggregated_key_bits].concat();
+            [index_bits, current_maximum_non_signers].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -201,14 +191,12 @@ mod tests {
 
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
         let rng = &mut rand::thread_rng();
-        let aggregated_pub_key = Some(Bls12_377G2Projective::rand(rng));
         let pubkeys = (0..10)
             .map(|_| Some(Bls12_377G2Projective::rand(rng)))
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
             maximum_non_signers: 12,
-            aggregated_pub_key,
             public_keys: pubkeys,
         }
     }
@@ -236,10 +224,9 @@ mod tests {
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers,
-            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
             pubkeys,
         )
-        .encode_to_bytes()
+        .encode_to_bytes(false)
         .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);
@@ -282,11 +269,19 @@ mod tests {
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers,
-            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
+            pubkeys.clone(),
+        )
+        .encode_to_bits(false)
+        .unwrap();
+
+        // calculate wrong bits
+        let bits_wrong = EpochBlock::new(
+            epoch.index.unwrap(),
+            epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_to_bits()
-        .unwrap();
+            .encode_to_bits(true)
+            .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
@@ -298,6 +293,7 @@ mod tests {
             .iter()
             .map(|x| x.get_value().unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(bits_inner, bits,);
+        assert_eq!(bits_inner, bits);
+        assert_ne!(bits_inner, bits_wrong);
     }
 }

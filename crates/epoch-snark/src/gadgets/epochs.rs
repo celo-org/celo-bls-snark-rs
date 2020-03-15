@@ -16,7 +16,7 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 use algebra::PairingEngine;
 use groth16::{Proof, VerifyingKey};
 
-use crate::gadgets::{single_update::SingleUpdate, EpochData, ProofOfCompression};
+use crate::gadgets::{single_update::SingleUpdate, EpochData, ProofOfCompression, g2_to_bits};
 
 use bls_gadgets::BlsVerifyGadget;
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
@@ -160,8 +160,17 @@ impl ValidatorSetUpdate<Bls12_377> {
             // Save the xof/crh and the last epoch's bits for compressing the public inputs
             all_crh_bits.extend_from_slice(&constrained_epoch.crh_bits);
             all_xof_bits.extend_from_slice(&constrained_epoch.xof_bits);
-            if i == self.epochs.len() {
+            if i == self.epochs.len() - 1 {
+                let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
+                    cs.ns(|| "last epoch aggregated pk"),
+                    &previous_pubkey_vars, // These are now the last epoch new pubkeys
+                )?;
+                let last_apk_bits = g2_to_bits(
+                    &mut cs.ns(|| "last epoch aggregated pk bits"),
+                    &last_apk,
+                )?;
                 last_epoch_bits = constrained_epoch.bits;
+                last_epoch_bits.extend_from_slice(&last_apk_bits);
             }
         }
 

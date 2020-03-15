@@ -15,6 +15,9 @@ pub use proof_of_compression::ProofOfCompression;
 mod epochs;
 pub use epochs::ValidatorSetUpdate;
 
+mod smaller_than;
+pub use smaller_than::SmallerThanGadget;
+
 // some helpers
 use algebra::{bls12_377::Parameters, sw6::Fr, BigInteger, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
@@ -46,10 +49,9 @@ pub mod test_helpers {
         let epoch_bytes = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.maximum_non_signers,
-            PublicKey::from_pk(epoch.aggregated_pub_key.unwrap()),
             pubkeys,
         )
-        .encode_to_bytes()
+        .encode_to_bytes(false)
         .unwrap();
         let composite_hasher = CompositeHasher::new().unwrap();
         let try_and_increment = TryAndIncrement::new(&composite_hasher);

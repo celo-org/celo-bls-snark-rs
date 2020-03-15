@@ -96,7 +96,6 @@ impl SingleUpdate<Bls12_377> {
 pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
-    use bls_gadgets::test_helpers::sum;
 
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
@@ -104,11 +103,9 @@ pub mod test_helpers {
         public_keys: &[E::G2Projective],
         bitmap: &[bool],
     ) -> SingleUpdate<E> {
-        let aggregated_pubkey = sum(public_keys);
         let epoch_data = EpochData::<E> {
             index: Some(index),
             maximum_non_signers,
-            aggregated_pub_key: Some(aggregated_pubkey),
             public_keys: to_option_iter(public_keys),
         };
 

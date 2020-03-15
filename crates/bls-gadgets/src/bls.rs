@@ -167,6 +167,34 @@ where
         Ok(prepared_aggregated_pk)
     }
 
+    /// Returns a gadget which checks that an aggregate pubkey is correctly calculated
+    /// by the sum of the pub keys
+    pub fn enforce_aggregated_all_pubkeys<CS: ConstraintSystem<F>>(
+        mut cs: CS,
+        pub_keys: &[P::G2Gadget],
+    ) -> Result<P::G2Gadget, SynthesisError> {
+        // Allocate the G2 Generator
+        let g2_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
+            Ok(E::G2Projective::prime_subgroup_generator())
+        })?;
+
+        // We initialize the Aggregate Public Key as a generator point, in order to
+        // calculate the sum of all keys.
+        // This is needed since we cannot add to a Zero.
+        // After the sum is calculated, we must subtract the generator to get the
+        // correct result
+        let mut aggregated_pk = g2_generator.clone();
+        for (i, pk) in pub_keys.iter().enumerate() {
+            // Add the pubkey to the sum
+            // aggregated_pk += pk
+            aggregated_pk = aggregated_pk.add(&mut cs.ns(|| format!("add pk {}", i)), pk)?;
+        }
+        // Subtract the generator to get the correct aggregate pubkey
+        aggregated_pk = aggregated_pk.sub(cs.ns(|| "add neg generator"), &g2_generator)?;
+
+        Ok(aggregated_pk)
+    }
+
     /// Enforces that the provided bitmap contains no more than `maximum_non_signers`
     /// 0s. Also returns a gadget of the prepared message hash and a gadget for the aggregate public key
     ///
