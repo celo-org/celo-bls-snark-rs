@@ -5,6 +5,7 @@ use crate::gadgets::pack;
 use groth16::{prepare_verifying_key, verify_proof, Proof, VerifyingKey};
 use r1cs_core::SynthesisError;
 use thiserror::Error;
+use tracing::info;
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
@@ -23,6 +24,7 @@ pub fn verify(
     last_epoch: &EpochBlock,
     proof: Proof<CPCurve>,
 ) -> Result<(), VerificationError> {
+    info!("Verifying proof");
     // Hash the first-last block together
     let hash = hash_first_last_epoch_block(first_epoch, last_epoch)?;
     // packs them

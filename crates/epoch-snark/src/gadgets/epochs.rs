@@ -10,6 +10,7 @@ use r1cs_std::{
     fields::fp::FpGadget,
     Assignment,
 };
+use tracing::{debug, span, Level};
 
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
@@ -66,12 +67,17 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         self,
         cs: &mut CS,
     ) -> Result<(), SynthesisError> {
+        let span = span!(Level::TRACE, "ValidatorSetUpdate");
+        let _enter = span.enter();
+        info!("generating constraints");
         let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
         proof_of_compression.compress_public_inputs(
             &mut cs.ns(|| "compress public inputs"),
             &self.proof,
             &self.verifying_key,
         )?;
+
+        info!("constraints generated");
 
         Ok(())
     }
@@ -82,12 +88,17 @@ impl ValidatorSetUpdate<Bls12_377> {
         &self,
         cs: &mut CS,
     ) -> Result<ProofOfCompression, SynthesisError> {
+        let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
+        let _enter = span.enter();
+
+        debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
             self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
+        debug!("verifying intermediate epochs");
         let (
             last_epoch_bits,
             crh_bits,
@@ -102,6 +113,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         )?;
 
         // Verify the aggregate BLS signature
+        debug!("verifying bls signature");
         self.verify_signature(
             &mut cs.ns(|| "verify aggregated signature"),
             &prepared_aggregated_public_keys,
@@ -136,6 +148,9 @@ impl ValidatorSetUpdate<Bls12_377> {
         ),
         SynthesisError,
     > {
+        let span = span!(Level::TRACE, "verify_intermediate_epochs");
+        let _enter = span.enter();
+
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
@@ -145,6 +160,8 @@ impl ValidatorSetUpdate<Bls12_377> {
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
         for (i, epoch) in self.epochs.iter().enumerate() {
+            let span = span!(Level::TRACE, "index", i);
+            let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
                 &mut cs.ns(|| format!("epoch {}", i)),
                 &previous_pubkey_vars,
@@ -175,7 +192,10 @@ impl ValidatorSetUpdate<Bls12_377> {
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
             }
+            debug!("epoch {} constrained", i);
         }
+
+        debug!("intermediate epochs verified");
 
         Ok((
             last_epoch_bits,

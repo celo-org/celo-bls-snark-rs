@@ -15,6 +15,7 @@ crypto-primitives = { git = "https://github.com/scipr-lab/zexe", default-feature
 # used only when exporting our test helpers to be used in the snark crate
 rand_xorshift = { version = "0.2", optional = true }
 rand = { version = "0.7" , optional = true }
+tracing = "0.1.13"
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }

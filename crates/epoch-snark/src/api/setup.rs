@@ -13,6 +13,7 @@ use rand::Rng;
 use super::{BLSCurve, CPCurve, CPFrParams};
 
 use groth16::{generate_random_parameters, Parameters as Groth16Parameters, VerifyingKey};
+use tracing::{debug, error, info, span, warn, Level};
 
 type Result<T> = std::result::Result<T, SynthesisError>;
 
@@ -75,9 +76,19 @@ where
     F: FnOnce(HashToBits, &mut R) -> Result<Groth16Parameters<BLS>>,
     G: FnOnce(ValidatorSetUpdate<BLS>, &mut R) -> Result<Groth16Parameters<CP>>,
 {
+    info!(
+        "Generating parameters for {} validators and {} epochs",
+        num_validators, num_epochs
+    );
+
+    let span = span!(Level::TRACE, "setup");
+    let _enter = span.enter();
+
+    info!("CRH->XOF");
     let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
     let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
 
+    info!("BLS");
     let empty_epochs = ValidatorSetUpdate::empty(
         num_validators,
         num_epochs,

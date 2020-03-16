@@ -5,7 +5,17 @@ use std::env;
 mod fixtures;
 use fixtures::generate_test_data;
 
+use tracing_subscriber::{
+    filter::EnvFilter,
+    fmt::{time::ChronoUtc, Subscriber},
+};
+
 fn main() {
+    Subscriber::builder()
+        .with_timer(ChronoUtc::rfc3339())
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
     let rng = &mut rand::thread_rng();
     let mut args = env::args();
     args.next().unwrap(); // discard the program name

@@ -8,6 +8,7 @@ use r1cs_std::{
 
 use super::{constrain_bool, EpochData};
 use bls_gadgets::BlsVerifyGadget;
+use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
 
@@ -61,6 +62,8 @@ impl SingleUpdate<Bls12_377> {
         previous_max_non_signers: &FrGadget,
         num_validators: u32,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
+        let span = span!(Level::TRACE, "SingleUpdate");
+        let _enter = span.enter();
         // the number of validators across all epochs must be consistent
         assert_eq!(num_validators as usize, self.epoch_data.public_keys.len());
 
