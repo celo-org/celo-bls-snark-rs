@@ -14,12 +14,24 @@ use algebra::{bls12_377::G1Projective, Zero};
 use groth16::{create_proof_no_zk, Proof as Groth16Proof};
 use r1cs_core::{ConstraintSynthesizer, SynthesisError};
 
+use tracing::{debug, error, info, span, warn, Level};
+
 pub fn prove(
     parameters: &Parameters,
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
 ) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
+    info!(
+        "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
+        transitions.len(),
+        initial_epoch.index,
+        num_validators,
+    );
+
+    let span = span!(Level::TRACE, "proof_generation");
+    let _enter = span.enter();
+
     let composite_hasher = CompositeHasher::new().unwrap();
     let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
@@ -51,6 +63,7 @@ pub fn prove(
     // Generate proof of correct calculation of the CRH->Blake hashes
     // to make Hash to G1 cheaper
     let circuit = HashToBits { message_bits };
+    info!("CRH->XOF");
     let hash_proof = create_proof_no_zk(circuit, &parameters.hash_to_bits)?;
 
     // Generate the BLS proof
@@ -66,6 +79,7 @@ pub fn prove(
         proof: hash_proof,
         verifying_key: parameters.vk().1.clone(),
     };
+    info!("BLS");
     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
 
     Ok(bls_proof)

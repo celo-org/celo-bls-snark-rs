@@ -33,7 +33,7 @@ use crypto_primitives::{
     crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
 };
 use r1cs_std::edwards_sw6::EdwardsSWGadget;
-use tracing::{debug, error, info, span, trace, warn, Level};
+use tracing::{debug, span, trace, Level};
 
 use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 
@@ -87,10 +87,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         counter: UInt8,
         message: &[UInt8],
     ) -> Result<(G1Gadget<Bls12_377_Parameters>, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
-        let span = span!(
-            Level::TRACE,
-            "enforcing_hash_to_group",
-        );
+        let span = span!(Level::TRACE, "enforcing_hash_to_group",);
         let _enter = span.enter();
 
         // combine the counter with the message
@@ -230,10 +227,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         mut cs: CS,
         xof_bits: &[Boolean],
     ) -> Result<G1Gadget<P>, SynthesisError> {
-        let span = span!(
-            Level::TRACE,
-            "hash_to_group_gadget",
-        );
+        let span = span!(Level::TRACE, "hash_to_group_gadget",);
         let _enter = span.enter();
 
         trace!("getting G1 point from bits");

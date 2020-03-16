@@ -6,7 +6,6 @@ use r1cs_std::{
     prelude::*,
     Assignment,
 };
-use tracing::{debug, error, info, span, warn, Level};
 
 /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
 /// present in the provided bitmap

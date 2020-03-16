@@ -2,7 +2,7 @@ use algebra::{BigInteger, FpParameters, PrimeField};
 use bls_gadgets::is_setup;
 use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
-use tracing::{debug, error, info, span, trace, warn, Level};
+use tracing::{span, trace, Level};
 
 pub struct MultipackGadget;
 

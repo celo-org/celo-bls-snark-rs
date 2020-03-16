@@ -6,7 +6,7 @@ use r1cs_std::{
     groups::GroupGadget, pairing::PairingGadget, select::CondSelectGadget,
 };
 use std::marker::PhantomData;
-use tracing::{debug, error, info, span, trace, warn, Level};
+use tracing::{debug, span, Level};
 
 /// BLS Signature Verification Pairing Gadget.
 ///
