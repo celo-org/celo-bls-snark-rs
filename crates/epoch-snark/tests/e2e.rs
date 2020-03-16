@@ -20,14 +20,7 @@ fn prover_verifier_groth16() {
         generate_test_data(num_validators, faults, num_epochs);
 
     // Prover generates the proof given the params
-    let proof = prover::prove(
-        &params,
-        num_validators as u32,
-        &first_epoch,
-        &transitions,
-        rng,
-    )
-    .unwrap();
+    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
     let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, proof);
