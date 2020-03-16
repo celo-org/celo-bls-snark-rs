@@ -7,7 +7,6 @@ use groth16::{Proof, VerifyingKey};
 use std::slice;
 
 // Each pubkey is a BLS G2Projective element
-const MAX_NON_SIGNERS: u32 = 4; // TODO: Is this always the same?
 pub(super) const PROOF_BYTES: u32 = 900; // todo: find this
 pub(super) const VK_BYTES: u32 = 900; // todo: find this
 const PUBKEY_BYTES: usize = 96;
@@ -40,6 +39,7 @@ pub struct EpochBlockFFI {
     pub index: u16,
     pub pubkeys: *const u8,
     pub pubkeys_num: u8,
+    pub maximum_non_signers: u32,
 }
 
 impl From<&EpochBlockFFI> for EpochBlock {
@@ -47,8 +47,8 @@ impl From<&EpochBlockFFI> for EpochBlock {
         let pubkeys = read_pubkeys(src.pubkeys, src.pubkeys_num as u32).unwrap();
         EpochBlock {
             index: src.index,
+            maximum_non_signers: src.maximum_non_signers,
             new_public_keys: pubkeys,
-            maximum_non_signers: MAX_NON_SIGNERS,
         }
     }
 }
