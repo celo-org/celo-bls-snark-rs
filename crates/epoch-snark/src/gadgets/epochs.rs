@@ -192,6 +192,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
             }
+            debug!("epoch {} constrained", i);
         }
 
         debug!("intermediate epochs verified");

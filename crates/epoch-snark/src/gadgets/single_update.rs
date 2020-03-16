@@ -86,7 +86,6 @@ impl SingleUpdate<Bls12_377> {
                 &previous_max_non_signers,
             )?;
 
-        debug!("constrained");
         Ok(ConstrainedEpoch {
             new_pubkeys: epoch_data.pubkeys,
             new_max_non_signers: epoch_data.maximum_non_signers,

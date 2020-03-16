@@ -70,7 +70,6 @@ impl EpochData<Bls12_377> {
         let (message_hash, crh_bits, xof_bits) =
             Self::hash_bits_to_g1(&mut cs.ns(|| "hash epoch to g1 bits"), &bits)?;
 
-        debug!("constrained");
         Ok(ConstrainedEpochData {
             bits,
             index,
