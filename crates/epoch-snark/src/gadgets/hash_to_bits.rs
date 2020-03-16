@@ -7,7 +7,7 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 use super::{constrain_bool, MultipackGadget};
 use bls_crypto::bls::keys::SIG_DOMAIN;
 use bls_gadgets::hash_to_bits;
-use tracing::{debug, info, span, Level};
+use tracing::{debug, info, span, trace, Level};
 
 #[derive(Clone)]
 /// Gadget which
@@ -34,11 +34,13 @@ impl HashToBits {
 }
 
 impl ConstraintSynthesizer<Fr> for HashToBits {
+    #[allow(clippy::cognitive_complexity)] // false positive triggered by the info!("generating constraints") log
     fn generate_constraints<CS: ConstraintSystem<Fr>>(
         self,
         cs: &mut CS,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "HashToBits");
+        info!("generating constraints");
         let _enter = span.enter();
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
@@ -46,7 +48,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut all_bits = vec![];
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
-            debug!(epoch = i, "hashing to bits");
+            trace!(epoch = i, "hashing to bits");
             let bits = constrain_bool(&mut cs.ns(|| i.to_string()), &message_bits)?;
             let hash = hash_to_bits(
                 cs.ns(|| format!("{}: hash to bits", i)),

@@ -87,7 +87,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         counter: UInt8,
         message: &[UInt8],
     ) -> Result<(G1Gadget<Bls12_377_Parameters>, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
-        let span = span!(Level::TRACE, "enforcing_hash_to_group",);
+        let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
 
         // combine the counter with the message
@@ -162,7 +162,7 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
 ) -> Result<Vec<Boolean>, SynthesisError> {
     let span = span!(
         Level::TRACE,
-        "hash_to_bits_gadget",
+        "hash_to_bits",
         hash_length,
         generate_constraints
     );
@@ -223,11 +223,11 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
     // get the hash
-    pub fn hash_to_group<CS: ConstraintSystem<P::Fp>>(
+    fn hash_to_group<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         xof_bits: &[Boolean],
     ) -> Result<G1Gadget<P>, SynthesisError> {
-        let span = span!(Level::TRACE, "hash_to_group_gadget",);
+        let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
         trace!("getting G1 point from bits");
@@ -302,8 +302,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
             cs.ns(|| "scale by cofactor"),
             &expected_point_before_cofactor,
         )?;
-
-        debug!("point has been hashed to G1");
 
         Ok(scaled_point)
     }

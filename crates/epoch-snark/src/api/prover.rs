@@ -29,7 +29,7 @@ pub fn prove(
         num_validators,
     );
 
-    let span = span!(Level::TRACE, "proof_generation");
+    let span = span!(Level::TRACE, "prove");
     let _enter = span.enter();
 
     let composite_hasher = CompositeHasher::new().unwrap();

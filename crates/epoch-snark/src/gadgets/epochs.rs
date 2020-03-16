@@ -69,12 +69,15 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
+        info!("generating constraints");
         let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
         proof_of_compression.compress_public_inputs(
             &mut cs.ns(|| "compress public inputs"),
             &self.proof,
             &self.verifying_key,
         )?;
+
+        info!("constraints generated");
 
         Ok(())
     }
@@ -85,7 +88,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         &self,
         cs: &mut CS,
     ) -> Result<ProofOfCompression, SynthesisError> {
-        let span = span!(Level::TRACE, "enforce_bls");
+        let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
         debug!("converting initial EpochData to_bits");
@@ -95,6 +98,7 @@ impl ValidatorSetUpdate<Bls12_377> {
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
+        debug!("verifying intermediate epochs");
         let (
             last_epoch_bits,
             crh_bits,
@@ -109,6 +113,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         )?;
 
         // Verify the aggregate BLS signature
+        debug!("verifying bls signature");
         self.verify_signature(
             &mut cs.ns(|| "verify aggregated signature"),
             &prepared_aggregated_public_keys,
@@ -143,8 +148,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         ),
         SynthesisError,
     > {
-        debug!("verifying intermediate epochs");
-        let span = span!(Level::TRACE, "verifying_epoch");
+        let span = span!(Level::TRACE, "verify_intermediate_epochs");
         let _enter = span.enter();
 
         let mut prepared_aggregated_public_keys = vec![];
@@ -208,7 +212,6 @@ impl ValidatorSetUpdate<Bls12_377> {
         pubkeys: &[G2PreparedGadget],
         messages: &[G1PreparedGadget],
     ) -> Result<(), SynthesisError> {
-        debug!("verifying bls signature");
         let aggregated_signature = G1Gadget::alloc(cs.ns(|| "aggregated signature"), || {
             self.aggregated_signature.get()
         })?;

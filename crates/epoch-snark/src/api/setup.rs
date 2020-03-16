@@ -84,9 +84,11 @@ where
     let span = span!(Level::TRACE, "setup");
     let _enter = span.enter();
 
+    info!("CRH->XOF");
     let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
     let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
 
+    info!("BLS");
     let empty_epochs = ValidatorSetUpdate::empty(
         num_validators,
         num_epochs,
