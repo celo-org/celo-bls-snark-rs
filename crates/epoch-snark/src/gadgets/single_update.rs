@@ -8,7 +8,7 @@ use r1cs_std::{
 
 use super::{constrain_bool, EpochData};
 use bls_gadgets::BlsVerifyGadget;
-use tracing::{debug, span, Level};
+use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
 

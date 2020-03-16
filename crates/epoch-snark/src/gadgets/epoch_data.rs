@@ -18,7 +18,7 @@ use bls_crypto::{
 use bls_gadgets::{is_setup, HashToGroupGadget};
 
 use super::{fr_to_bits, g2_to_bits, to_fr};
-use tracing::{debug, span, Level};
+use tracing::{span, trace, Level};
 
 type FrGadget = FpGadget<Fr>;
 
