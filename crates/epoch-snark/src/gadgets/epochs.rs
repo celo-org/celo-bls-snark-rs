@@ -10,6 +10,7 @@ use r1cs_std::{
     fields::fp::FpGadget,
     Assignment,
 };
+use tracing::{debug, span, Level};
 
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
@@ -66,6 +67,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         self,
         cs: &mut CS,
     ) -> Result<(), SynthesisError> {
+        let span = span!(Level::TRACE, "ValidatorSetUpdate");
+        let _enter = span.enter();
         let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
         proof_of_compression.compress_public_inputs(
             &mut cs.ns(|| "compress public inputs"),
@@ -82,6 +85,10 @@ impl ValidatorSetUpdate<Bls12_377> {
         &self,
         cs: &mut CS,
     ) -> Result<ProofOfCompression, SynthesisError> {
+        let span = span!(Level::TRACE, "enforce_bls");
+        let _enter = span.enter();
+
+        debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
             self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
@@ -136,6 +143,10 @@ impl ValidatorSetUpdate<Bls12_377> {
         ),
         SynthesisError,
     > {
+        debug!("verifying intermediate epochs");
+        let span = span!(Level::TRACE, "verifying_epoch");
+        let _enter = span.enter();
+
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
@@ -145,6 +156,8 @@ impl ValidatorSetUpdate<Bls12_377> {
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
         for (i, epoch) in self.epochs.iter().enumerate() {
+            let span = span!(Level::TRACE, "index", i);
+            let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
                 &mut cs.ns(|| format!("epoch {}", i)),
                 &previous_pubkey_vars,
@@ -177,6 +190,8 @@ impl ValidatorSetUpdate<Bls12_377> {
             }
         }
 
+        debug!("intermediate epochs verified");
+
         Ok((
             last_epoch_bits,
             all_crh_bits,
@@ -193,6 +208,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         pubkeys: &[G2PreparedGadget],
         messages: &[G1PreparedGadget],
     ) -> Result<(), SynthesisError> {
+        debug!("verifying bls signature");
         let aggregated_signature = G1Gadget::alloc(cs.ns(|| "aggregated signature"), || {
             self.aggregated_signature.get()
         })?;

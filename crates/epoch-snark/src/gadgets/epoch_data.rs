@@ -18,6 +18,7 @@ use bls_crypto::{
 use bls_gadgets::{is_setup, HashToGroupGadget};
 
 use super::{fr_to_bits, g2_to_bits, to_fr};
+use tracing::{debug, span, Level};
 
 type FrGadget = FpGadget<Fr>;
 
@@ -60,6 +61,8 @@ impl EpochData<Bls12_377> {
         cs: &mut CS,
         previous_index: &FrGadget,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
+        let span = span!(Level::TRACE, "EpochData");
+        let _enter = span.enter();
         let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
@@ -67,6 +70,7 @@ impl EpochData<Bls12_377> {
         let (message_hash, crh_bits, xof_bits) =
             Self::hash_bits_to_g1(&mut cs.ns(|| "hash epoch to g1 bits"), &bits)?;
 
+        debug!("constrained");
         Ok(ConstrainedEpochData {
             bits,
             index,
@@ -119,6 +123,7 @@ impl EpochData<Bls12_377> {
         previous_index: &FrGadget,
         index: &FrGadget,
     ) -> Result<(), SynthesisError> {
+        trace!("enforcing next epoch");
         let previous_plus_one =
             previous_index.add_constant(cs.ns(|| "previous plus_one"), &Fr::one())?;
         index.enforce_equal(cs.ns(|| "index enforce equal"), &previous_plus_one)?;
@@ -131,6 +136,7 @@ impl EpochData<Bls12_377> {
         cs: &mut CS,
         epoch_bits: &[Boolean],
     ) -> Result<(G1Gadget, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
+        trace!("hashing epoch to g1");
         // Reverse to LE
         let mut epoch_bits = epoch_bits.to_vec();
         epoch_bits.reverse();
