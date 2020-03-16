@@ -33,6 +33,7 @@ use crypto_primitives::{
     crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
 };
 use r1cs_std::edwards_sw6::EdwardsSWGadget;
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 
@@ -86,6 +87,12 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         counter: UInt8,
         message: &[UInt8],
     ) -> Result<(G1Gadget<Bls12_377_Parameters>, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
+        let span = span!(
+            Level::TRACE,
+            "enforcing_hash_to_group",
+        );
+        let _enter = span.enter();
+
         // combine the counter with the message
         let mut input = vec![counter];
         input.extend_from_slice(message);
@@ -107,11 +114,12 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
 
         let hash = Self::hash_to_group(cs.ns(|| "hash to group"), &xof_bits)?;
 
+        debug!("message and counter have been hashed to G1");
         Ok((hash, crh_bits, xof_bits))
     }
 
     /// Compress the input by passing it through a Pedersen hash
-    pub fn pedersen_hash<CS: ConstraintSystem<Bls12_377_Fq>>(
+    fn pedersen_hash<CS: ConstraintSystem<Bls12_377_Fq>>(
         cs: &mut CS,
         input: &[UInt8],
     ) -> Result<Vec<Boolean>, SynthesisError> {
@@ -155,7 +163,15 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
     personalization: [u8; 8],
     generate_constraints: bool,
 ) -> Result<Vec<Boolean>, SynthesisError> {
+    let span = span!(
+        Level::TRACE,
+        "hash_to_bits_gadget",
+        hash_length,
+        generate_constraints
+    );
+    let _enter = span.enter();
     let xof_bits = if generate_constraints {
+        trace!("generating hash with constraints");
         // Reverse the message to LE
         let mut message = message.to_vec();
         message.reverse();
@@ -167,6 +183,7 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
         // Run Blake on the message N times, each time offset by `i`
         // to get a `hash_length` hash. The hash is in LE.
         for i in 0..iterations {
+            trace!(blake_iteration = i);
             // calculate the hash (Vec<Boolean>)
             let blake2s_parameters = blake2xs_params(hash_length, i.into(), personalization);
             let xof_result = blake2s_gadget_with_parameters(
@@ -184,6 +201,7 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
         }
         xof_bits
     } else {
+        trace!("generating hash without constraints");
         let bits = if is_setup(&message) {
             vec![false; 512]
         } else {
@@ -212,6 +230,13 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         mut cs: CS,
         xof_bits: &[Boolean],
     ) -> Result<G1Gadget<P>, SynthesisError> {
+        let span = span!(
+            Level::TRACE,
+            "hash_to_group_gadget",
+        );
+        let _enter = span.enter();
+
+        trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             G1Gadget::<P>::alloc(cs.ns(|| "expected point before cofactor"), || {
                 // if we're in setup mode, just return an error
@@ -244,6 +269,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
                 Ok(p.into_projective())
             })?;
 
+        trace!("compressing y");
         // Point compression on the G1 Gadget
         let compressed_point: Vec<Boolean> = {
             // Convert x to LE
@@ -276,10 +302,14 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
                 );
             });
 
+        trace!("scaling by G1 cofactor");
+
         let scaled_point = Self::scale_by_cofactor_g1(
             cs.ns(|| "scale by cofactor"),
             &expected_point_before_cofactor,
         )?;
+
+        debug!("point has been hashed to G1");
 
         Ok(scaled_point)
     }

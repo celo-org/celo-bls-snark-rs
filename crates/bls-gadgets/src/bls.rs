@@ -6,6 +6,7 @@ use r1cs_std::{
     groups::GroupGadget, pairing::PairingGadget, select::CondSelectGadget,
 };
 use std::marker::PhantomData;
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 /// BLS Signature Verification Pairing Gadget.
 ///
@@ -42,6 +43,8 @@ where
         signature: &P::G1Gadget,
         maximum_non_signers: &FpGadget<F>,
     ) -> Result<(), SynthesisError> {
+        let span = span!(Level::TRACE, "BlsVerifyGadget");
+        let _enter = span.enter();
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
         let (prepared_message_hash, prepared_aggregated_pk) = Self::enforce_bitmap_and_prepare(
@@ -207,8 +210,10 @@ where
         message_hash: &P::G1Gadget,
         maximum_non_signers: &FpGadget<F>,
     ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
+        debug!("enforcing bitmap");
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
+        debug!("preparing message hash and aggregated pubkey");
         let prepared_message_hash =
             P::prepare_g1(cs.ns(|| "prepared message hash"), &message_hash)?;
         let prepared_aggregated_pk =
@@ -248,6 +253,7 @@ where
         g1: &[P::G1PreparedGadget],
         g2: &[P::G2PreparedGadget],
     ) -> Result<(), SynthesisError> {
+        debug!("enforcing BLS equation");
         let bls_equation = P::product_of_pairings(cs.ns(|| "verify BLS signature"), g1, g2)?;
         let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
         bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
