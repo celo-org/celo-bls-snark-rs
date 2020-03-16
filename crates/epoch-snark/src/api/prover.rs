@@ -11,7 +11,7 @@ use bls_crypto::{
 use bls_gadgets::bytes_to_bits;
 
 use algebra::{bls12_377::G1Projective, Zero};
-use groth16::{create_random_proof, Proof as Groth16Proof};
+use groth16::{create_proof_no_zk, Proof as Groth16Proof};
 use r1cs_core::{ConstraintSynthesizer, SynthesisError};
 
 pub fn prove(
@@ -19,7 +19,6 @@ pub fn prove(
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
-    rng: &mut impl rand::Rng,
 ) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
     let composite_hasher = CompositeHasher::new().unwrap();
     let try_and_increment = TryAndIncrement::new(&composite_hasher);
@@ -52,7 +51,7 @@ pub fn prove(
     // Generate proof of correct calculation of the CRH->Blake hashes
     // to make Hash to G1 cheaper
     let circuit = HashToBits { message_bits };
-    let hash_proof = create_random_proof(circuit, &parameters.hash_to_bits, rng)?;
+    let hash_proof = create_proof_no_zk(circuit, &parameters.hash_to_bits)?;
 
     // Generate the BLS proof
     let asig = transitions.iter().fold(G1Projective::zero(), |acc, epoch| {
@@ -67,7 +66,7 @@ pub fn prove(
         proof: hash_proof,
         verifying_key: parameters.vk().1.clone(),
     };
-    let bls_proof = create_random_proof(circuit, &parameters.epochs, rng)?;
+    let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
 
     Ok(bls_proof)
 }
