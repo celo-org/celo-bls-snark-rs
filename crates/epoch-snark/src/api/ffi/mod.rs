@@ -11,10 +11,17 @@ use algebra::{bls12_377::G2Affine, AffineCurve, CanonicalDeserialize};
 use std::convert::TryFrom;
 
 #[no_mangle]
-/// # Safety
+/// Verifies a Groth16 proof about the validity of the epoch transitions
+/// between the provided `first_epoch` and `last_epoch` blocks. 
+/// 
+/// All elements are assumed to be sent as serialized byte arrays
+/// of **compressed elements**. There are no assumptions made about
+/// the length of the verifying key or the proof, so that must be 
+/// provided by the caller.
 ///
-/// VK and Proof must be valid pointers
-/// The vector of pubkeys inside EpochBlockFFI must point to valid memory
+/// # Safety
+/// 1. VK and Proof must be valid pointers
+/// 1. The vector of pubkeys inside EpochBlockFFI must point to valid memory
 pub unsafe extern "C" fn verify(
     // serialized VK
     vk: *const u8,
