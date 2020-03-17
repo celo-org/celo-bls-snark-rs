@@ -95,7 +95,7 @@ workflows:
       - rust-tests:
           requires:
             - checkout-repo
-      - go-module-tests:
+      - go-tests:
           requires:
             - checkout-repo
             - rust-tests
