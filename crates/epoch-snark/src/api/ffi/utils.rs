@@ -27,14 +27,6 @@ pub struct EpochBlockFFI {
     pub maximum_non_signers: u32,
 }
 
-fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
-    let mut v = Vec::new();
-    for p in pubkeys {
-        p.get_pk().into_affine().serialize(&mut v)?
-    }
-    Ok(v)
-}
-
 impl TryFrom<&EpochBlock> for EpochBlockFFI {
     type Error = EncodingError;
     fn try_from(src: &EpochBlock) -> Result<EpochBlockFFI, Self::Error> {
@@ -71,9 +63,8 @@ pub(super) fn read_slice<C: CanonicalDeserialize>(
     ptr: *const u8,
     len: usize,
 ) -> Result<C, EncodingError> {
-    let data: Vec<u8> = unsafe { slice::from_raw_parts(ptr, len).to_vec() };
-    let ret = C::deserialize(&mut &data[..])?;
-    Ok(ret)
+    let mut data = unsafe { slice::from_raw_parts(ptr, len) };
+    Ok(C::deserialize(&mut data)?)
 }
 
 /// Reads `num` * `PUBKEY_BYTES` bytes starting from the pointer's location
@@ -82,10 +73,17 @@ pub(super) fn read_slice<C: CanonicalDeserialize>(
 ///
 /// This WILL read invalid data if you give it a larger `num` argument
 /// than expected. Use with caution.
-unsafe fn read_serialized_pubkeys(ptr: *const u8, num: usize) -> Vec<u8> {
-    let len = num * PUBKEY_BYTES;
-    let data: Vec<u8> = slice::from_raw_parts(ptr, len).to_vec();
-    data
+unsafe fn read_serialized_pubkeys<'a>(ptr: *const u8, num: usize) -> &'a [u8] {
+    slice::from_raw_parts(ptr, num * PUBKEY_BYTES)
+}
+
+/// Serializes the inner G2 elements of the pubkeys to a vector
+fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
+    let mut v = Vec::new();
+    for p in pubkeys {
+        p.get_pk().into_affine().serialize(&mut v)?
+    }
+    Ok(v)
 }
 
 /// Reads `num` PublicKey elements starting from the memory that the pointer points to.
@@ -94,18 +92,14 @@ unsafe fn read_serialized_pubkeys(ptr: *const u8, num: usize) -> Vec<u8> {
 /// This WILL NOT fail if the `num` variable is larger than the expected elements, and will
 /// simply return an array of `PublicKeys` whose internals will be whatever data was in the memory.
 /// Use with caution.
-pub(super) unsafe fn read_pubkeys(
-    ptr: *const u8,
-    num: usize,
-) -> Result<Vec<PublicKey>, EncodingError> {
-    let data = unsafe { read_serialized_pubkeys(ptr, num) };
+unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, EncodingError> {
+    let mut data = unsafe { read_serialized_pubkeys(ptr, num) };
     let mut pubkeys = Vec::new();
     for _ in 0..num {
-        let key = G2Affine::deserialize(&mut &data[..])?;
+        let key = G2Affine::deserialize(&mut data)?;
         let key = key.into_projective();
         pubkeys.push(PublicKey::from_pk(key))
     }
-
     Ok(pubkeys)
 }
 
@@ -194,10 +188,9 @@ mod tests {
         let pubkeys = rand_pubkeys(num_keys);
         let serialized = serialize_pubkeys(&pubkeys).unwrap();
         let ptr = &serialized[0] as *const u8;
-        // We read a bunch of junk data as valid pubkeys, hence why this MUST
+        // We read a bunch of junk data, hence why this MUST
         // be unsafe :)
-        let invalid_deserialized = unsafe { read_pubkeys(ptr, 99).unwrap() };
-        assert_ne!(invalid_deserialized, pubkeys)
+        unsafe { read_pubkeys(ptr, 99).unwrap_err() };
     }
 
     fn rand_pubkeys(num_keys: usize) -> Vec<PublicKey> {

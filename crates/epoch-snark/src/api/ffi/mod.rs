@@ -24,13 +24,17 @@ use std::convert::TryFrom;
 /// 1. VK and Proof must be valid pointers
 /// 1. The vector of pubkeys inside EpochBlockFFI must point to valid memory
 pub unsafe extern "C" fn verify(
-    // serialized VK
+    // Serialized verifying key
     vk: *const u8,
+    // Length of serialized verifying key
     vk_len: u32,
-    // serialized Proof
+    // Serialized proof
     proof: *const u8,
+    // Length of serialized proof
     proof_len: u32,
+    // First epoch data (pubkeys serialized)
     first_epoch: EpochBlockFFI,
+    // Last epoch data (pubkeys serialized)
     last_epoch: EpochBlockFFI,
 ) -> bool {
     convert_result_to_bool(|| {
