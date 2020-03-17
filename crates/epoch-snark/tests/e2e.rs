@@ -8,17 +8,17 @@ use fixtures::generate_test_data;
 #[ignore] // This test makes CI run out of memory and takes too long. It works though!
 fn prover_verifier_groth16() {
     let rng = &mut rand::thread_rng();
-    let num_epochs = 2;
+    let num_transitions = 2;
     let faults = 1;
     let num_validators = 3 * faults + 1;
 
     // Trusted setup
-    let params = setup::trusted_setup(num_validators, num_epochs, faults, rng).unwrap();
+    let params = setup::trusted_setup(num_validators, num_transitions, faults, rng).unwrap();
 
-    // Create the state to be proven (first - last and in between)
+    // Create the state to be proven (first epoch + `num_transitions` transitions.
     // Note: This is all data which should be fetched via the Celo blockchain
     let (first_epoch, transitions, last_epoch) =
-        generate_test_data(num_validators, faults, num_epochs);
+        generate_test_data(num_validators, faults, num_transitions);
 
     // Prover generates the proof given the params
     let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
@@ -32,12 +32,15 @@ fn prover_verifier_groth16() {
     params.vk().0.serialize(&mut serialized_vk).unwrap();
     let mut serialized_proof = vec![];
     proof.serialize(&mut serialized_proof).unwrap();
+    dbg!(hex::encode(&serialized_vk));
+    dbg!(hex::encode(&serialized_proof));
 
     // Get the corresponding pointers
     let proof_ptr = &serialized_proof[0] as *const u8;
     let vk_ptr = &serialized_vk[0] as *const u8;
 
     let serialized_pubkeys = ffi::utils::serialize_pubkeys(&first_epoch.new_public_keys).unwrap();
+    dbg!(hex::encode(&serialized_pubkeys));
     let first_epoch = ffi::utils::EpochBlockFFI {
         index: first_epoch.index,
         maximum_non_signers: first_epoch.maximum_non_signers,
@@ -46,6 +49,7 @@ fn prover_verifier_groth16() {
     };
 
     let serialized_pubkeys = ffi::utils::serialize_pubkeys(&last_epoch.new_public_keys).unwrap();
+    dbg!(hex::encode(&serialized_pubkeys));
     let last_epoch = ffi::utils::EpochBlockFFI {
         index: last_epoch.index,
         maximum_non_signers: last_epoch.maximum_non_signers,
