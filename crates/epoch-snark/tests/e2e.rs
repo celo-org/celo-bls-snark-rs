@@ -1,7 +1,5 @@
 use algebra::CanonicalSerialize;
-use epoch_snark::api::EpochBlockFFI;
-use epoch_snark::api::{prover, setup, verifier, verify};
-use std::convert::TryFrom;
+use epoch_snark::api::{ffi, prover, setup, verifier};
 
 mod fixtures;
 use fixtures::generate_test_data;
@@ -30,24 +28,40 @@ fn prover_verifier_groth16() {
     assert!(res.is_ok());
 
     // Serialize the proof / vk
-    let mut serialized_proof = vec![];
-    proof.serialize(&mut serialized_proof).unwrap();
     let mut serialized_vk = vec![];
     params.vk().0.serialize(&mut serialized_vk).unwrap();
+    let mut serialized_proof = vec![];
+    proof.serialize(&mut serialized_proof).unwrap();
 
     // Get the corresponding pointers
     let proof_ptr = &serialized_proof[0] as *const u8;
     let vk_ptr = &serialized_vk[0] as *const u8;
 
+    let serialized_pubkeys = ffi::utils::serialize_pubkeys(&first_epoch.new_public_keys).unwrap();
+    let first_epoch = ffi::utils::EpochBlockFFI {
+        index: first_epoch.index,
+        maximum_non_signers: first_epoch.maximum_non_signers,
+        pubkeys_num: first_epoch.new_public_keys.len(),
+        pubkeys: &serialized_pubkeys[0] as *const u8,
+    };
+
+    let serialized_pubkeys = ffi::utils::serialize_pubkeys(&last_epoch.new_public_keys).unwrap();
+    let last_epoch = ffi::utils::EpochBlockFFI {
+        index: last_epoch.index,
+        maximum_non_signers: last_epoch.maximum_non_signers,
+        pubkeys_num: last_epoch.new_public_keys.len(),
+        pubkeys: &serialized_pubkeys[0] as *const u8,
+    };
+
     // Make the verification
     let res = unsafe {
-        verify(
+        ffi::verify(
             vk_ptr,
             serialized_vk.len() as u32,
             proof_ptr,
             serialized_proof.len() as u32,
-            EpochBlockFFI::try_from(&first_epoch).unwrap(),
-            EpochBlockFFI::try_from(&last_epoch).unwrap(),
+            first_epoch,
+            last_epoch,
         )
     };
     assert!(res);

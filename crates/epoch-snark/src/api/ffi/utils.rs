@@ -27,19 +27,6 @@ pub struct EpochBlockFFI {
     pub maximum_non_signers: u32,
 }
 
-impl TryFrom<&EpochBlock> for EpochBlockFFI {
-    type Error = EncodingError;
-    fn try_from(src: &EpochBlock) -> Result<EpochBlockFFI, Self::Error> {
-        let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys)?;
-        Ok(EpochBlockFFI {
-            index: src.index,
-            maximum_non_signers: src.maximum_non_signers,
-            pubkeys_num: src.new_public_keys.len(),
-            pubkeys: &serialized_pubkeys[0] as *const u8,
-        })
-    }
-}
-
 impl TryFrom<&EpochBlockFFI> for EpochBlock {
     type Error = EncodingError;
 
@@ -78,7 +65,7 @@ unsafe fn read_serialized_pubkeys<'a>(ptr: *const u8, num: usize) -> &'a [u8] {
 }
 
 /// Serializes the inner G2 elements of the pubkeys to a vector
-fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
+pub fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
     let mut v = Vec::new();
     for p in pubkeys {
         p.get_pk().into_affine().serialize(&mut v)?
@@ -131,7 +118,6 @@ mod tests {
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,
         };
-        // let ffi_block = EpochBlockFFI::try_from(&block).unwrap();
         let block_from_ffi = EpochBlock::try_from(&ffi_block).unwrap();
         assert_eq!(block_from_ffi, src);
     }

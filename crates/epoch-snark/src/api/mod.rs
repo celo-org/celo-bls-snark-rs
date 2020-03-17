@@ -6,8 +6,7 @@ pub mod prover;
 pub mod setup;
 pub mod verifier;
 
-mod ffi;
-pub use ffi::{verify, EpochBlockFFI};
+pub mod ffi;
 
 use algebra::{bls12_377, sw6};
 

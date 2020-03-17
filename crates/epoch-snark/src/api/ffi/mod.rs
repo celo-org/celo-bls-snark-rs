@@ -1,6 +1,5 @@
-mod utils;
-use utils::read_slice;
-pub use utils::EpochBlockFFI;
+pub mod utils;
+use utils::{read_slice, EpochBlockFFI};
 
 #[cfg(test)]
 mod test_helpers;
