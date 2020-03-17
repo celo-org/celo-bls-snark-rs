@@ -2,7 +2,9 @@ use super::{CPCurve, Parameters};
 use crate::convert_result_to_bool;
 use crate::epoch_block::{EpochBlock, EpochTransition};
 use crate::EncodingError;
-use algebra::{bls12_377::G2Affine, AffineCurve, CanonicalDeserialize};
+use algebra::{
+    bls12_377::G2Affine, AffineCurve, CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve,
+};
 use bls_crypto::PublicKey;
 use groth16::{Proof, VerifyingKey};
 use std::convert::TryFrom;
@@ -20,9 +22,30 @@ pub struct EpochBlockFFI {
     /// Pointer to the public keys array
     pub pubkeys: *const u8,
     /// The number of public keys to be read from the pointer
-    pub pubkeys_num: u8,
+    pub pubkeys_num: usize,
     /// Maximum number of non signers for that epoch
     pub maximum_non_signers: u32,
+}
+
+fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
+    let mut v = Vec::new();
+    for p in pubkeys {
+        p.get_pk().into_affine().serialize(&mut v)?
+    }
+    Ok(v)
+}
+
+impl TryFrom<&EpochBlock> for EpochBlockFFI {
+    type Error = EncodingError;
+    fn try_from(src: &EpochBlock) -> Result<EpochBlockFFI, Self::Error> {
+        let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys)?;
+        Ok(EpochBlockFFI {
+            index: src.index,
+            maximum_non_signers: src.maximum_non_signers,
+            pubkeys_num: src.new_public_keys.len(),
+            pubkeys: &serialized_pubkeys[0] as *const u8,
+        })
+    }
 }
 
 impl TryFrom<&EpochBlockFFI> for EpochBlock {
@@ -98,6 +121,20 @@ mod tests {
     use groth16::{create_proof_no_zk, generate_random_parameters};
 
     #[test]
+    fn ffi_block_conversion() {
+        let num_keys = 10;
+        let pubkeys = rand_pubkeys(num_keys);
+        let block = EpochBlock {
+            index: 1,
+            maximum_non_signers: 19,
+            new_public_keys: pubkeys,
+        };
+        let ffi_block = EpochBlockFFI::try_from(&block).unwrap();
+        let block_from_ffi = EpochBlock::try_from(&ffi_block).unwrap();
+        assert_eq!(block_from_ffi, block);
+    }
+
+    #[test]
     fn groth_verifying_key_from_pointer() {
         let rng = &mut rand::thread_rng();
         let c = TestCircuit::<Bls12_377>(None);
@@ -143,9 +180,9 @@ mod tests {
 
     #[test]
     fn pubkeys_from_pointer() {
-        let num_keys = 1;
+        let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
-        let serialized = serialize_pubkeys(&pubkeys);
+        let serialized = serialize_pubkeys(&pubkeys).unwrap();
         let ptr = &serialized[0] as *const u8;
         let deserialized_from_ptr = unsafe { read_pubkeys(ptr, num_keys).unwrap() };
         assert_eq!(deserialized_from_ptr, pubkeys);
@@ -155,7 +192,7 @@ mod tests {
     fn invalid_pubkey_len_panic() {
         let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
-        let serialized = serialize_pubkeys(&pubkeys);
+        let serialized = serialize_pubkeys(&pubkeys).unwrap();
         let ptr = &serialized[0] as *const u8;
         // We read a bunch of junk data as valid pubkeys, hence why this MUST
         // be unsafe :)
@@ -175,13 +212,5 @@ mod tests {
             .iter()
             .map(|p| PublicKey::from_pk(*p))
             .collect::<Vec<_>>()
-    }
-
-    fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Vec<u8> {
-        let mut v = Vec::new();
-        for p in pubkeys {
-            p.get_pk().into_affine().serialize(&mut v).unwrap();
-        }
-        v
     }
 }

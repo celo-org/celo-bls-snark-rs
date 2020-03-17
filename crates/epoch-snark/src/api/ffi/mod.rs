@@ -1,5 +1,6 @@
 mod utils;
-use utils::{read_slice, EpochBlockFFI};
+use utils::read_slice;
+pub use utils::EpochBlockFFI;
 
 #[cfg(test)]
 mod test_helpers;
@@ -12,11 +13,11 @@ use std::convert::TryFrom;
 
 #[no_mangle]
 /// Verifies a Groth16 proof about the validity of the epoch transitions
-/// between the provided `first_epoch` and `last_epoch` blocks. 
-/// 
+/// between the provided `first_epoch` and `last_epoch` blocks.
+///
 /// All elements are assumed to be sent as serialized byte arrays
 /// of **compressed elements**. There are no assumptions made about
-/// the length of the verifying key or the proof, so that must be 
+/// the length of the verifying key or the proof, so that must be
 /// provided by the caller.
 ///
 /// # Safety
@@ -38,6 +39,6 @@ pub unsafe extern "C" fn verify(
         let vk = read_slice(vk, vk_len as usize)?;
         let proof = read_slice(proof, proof_len as usize)?;
 
-        super::verifier::verify(&vk, &first_epoch, &last_epoch, proof)
+        super::verifier::verify(&vk, &first_epoch, &last_epoch, &proof)
     })
 }

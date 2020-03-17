@@ -1,4 +1,7 @@
-use epoch_snark::api::{prover, setup, verifier};
+use algebra::CanonicalSerialize;
+use epoch_snark::api::EpochBlockFFI;
+use epoch_snark::api::{prover, setup, verifier, verify};
+use std::convert::TryFrom;
 
 mod fixtures;
 use fixtures::generate_test_data;
@@ -23,6 +26,29 @@ fn prover_verifier_groth16() {
     let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, proof);
+    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
+
+    // Serialize the proof / vk
+    let mut serialized_proof = vec![];
+    proof.serialize(&mut serialized_proof).unwrap();
+    let mut serialized_vk = vec![];
+    params.vk().0.serialize(&mut serialized_vk).unwrap();
+
+    // Get the corresponding pointers
+    let proof_ptr = &serialized_proof[0] as *const u8;
+    let vk_ptr = &serialized_vk[0] as *const u8;
+
+    // Make the verification
+    let res = unsafe {
+        verify(
+            vk_ptr,
+            serialized_vk.len() as u32,
+            proof_ptr,
+            serialized_proof.len() as u32,
+            EpochBlockFFI::try_from(&first_epoch).unwrap(),
+            EpochBlockFFI::try_from(&last_epoch).unwrap(),
+        )
+    };
+    assert!(res);
 }
