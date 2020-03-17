@@ -1,7 +1,6 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../../target/release -lepoch_snark -ldl -lm
 #include "bls.h"
 */
 import "C"
