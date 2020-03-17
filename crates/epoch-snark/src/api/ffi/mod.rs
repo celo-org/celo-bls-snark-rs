@@ -1,10 +1,14 @@
 mod utils;
-use utils::{read_slice, EpochBlockFFI, PROOF_BYTES, VK_BYTES};
+use utils::{read_slice, EpochBlockFFI};
+
+#[cfg(test)]
+mod test_helpers;
 
 use crate::api::{CPCurve, Parameters};
 use crate::convert_result_to_bool;
 use crate::epoch_block::{EpochBlock, EpochTransition};
 use algebra::{bls12_377::G2Affine, AffineCurve, CanonicalDeserialize};
+use std::convert::TryFrom;
 
 #[no_mangle]
 /// # Safety
@@ -14,15 +18,19 @@ use algebra::{bls12_377::G2Affine, AffineCurve, CanonicalDeserialize};
 pub unsafe extern "C" fn verify(
     // serialized VK
     vk: *const u8,
+    vk_len: u32,
     // serialized Proof
     proof: *const u8,
+    proof_len: u32,
     first_epoch: EpochBlockFFI,
     last_epoch: EpochBlockFFI,
 ) -> bool {
-    let first_epoch = EpochBlock::from(&first_epoch);
-    let last_epoch = EpochBlock::from(&last_epoch);
-    let vk = read_slice(vk, VK_BYTES).unwrap();
-    let proof = read_slice(proof, PROOF_BYTES).unwrap();
+    convert_result_to_bool(|| {
+        let first_epoch = EpochBlock::try_from(&first_epoch)?;
+        let last_epoch = EpochBlock::try_from(&last_epoch)?;
+        let vk = read_slice(vk, vk_len as usize)?;
+        let proof = read_slice(proof, proof_len as usize)?;
 
-    super::verifier::verify(&vk, &first_epoch, &last_epoch, proof).is_ok()
+        super::verifier::verify(&vk, &first_epoch, &last_epoch, proof)
+    })
 }
