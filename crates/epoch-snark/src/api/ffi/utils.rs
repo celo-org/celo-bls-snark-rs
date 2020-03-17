@@ -123,9 +123,17 @@ mod tests {
             maximum_non_signers: 19,
             new_public_keys: pubkeys,
         };
-        let ffi_block = EpochBlockFFI::try_from(&block).unwrap();
+        let src = block;
+        let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
+        let ffi_block = EpochBlockFFI {
+            index: src.index,
+            maximum_non_signers: src.maximum_non_signers,
+            pubkeys_num: src.new_public_keys.len(),
+            pubkeys: &serialized_pubkeys[0] as *const u8,
+        };
+        // let ffi_block = EpochBlockFFI::try_from(&block).unwrap();
         let block_from_ffi = EpochBlock::try_from(&ffi_block).unwrap();
-        assert_eq!(block_from_ffi, block);
+        assert_eq!(block_from_ffi, src);
     }
 
     #[test]
