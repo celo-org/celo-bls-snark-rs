@@ -82,7 +82,8 @@ jobs:
           command: |
             cd ~/app/
             LIB_DIR=`pwd`/target/release
-            CGO_LDFLAGS="-L$LIB_DIR -lepoch_snark -ldl -lm" go build -ldflags "-w" ./go/cmd/bls_example.go
+            cd ./go/cmd
+            CGO_LDFLAGS="-L$LIB_DIR -lepoch_snark -ldl -lm" go build -ldflags "-w" bls_example.go
             ./bls_example
  
 
