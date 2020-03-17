@@ -92,10 +92,10 @@ workflows:
   run-tests:
     jobs:
       - checkout-repo
-      - bls-tests:
+      - rust-tests:
           requires:
             - checkout-repo
       - go-module-tests:
           requires:
             - checkout-repo
-            - bls-tests
+            - rust-tests
