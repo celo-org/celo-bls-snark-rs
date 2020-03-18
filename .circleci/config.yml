@@ -24,7 +24,7 @@ jobs:
           root: .
           paths: .
 
-  rust-tests:
+  bls-tests:
     <<: *rust_defaults
     steps:
       - attach_workspace:
