@@ -44,7 +44,7 @@ pub fn prove(
     // Generate a helping proof if a Proving Key for the HashToBits
     // circuit was provided
     let hash_helper = if let Some(ref params) = parameters.hash_to_bits {
-        Some(get_hash_helper(&params, transitions)?)
+        Some(generate_hash_helper(&params, transitions)?)
     } else {
         None
     };
@@ -67,7 +67,8 @@ pub fn prove(
     Ok(bls_proof)
 }
 
-fn get_hash_helper(
+/// Helper which creates the hashproof inside BLS12-377
+fn generate_hash_helper(
     params: &Groth16Parameters<BLSCurve>,
     transitions: &[EpochTransition],
 ) -> Result<HashToBitsHelper<BLSCurve>, SynthesisError> {
@@ -75,28 +76,27 @@ fn get_hash_helper(
     let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
     // Generate the CRH per epoch
-    let mut message_bits = Vec::with_capacity(transitions.len());
+    let message_bits = transitions
+        .iter()
+        .map(|transition| {
+            let block = &transition.block;
+            let epoch_bytes = block.encode_to_bytes().unwrap();
 
-    for transition in transitions {
-        let block = &transition.block;
-        let epoch_bytes = block.encode_to_bytes().unwrap();
-
-        // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
-        let (_, counter) = try_and_increment
-            .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
-            .unwrap();
-        let crh_bytes = composite_hasher
-            .crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0)
-            .unwrap();
-        // The verifier should run both the crh and the xof here to generate a
-        // valid statement for the verify
-        message_bits.push(
+            // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
+            let (_, counter) = try_and_increment
+                .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
+                .unwrap();
+            let crh_bytes = composite_hasher
+                .crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0)
+                .unwrap();
+            // The verifier should run both the crh and the xof here to generate a
+            // valid statement for the verify
             bytes_to_bits(&crh_bytes, 384)
                 .iter()
                 .map(|b| Some(*b))
-                .collect(),
-        );
-    }
+                .collect()
+        })
+        .collect::<Vec<_>>();
 
     // Generate proof of correct calculation of the CRH->Blake hashes
     // to make Hash to G1 cheaper

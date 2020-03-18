@@ -81,8 +81,8 @@ where
     let span = span!(Level::TRACE, "setup");
     let _enter = span.enter();
 
-    info!("CRH->XOF");
     let (vk, hash_to_bits) = if generate_constraints {
+        info!("CRH->XOF");
         let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
         let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
         (Some(hash_to_bits.vk.clone()), Some(hash_to_bits))
