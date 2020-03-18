@@ -391,10 +391,12 @@ dependencies = [
  "derivative",
  "digest",
  "ff-fft",
+ "gm17",
  "groth16",
  "r1cs-core",
  "r1cs-std",
  "rand",
+ "rayon",
 ]
 
 [[package]]
@@ -515,6 +517,20 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
+]
+
+[[package]]
+name = "gm17"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe#8cb038c93e45286b411c9e5f0ad7a8151090cfd7"
+dependencies = [
+ "algebra-core",
+ "bench-utils",
+ "ff-fft",
+ "r1cs-core",
+ "rand",
+ "rayon",
+ "smallvec",
 ]
 
 [[package]]
