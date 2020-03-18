@@ -61,7 +61,7 @@ impl SingleUpdate<Bls12_377> {
         previous_epoch_index: &FrGadget,
         previous_max_non_signers: &FrGadget,
         num_validators: u32,
-        generate_constraints: bool,
+        generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
         let span = span!(Level::TRACE, "SingleUpdate");
         let _enter = span.enter();
@@ -72,7 +72,7 @@ impl SingleUpdate<Bls12_377> {
         let epoch_data = self.epoch_data.constrain(
             &mut cs.ns(|| "constrain"),
             previous_epoch_index,
-            generate_constraints,
+            generate_constraints_for_hash,
         )?;
 
         // convert the bitmap to constraints

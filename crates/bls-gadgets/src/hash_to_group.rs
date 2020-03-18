@@ -86,7 +86,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         cs: &mut CS,
         counter: UInt8,
         message: &[UInt8],
-        generate_constraints: bool,
+        generate_constraints_for_hash: bool,
     ) -> Result<(G1Gadget<Bls12_377_Parameters>, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
         let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
@@ -107,7 +107,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
             &crh_bits,
             512,
             personalization,
-            generate_constraints,
+            generate_constraints_for_hash,
         )?;
 
         let hash = Self::hash_to_group(cs.ns(|| "hash to group"), &xof_bits)?;
@@ -159,16 +159,16 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
     message: &[Boolean],
     hash_length: u16,
     personalization: [u8; 8],
-    generate_constraints: bool,
+    generate_constraints_for_hash: bool,
 ) -> Result<Vec<Boolean>, SynthesisError> {
     let span = span!(
         Level::TRACE,
         "hash_to_bits",
         hash_length,
-        generate_constraints
+        generate_constraints_for_hash
     );
     let _enter = span.enter();
-    let xof_bits = if generate_constraints {
+    let xof_bits = if generate_constraints_for_hash {
         trace!("generating hash with constraints");
         // Reverse the message to LE
         let mut message = message.to_vec();

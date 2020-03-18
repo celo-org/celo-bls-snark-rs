@@ -60,7 +60,7 @@ impl EpochData<Bls12_377> {
         &self,
         cs: &mut CS,
         previous_index: &FrGadget,
-        generate_constraints: bool,
+        generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
@@ -71,7 +71,7 @@ impl EpochData<Bls12_377> {
         let (message_hash, crh_bits, xof_bits) = Self::hash_bits_to_g1(
             &mut cs.ns(|| "hash epoch to g1 bits"),
             &bits,
-            generate_constraints,
+            generate_constraints_for_hash,
         )?;
 
         Ok(ConstrainedEpochData {
@@ -138,7 +138,7 @@ impl EpochData<Bls12_377> {
     fn hash_bits_to_g1<CS: ConstraintSystem<Fr>>(
         cs: &mut CS,
         epoch_bits: &[Boolean],
-        generate_constraints: bool,
+        generate_constraints_for_hash: bool,
     ) -> Result<(G1Gadget, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
         trace!("hashing epoch to g1");
         // Reverse to LE
@@ -181,7 +181,7 @@ impl EpochData<Bls12_377> {
             &mut cs.ns(|| "hash to group"),
             counter_var,
             &input_bytes_var,
-            generate_constraints,
+            generate_constraints_for_hash,
         )
     }
 }
