@@ -10,6 +10,8 @@ use tracing_subscriber::{
     fmt::{time::ChronoUtc, Subscriber},
 };
 
+use bench_utils::{end_timer, start_timer};
+
 fn main() {
     Subscriber::builder()
         .with_timer(ChronoUtc::rfc3339())
@@ -32,7 +34,9 @@ fn main() {
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
+    let time = start_timer!(|| "Trusted setup");
     let params = setup::trusted_setup(num_validators, num_epochs, faults, rng).unwrap();
+    end_timer!(time);
 
     // Create the state to be proven (first - last and in between)
     // Note: This is all data which should be fetched via the Celo blockchain
@@ -40,9 +44,13 @@ fn main() {
         generate_test_data(num_validators, faults, num_epochs);
 
     // Prover generates the proof given the params
+    let time = start_timer!(|| "Generate proof");
     let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    end_timer!(time);
 
     // Verifier checks the proof
+    let time = start_timer!(|| "Verify proof");
     let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
+    end_timer!(time);
     assert!(res.is_ok());
 }
