@@ -37,6 +37,8 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub proof: Proof<E>,
     /// The VK produced by the trusted setup
     pub verifying_key: VerifyingKey<E>,
+    /// Flag which toggles generating constraints in SW6
+    pub generate_constraints: bool,
 }
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
@@ -45,6 +47,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
         num_epochs: usize,
         maximum_non_signers: usize,
         vk: VerifyingKey<E>,
+        generate_constraints: bool,
     ) -> Self {
         let empty_update = SingleUpdate::empty(num_validators, maximum_non_signers);
         let empty_hash_proof = Proof::<E>::default();
@@ -56,6 +59,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
             aggregated_signature: None,
             proof: empty_hash_proof,
             verifying_key: vk,
+            generate_constraints,
         }
     }
 }
@@ -168,6 +172,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_epoch_index,
                 &previous_max_non_signers,
                 self.num_validators,
+                self.generate_constraints,
             )?;
 
             // Update the pubkeys for the next iteration
@@ -313,6 +318,7 @@ mod tests {
                 aggregated_signature: Some(aggregated_signature),
                 proof,
                 verifying_key: vk,
+                generate_constraints: false,
             };
 
             let mut cs = TestConstraintSystem::<Fr>::new();

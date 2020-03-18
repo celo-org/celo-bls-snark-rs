@@ -21,6 +21,7 @@ pub fn prove(
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
+    generate_constraints: bool,
 ) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
     info!(
         "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
@@ -60,6 +61,8 @@ pub fn prove(
         epochs.push(to_update(transition));
     }
 
+    // If generate constraint sis true, generate both proofs, otherwise just one
+
     // Generate proof of correct calculation of the CRH->Blake hashes
     // to make Hash to G1 cheaper
     let circuit = HashToBits { message_bits };
@@ -78,6 +81,7 @@ pub fn prove(
         num_validators,
         proof: hash_proof,
         verifying_key: parameters.vk().1.clone(),
+        generate_constraints,
     };
     info!("BLS");
     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;

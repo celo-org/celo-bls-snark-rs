@@ -86,6 +86,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         cs: &mut CS,
         counter: UInt8,
         message: &[UInt8],
+        generate_constraints: bool,
     ) -> Result<(G1Gadget<Bls12_377_Parameters>, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
         let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
@@ -106,7 +107,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
             &crh_bits,
             512,
             personalization,
-            false,
+            generate_constraints,
         )?;
 
         let hash = Self::hash_to_group(cs.ns(|| "hash to group"), &xof_bits)?;
@@ -379,6 +380,7 @@ mod test {
             &mut cs.ns(|| "hash to group"),
             counter,
             &input,
+            false,
         )
         .unwrap()
         .0;

@@ -12,8 +12,17 @@ fn prover_verifier_groth16() {
     let faults = 1;
     let num_validators = 3 * faults + 1;
 
+    let generate_constraints = false;
+
     // Trusted setup
-    let params = setup::trusted_setup(num_validators, num_transitions, faults, rng).unwrap();
+    let params = setup::trusted_setup(
+        num_validators,
+        num_transitions,
+        faults,
+        rng,
+        generate_constraints,
+    )
+    .unwrap();
 
     // Create the state to be proven (first epoch + `num_transitions` transitions.
     // Note: This is all data which should be fetched via the Celo blockchain
@@ -21,7 +30,14 @@ fn prover_verifier_groth16() {
         generate_test_data(num_validators, faults, num_transitions);
 
     // Prover generates the proof given the params
-    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    let proof = prover::prove(
+        &params,
+        num_validators as u32,
+        &first_epoch,
+        &transitions,
+        generate_constraints,
+    )
+    .unwrap();
 
     // Verifier checks the proof
     let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);

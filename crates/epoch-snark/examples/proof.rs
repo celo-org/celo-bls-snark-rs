@@ -31,11 +31,23 @@ fn main() {
         .expect("num epochs was expected")
         .parse()
         .expect("NaN");
+    let generate_constraints: bool = args
+        .next()
+        .expect("expected flag for generating or not constraints inside SW6")
+        .parse()
+        .expect("not a bool");
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
-    let params = setup::trusted_setup(num_validators, num_epochs, faults, rng).unwrap();
+    let params = setup::trusted_setup(
+        num_validators,
+        num_epochs,
+        faults,
+        rng,
+        generate_constraints,
+    )
+    .unwrap();
     end_timer!(time);
 
     // Create the state to be proven (first - last and in between)
@@ -45,7 +57,14 @@ fn main() {
 
     // Prover generates the proof given the params
     let time = start_timer!(|| "Generate proof");
-    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    let proof = prover::prove(
+        &params,
+        num_validators as u32,
+        &first_epoch,
+        &transitions,
+        generate_constraints,
+    )
+    .unwrap();
     end_timer!(time);
 
     // Verifier checks the proof

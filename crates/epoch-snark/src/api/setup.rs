@@ -35,6 +35,7 @@ pub fn trusted_setup<R: Rng>(
     num_epochs: usize,
     maximum_non_signers: usize,
     rng: &mut R,
+    generate_constraints: bool,
 ) -> Result<Parameters<CPCurve, BLSCurve>> {
     setup(
         num_validators,
@@ -43,6 +44,7 @@ pub fn trusted_setup<R: Rng>(
         rng,
         |c, rng| generate_random_parameters(c, rng),
         |c, rng| generate_random_parameters(c, rng),
+        generate_constraints,
     )
 }
 
@@ -52,7 +54,7 @@ mod tests {
     #[test]
     fn runs_setup() {
         let rng = &mut rand::thread_rng();
-        assert!(trusted_setup(3, 2, 1, rng).is_ok())
+        assert!(trusted_setup(3, 2, 1, rng, false).is_ok())
     }
 }
 
@@ -68,6 +70,7 @@ fn setup<CP, BLS, F, G, R>(
     rng: &mut R,
     hash_to_bits_setup: F,
     validator_setup_fn: G,
+    generate_constraints: bool,
 ) -> Result<Parameters<CP, BLS>>
 where
     CP: PairingEngine,
@@ -94,6 +97,7 @@ where
         num_epochs,
         maximum_non_signers,
         hash_to_bits.vk.clone(),
+        generate_constraints,
     );
     let epochs = validator_setup_fn(empty_epochs, rng)?;
 

@@ -60,6 +60,7 @@ impl EpochData<Bls12_377> {
         &self,
         cs: &mut CS,
         previous_index: &FrGadget,
+        generate_constraints: bool,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
@@ -67,8 +68,11 @@ impl EpochData<Bls12_377> {
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
-        let (message_hash, crh_bits, xof_bits) =
-            Self::hash_bits_to_g1(&mut cs.ns(|| "hash epoch to g1 bits"), &bits)?;
+        let (message_hash, crh_bits, xof_bits) = Self::hash_bits_to_g1(
+            &mut cs.ns(|| "hash epoch to g1 bits"),
+            &bits,
+            generate_constraints,
+        )?;
 
         Ok(ConstrainedEpochData {
             bits,
@@ -134,6 +138,7 @@ impl EpochData<Bls12_377> {
     fn hash_bits_to_g1<CS: ConstraintSystem<Fr>>(
         cs: &mut CS,
         epoch_bits: &[Boolean],
+        generate_constraints: bool,
     ) -> Result<(G1Gadget, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
         trace!("hashing epoch to g1");
         // Reverse to LE
@@ -176,6 +181,7 @@ impl EpochData<Bls12_377> {
             &mut cs.ns(|| "hash to group"),
             counter_var,
             &input_bytes_var,
+            generate_constraints,
         )
     }
 }
@@ -211,7 +217,7 @@ mod tests {
         let mut cs = TestConstraintSystem::<Fr>::new();
         let index = to_fr(&mut cs.ns(|| "index"), Some(9u32)).unwrap();
         epoch
-            .constrain(&mut cs.ns(|| "constraint"), &index)
+            .constrain(&mut cs.ns(|| "constraint"), &index, false)
             .unwrap();
         assert!(cs.is_satisfied());
     }
@@ -237,7 +243,7 @@ mod tests {
         // compare it with the one calculated in the circuit from its bytes
         let mut cs = TestConstraintSystem::<Fr>::new();
         let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
-        let ret = EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits).unwrap();
+        let ret = EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
         assert_eq!(ret.0.get_value().unwrap(), hash);
     }
 
