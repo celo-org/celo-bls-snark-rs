@@ -96,8 +96,7 @@ where
         num_validators,
         num_epochs,
         maximum_non_signers,
-        hash_to_bits.vk.clone(),
-        generate_constraints,
+        Some(hash_to_bits.vk.clone()),
     );
     let epochs = validator_setup_fn(empty_epochs, rng)?;
 

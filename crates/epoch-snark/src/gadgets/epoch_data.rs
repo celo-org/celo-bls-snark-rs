@@ -243,7 +243,8 @@ mod tests {
         // compare it with the one calculated in the circuit from its bytes
         let mut cs = TestConstraintSystem::<Fr>::new();
         let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
-        let ret = EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
+        let ret =
+            EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
         assert_eq!(ret.0.get_value().unwrap(), hash);
     }
 

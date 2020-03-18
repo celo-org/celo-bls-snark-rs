@@ -2,7 +2,11 @@ use super::{BLSCurve, CPCurve, Parameters};
 use crate::{
     api::CPField,
     epoch_block::{EpochBlock, EpochTransition},
-    gadgets::{single_update::SingleUpdate, EpochData, HashToBits, ValidatorSetUpdate},
+    gadgets::{
+        epochs::{HashToBitsHelper, ValidatorSetUpdate},
+        single_update::SingleUpdate,
+        EpochData, HashToBits,
+    },
 };
 use bls_crypto::{
     bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement, hash::composite::CRH,
@@ -79,9 +83,10 @@ pub fn prove(
         epochs,
         aggregated_signature: Some(asig),
         num_validators,
-        proof: hash_proof,
-        verifying_key: parameters.vk().1.clone(),
-        generate_constraints,
+        hash_helper: Some(HashToBitsHelper {
+            proof: hash_proof,
+            verifying_key: parameters.vk().1.clone(),
+        }),
     };
     info!("BLS");
     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
