@@ -30,22 +30,15 @@ fn prover_verifier_groth16() {
         generate_test_data(num_validators, faults, num_transitions);
 
     // Prover generates the proof given the params
-    let proof = prover::prove(
-        &params,
-        num_validators as u32,
-        &first_epoch,
-        &transitions,
-        generate_constraints,
-    )
-    .unwrap();
+    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
+    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
 
     // Serialize the proof / vk
     let mut serialized_vk = vec![];
-    params.vk().0.serialize(&mut serialized_vk).unwrap();
+    params.epochs.vk.serialize(&mut serialized_vk).unwrap();
     let mut serialized_proof = vec![];
     proof.serialize(&mut serialized_proof).unwrap();
     dbg!(hex::encode(&serialized_vk));

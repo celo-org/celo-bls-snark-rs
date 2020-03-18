@@ -18,14 +18,8 @@ use tracing::{debug, error, info, span, warn, Level};
 type Result<T> = std::result::Result<T, SynthesisError>;
 
 pub struct Parameters<CP: PairingEngine, BLS: PairingEngine> {
-    pub hash_to_bits: Groth16Parameters<BLS>,
     pub epochs: Groth16Parameters<CP>,
-}
-
-impl<CP: PairingEngine, BLS: PairingEngine> Parameters<CP, BLS> {
-    pub fn vk(&self) -> (&VerifyingKey<CP>, &VerifyingKey<BLS>) {
-        (&self.epochs.vk, &self.hash_to_bits.vk)
-    }
+    pub hash_to_bits: Option<Groth16Parameters<BLS>>,
 }
 
 /// Initializes the Hash To Bits and Validator Set Update circuits with random parameters
@@ -88,20 +82,21 @@ where
     let _enter = span.enter();
 
     info!("CRH->XOF");
-    let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
-    let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
+    let (vk, hash_to_bits) = if generate_constraints {
+        let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
+        let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
+        (Some(hash_to_bits.vk.clone()), Some(hash_to_bits))
+    } else {
+        (None, None)
+    };
 
     info!("BLS");
-    let empty_epochs = ValidatorSetUpdate::empty(
-        num_validators,
-        num_epochs,
-        maximum_non_signers,
-        Some(hash_to_bits.vk.clone()),
-    );
+    let empty_epochs =
+        ValidatorSetUpdate::empty(num_validators, num_epochs, maximum_non_signers, vk);
     let epochs = validator_setup_fn(empty_epochs, rng)?;
 
     Ok(Parameters {
-        hash_to_bits,
         epochs,
+        hash_to_bits,
     })
 }

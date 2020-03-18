@@ -57,19 +57,12 @@ fn main() {
 
     // Prover generates the proof given the params
     let time = start_timer!(|| "Generate proof");
-    let proof = prover::prove(
-        &params,
-        num_validators as u32,
-        &first_epoch,
-        &transitions,
-        generate_constraints,
-    )
-    .unwrap();
+    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
     end_timer!(time);
 
     // Verifier checks the proof
     let time = start_timer!(|| "Verify proof");
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
+    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     end_timer!(time);
     assert!(res.is_ok());
 }

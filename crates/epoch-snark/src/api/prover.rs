@@ -15,7 +15,7 @@ use bls_crypto::{
 use bls_gadgets::bytes_to_bits;
 
 use algebra::{bls12_377::G1Projective, Zero};
-use groth16::{create_proof_no_zk, Proof as Groth16Proof};
+use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
 use r1cs_core::{ConstraintSynthesizer, SynthesisError};
 
 use tracing::{debug, error, info, span, warn, Level};
@@ -25,7 +25,6 @@ pub fn prove(
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
-    generate_constraints: bool,
 ) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
     info!(
         "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
@@ -37,12 +36,47 @@ pub fn prove(
     let span = span!(Level::TRACE, "prove");
     let _enter = span.enter();
 
+    let epochs = transitions
+        .iter()
+        .map(|transition| to_update(transition))
+        .collect::<Vec<_>>();
+
+    // Generate a helping proof if a Proving Key for the HashToBits
+    // circuit was provided
+    let hash_helper = if let Some(ref params) = parameters.hash_to_bits {
+        Some(get_hash_helper(&params, transitions)?)
+    } else {
+        None
+    };
+
+    // Generate the BLS proof
+    let asig = transitions.iter().fold(G1Projective::zero(), |acc, epoch| {
+        acc + epoch.aggregate_signature.get_sig()
+    });
+
+    let circuit = ValidatorSetUpdate::<BLSCurve> {
+        initial_epoch: to_epoch_data(initial_epoch),
+        epochs,
+        aggregated_signature: Some(asig),
+        num_validators,
+        hash_helper,
+    };
+    info!("BLS");
+    let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
+
+    Ok(bls_proof)
+}
+
+fn get_hash_helper(
+    params: &Groth16Parameters<BLSCurve>,
+    transitions: &[EpochTransition],
+) -> Result<HashToBitsHelper<BLSCurve>, SynthesisError> {
     let composite_hasher = CompositeHasher::new().unwrap();
     let try_and_increment = TryAndIncrement::new(&composite_hasher);
 
     // Generate the CRH per epoch
     let mut message_bits = Vec::with_capacity(transitions.len());
-    let mut epochs = Vec::with_capacity(transitions.len());
+
     for transition in transitions {
         let block = &transition.block;
         let epoch_bytes = block.encode_to_bytes().unwrap();
@@ -62,36 +96,18 @@ pub fn prove(
                 .map(|b| Some(*b))
                 .collect(),
         );
-        epochs.push(to_update(transition));
     }
-
-    // If generate constraint sis true, generate both proofs, otherwise just one
 
     // Generate proof of correct calculation of the CRH->Blake hashes
     // to make Hash to G1 cheaper
     let circuit = HashToBits { message_bits };
     info!("CRH->XOF");
-    let hash_proof = create_proof_no_zk(circuit, &parameters.hash_to_bits)?;
+    let hash_proof = create_proof_no_zk(circuit, params)?;
 
-    // Generate the BLS proof
-    let asig = transitions.iter().fold(G1Projective::zero(), |acc, epoch| {
-        acc + epoch.aggregate_signature.get_sig()
-    });
-
-    let circuit = ValidatorSetUpdate::<BLSCurve> {
-        initial_epoch: to_epoch_data(initial_epoch),
-        epochs,
-        aggregated_signature: Some(asig),
-        num_validators,
-        hash_helper: Some(HashToBitsHelper {
-            proof: hash_proof,
-            verifying_key: parameters.vk().1.clone(),
-        }),
-    };
-    info!("BLS");
-    let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
-
-    Ok(bls_proof)
+    Ok(HashToBitsHelper {
+        proof: hash_proof,
+        verifying_key: params.vk.clone(),
+    })
 }
 
 fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
