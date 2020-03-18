@@ -12,7 +12,7 @@ fn prover_verifier_groth16() {
     let faults = 1;
     let num_validators = 3 * faults + 1;
 
-    let generate_constraints = false;
+    let hashes_in_bls12_377 = true;
 
     // Trusted setup
     let params = setup::trusted_setup(
@@ -20,7 +20,7 @@ fn prover_verifier_groth16() {
         num_transitions,
         faults,
         rng,
-        generate_constraints,
+        hashes_in_bls12_377,
     )
     .unwrap();
 

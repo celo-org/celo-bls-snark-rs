@@ -24,12 +24,17 @@ pub struct Parameters<CP: PairingEngine, BLS: PairingEngine> {
 
 /// Initializes the Hash To Bits and Validator Set Update circuits with random parameters
 /// seeded by the provided RNG over BLS12-377 and SW6.
+///
+/// `hashes_in_bls_12377` should be set to `true` if you're using the 2-SNARK technique,
+/// which will perform 2 setups, one for the CRH->XOF hashes in BLS12-377 and the rest
+/// of the circuit in SW6. If set to `false, only 1 setup will be done (at the expense
+/// of having a longer proving time due to CRH->XOF hashes being done in SW6)
 pub fn trusted_setup<R: Rng>(
     num_validators: usize,
     num_epochs: usize,
     maximum_non_signers: usize,
     rng: &mut R,
-    generate_constraints: bool,
+    hashes_in_bls12_377: bool,
 ) -> Result<Parameters<CPCurve, BLSCurve>> {
     setup(
         num_validators,
@@ -38,7 +43,7 @@ pub fn trusted_setup<R: Rng>(
         rng,
         |c, rng| generate_random_parameters(c, rng),
         |c, rng| generate_random_parameters(c, rng),
-        generate_constraints,
+        hashes_in_bls12_377,
     )
 }
 
@@ -64,7 +69,7 @@ fn setup<CP, BLS, F, G, R>(
     rng: &mut R,
     hash_to_bits_setup: F,
     validator_setup_fn: G,
-    generate_constraints: bool,
+    hashes_in_bls12_377: bool,
 ) -> Result<Parameters<CP, BLS>>
 where
     CP: PairingEngine,
@@ -81,7 +86,7 @@ where
     let span = span!(Level::TRACE, "setup");
     let _enter = span.enter();
 
-    let (vk, hash_to_bits) = if generate_constraints {
+    let (vk, hash_to_bits) = if hashes_in_bls12_377 {
         info!("CRH->XOF");
         let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
         let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;

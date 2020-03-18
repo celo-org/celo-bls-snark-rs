@@ -31,23 +31,17 @@ fn main() {
         .expect("num epochs was expected")
         .parse()
         .expect("NaN");
-    let generate_constraints: bool = args
+    let hashes_in_bls12_377: bool = args
         .next()
-        .expect("expected flag for generating or not constraints inside SW6")
+        .expect("expected flag for generating or not constraints inside BLS12_377")
         .parse()
         .expect("not a bool");
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
-    let params = setup::trusted_setup(
-        num_validators,
-        num_epochs,
-        faults,
-        rng,
-        generate_constraints,
-    )
-    .unwrap();
+    let params =
+        setup::trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
     end_timer!(time);
 
     // Create the state to be proven (first - last and in between)

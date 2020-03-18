@@ -33,9 +33,9 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub epochs: Vec<SingleUpdate<E>>,
     /// The aggregated signature of all the validators over all the epoch changes
     pub aggregated_signature: Option<E::G1Projective>,
-    /// The optional hash to bits proof data. If provided, the circuit will not
+    /// The optional hash to bits proof data. If provided, the circuit **will not**
     /// constrain the inner CRH->XOF hashes in SW6 and instead it will be verified
-    /// via this proof
+    /// via the helper's proof which is in BLS12-377.
     pub hash_helper: Option<HashToBitsHelper<E>>,
 }
 
@@ -175,7 +175,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_epoch_index,
                 &previous_max_non_signers,
                 self.num_validators,
-                self.hash_helper.is_none(), // generate constraints if no helper was provided
+                self.hash_helper.is_none(), // generate constraints in SW6 if no helper was provided
             )?;
 
             // Update the pubkeys for the next iteration
