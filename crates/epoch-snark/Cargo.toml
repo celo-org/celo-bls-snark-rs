@@ -24,12 +24,9 @@ tracing = "0.1.13"
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
-bench-utils = { git = "https://github.com/scipr-lab/zexe" }
+bench-utils = { git = "https://github.com/scipr-lab/zexe", features = ["print-trace"] }
 hex = "0.3.2"
 bls-gadgets = { path = "../bls-gadgets", features = ["test-helpers"] }
-
-[features]
-print-trace = [ "bench-utils/print-trace" ]
 
 [lib]
 crate-type = ["lib", "staticlib"]
