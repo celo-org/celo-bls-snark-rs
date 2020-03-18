@@ -43,6 +43,6 @@ fn main() {
     let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, proof);
+    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
 }
