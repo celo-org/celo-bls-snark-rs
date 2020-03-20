@@ -18,23 +18,23 @@ use tracing::{debug, error, info, span, warn, Level};
 type Result<T> = std::result::Result<T, SynthesisError>;
 
 pub struct Parameters<CP: PairingEngine, BLS: PairingEngine> {
-    pub hash_to_bits: Groth16Parameters<BLS>,
     pub epochs: Groth16Parameters<CP>,
-}
-
-impl<CP: PairingEngine, BLS: PairingEngine> Parameters<CP, BLS> {
-    pub fn vk(&self) -> (&VerifyingKey<CP>, &VerifyingKey<BLS>) {
-        (&self.epochs.vk, &self.hash_to_bits.vk)
-    }
+    pub hash_to_bits: Option<Groth16Parameters<BLS>>,
 }
 
 /// Initializes the Hash To Bits and Validator Set Update circuits with random parameters
 /// seeded by the provided RNG over BLS12-377 and SW6.
+///
+/// `hashes_in_bls_12377` should be set to `true` if you're using the 2-SNARK technique,
+/// which will perform 2 setups, one for the CRH->XOF hashes in BLS12-377 and the rest
+/// of the circuit in SW6. If set to `false, only 1 setup will be done (at the expense
+/// of having a longer proving time due to CRH->XOF hashes being done in SW6)
 pub fn trusted_setup<R: Rng>(
     num_validators: usize,
     num_epochs: usize,
     maximum_non_signers: usize,
     rng: &mut R,
+    hashes_in_bls12_377: bool,
 ) -> Result<Parameters<CPCurve, BLSCurve>> {
     setup(
         num_validators,
@@ -43,6 +43,7 @@ pub fn trusted_setup<R: Rng>(
         rng,
         |c, rng| generate_random_parameters(c, rng),
         |c, rng| generate_random_parameters(c, rng),
+        hashes_in_bls12_377,
     )
 }
 
@@ -52,7 +53,7 @@ mod tests {
     #[test]
     fn runs_setup() {
         let rng = &mut rand::thread_rng();
-        assert!(trusted_setup(3, 2, 1, rng).is_ok())
+        assert!(trusted_setup(3, 2, 1, rng, false).is_ok())
     }
 }
 
@@ -68,6 +69,7 @@ fn setup<CP, BLS, F, G, R>(
     rng: &mut R,
     hash_to_bits_setup: F,
     validator_setup_fn: G,
+    hashes_in_bls12_377: bool,
 ) -> Result<Parameters<CP, BLS>>
 where
     CP: PairingEngine,
@@ -84,21 +86,22 @@ where
     let span = span!(Level::TRACE, "setup");
     let _enter = span.enter();
 
-    info!("CRH->XOF");
-    let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
-    let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
+    let (vk, hash_to_bits) = if hashes_in_bls12_377 {
+        info!("CRH->XOF");
+        let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
+        let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
+        (Some(hash_to_bits.vk.clone()), Some(hash_to_bits))
+    } else {
+        (None, None)
+    };
 
     info!("BLS");
-    let empty_epochs = ValidatorSetUpdate::empty(
-        num_validators,
-        num_epochs,
-        maximum_non_signers,
-        hash_to_bits.vk.clone(),
-    );
+    let empty_epochs =
+        ValidatorSetUpdate::empty(num_validators, num_epochs, maximum_non_signers, vk);
     let epochs = validator_setup_fn(empty_epochs, rng)?;
 
     Ok(Parameters {
-        hash_to_bits,
         epochs,
+        hash_to_bits,
     })
 }

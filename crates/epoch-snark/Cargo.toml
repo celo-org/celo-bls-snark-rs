@@ -34,3 +34,7 @@ crate-type = ["lib", "staticlib"]
 [[example]]
 name = "proof"
 path = "examples/proof.rs"
+
+[[example]]
+name = "constraints"
+path = "examples/constraints.rs"

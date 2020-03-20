@@ -12,8 +12,17 @@ fn prover_verifier_groth16() {
     let faults = 1;
     let num_validators = 3 * faults + 1;
 
+    let hashes_in_bls12_377 = true;
+
     // Trusted setup
-    let params = setup::trusted_setup(num_validators, num_transitions, faults, rng).unwrap();
+    let params = setup::trusted_setup(
+        num_validators,
+        num_transitions,
+        faults,
+        rng,
+        hashes_in_bls12_377,
+    )
+    .unwrap();
 
     // Create the state to be proven (first epoch + `num_transitions` transitions.
     // Note: This is all data which should be fetched via the Celo blockchain
@@ -24,12 +33,12 @@ fn prover_verifier_groth16() {
     let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
+    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
 
     // Serialize the proof / vk
     let mut serialized_vk = vec![];
-    params.vk().0.serialize(&mut serialized_vk).unwrap();
+    params.epochs.vk.serialize(&mut serialized_vk).unwrap();
     let mut serialized_proof = vec![];
     proof.serialize(&mut serialized_proof).unwrap();
     dbg!(hex::encode(&serialized_vk));

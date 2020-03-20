@@ -33,6 +33,14 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub epochs: Vec<SingleUpdate<E>>,
     /// The aggregated signature of all the validators over all the epoch changes
     pub aggregated_signature: Option<E::G1Projective>,
+    /// The optional hash to bits proof data. If provided, the circuit **will not**
+    /// constrain the inner CRH->XOF hashes in SW6 and instead it will be verified
+    /// via the helper's proof which is in BLS12-377.
+    pub hash_helper: Option<HashToBitsHelper<E>>,
+}
+
+#[derive(Clone)]
+pub struct HashToBitsHelper<E: PairingEngine> {
     /// The Groth16 proof satisfying the statement
     pub proof: Proof<E>,
     /// The VK produced by the trusted setup
@@ -44,18 +52,20 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
         num_validators: usize,
         num_epochs: usize,
         maximum_non_signers: usize,
-        vk: VerifyingKey<E>,
+        vk: Option<VerifyingKey<E>>,
     ) -> Self {
         let empty_update = SingleUpdate::empty(num_validators, maximum_non_signers);
-        let empty_hash_proof = Proof::<E>::default();
+        let hash_helper = vk.map(|vk| HashToBitsHelper {
+            proof: Proof::<E>::default(),
+            verifying_key: vk,
+        });
 
         ValidatorSetUpdate {
             initial_epoch: EpochData::empty(num_validators, maximum_non_signers),
             num_validators: num_validators as u32,
             epochs: vec![empty_update; num_epochs],
             aggregated_signature: None,
-            proof: empty_hash_proof,
-            verifying_key: vk,
+            hash_helper,
         }
     }
 }
@@ -71,11 +81,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
-        proof_of_compression.compress_public_inputs(
-            &mut cs.ns(|| "compress public inputs"),
-            &self.proof,
-            &self.verifying_key,
-        )?;
+        proof_of_compression
+            .compress_public_inputs(&mut cs.ns(|| "compress public inputs"), self.hash_helper)?;
 
         info!("constraints generated");
 
@@ -168,6 +175,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_epoch_index,
                 &previous_max_non_signers,
                 self.num_validators,
+                self.hash_helper.is_none(), // generate constraints in SW6 if no helper was provided
             )?;
 
             // Update the pubkeys for the next iteration
@@ -304,15 +312,12 @@ mod tests {
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
             let aggregated_signature = sum(&asigs);
 
-            let proof = Proof::default();
-            let vk = VerifyingKey::default();
             let valset = ValidatorSetUpdate::<Curve> {
                 initial_epoch,
                 epochs,
                 num_validators,
                 aggregated_signature: Some(aggregated_signature),
-                proof,
-                verifying_key: vk,
+                hash_helper: None,
             };
 
             let mut cs = TestConstraintSystem::<Fr>::new();

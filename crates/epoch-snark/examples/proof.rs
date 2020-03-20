@@ -31,11 +31,17 @@ fn main() {
         .expect("num epochs was expected")
         .parse()
         .expect("NaN");
+    let hashes_in_bls12_377: bool = args
+        .next()
+        .expect("expected flag for generating or not constraints inside BLS12_377")
+        .parse()
+        .expect("not a bool");
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
-    let params = setup::trusted_setup(num_validators, num_epochs, faults, rng).unwrap();
+    let params =
+        setup::trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
     end_timer!(time);
 
     // Create the state to be proven (first - last and in between)
@@ -50,7 +56,7 @@ fn main() {
 
     // Verifier checks the proof
     let time = start_timer!(|| "Verify proof");
-    let res = verifier::verify(params.vk().0, &first_epoch, &last_epoch, &proof);
+    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     end_timer!(time);
     assert!(res.is_ok());
 }
