@@ -303,6 +303,28 @@ impl Signature {
 
         Signature { sig: asig }
     }
+
+    pub fn batch_verify(
+        &self,
+        pubkeys: &[PublicKey],
+        message_hashes: &[G1Projective],
+    ) -> Result<(), BLSError> {
+        // `.into()` is needed to prepared the points
+        let mut els = vec![(
+            self.get_sig().into_affine().into(),
+            G2Affine::prime_subgroup_generator().neg().into(),
+        )];
+        message_hashes.iter().zip(pubkeys).for_each(|(hash, pubkey)| {
+            els.push((hash.into_affine().into(), pubkey.get_pk().into_affine().into()));
+        });
+
+        let pairing = Bls12_377::product_of_pairings(&els);
+        if pairing == Fq12::one() {
+            Ok(())
+        } else {
+            Err(BLSError::VerificationFailed)?
+        }
+    }
 }
 
 impl ToBytes for Signature {
@@ -424,6 +446,8 @@ mod test {
         hash::{composite::CompositeHasher, direct::DirectHasher},
     };
     use rand::thread_rng;
+    use crate::test_helpers::{keygen_batch, sign_batch, sum};
+
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -500,6 +524,44 @@ mod test {
         pk.verify_pop(&pk_bytes, &sig, &try_and_increment).unwrap();
         pk2.verify_pop(&pk_bytes, &sig, &try_and_increment)
             .unwrap_err();
+    }
+
+    #[test]
+    fn batch_verify() {
+        // generate 5 (aggregate sigs, message hash pairs)
+        // verify them all in 1 call
+        let batch_size = 5;
+        let num_keys = 7;
+        let rng = &mut rand::thread_rng();
+
+        // generate some random messages
+        let messages = (0..batch_size)
+            .map(|_| G1Projective::rand(rng))
+            .collect::<Vec<_>>();
+        //
+        // keygen for multiple rounds (7 keys per round)
+        let (secret_keys, public_keys_batches) = keygen_batch::<Bls12_377>(batch_size, num_keys);
+
+        // get the aggregate public key for each rounds
+        let aggregate_pubkeys = public_keys_batches
+            .iter()
+            .map(|pks| sum(pks))
+            .map(PublicKey::from_pk)
+            .collect::<Vec<_>>();
+
+        // the keys from each epoch sign the messages from the corresponding epoch
+        let asigs = sign_batch::<Bls12_377>(&secret_keys, &messages);
+
+        // get the complete aggregate signature
+        let asig = sum(&asigs);
+        let asig = Signature::from_sig(asig);
+
+        let res = asig.batch_verify(
+            &aggregate_pubkeys,
+            &messages,
+        );
+
+        assert!(res.is_ok());
     }
 
     #[test]
