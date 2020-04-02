@@ -107,12 +107,19 @@ impl FromBytes for PrivateKey {
 #[derive(Debug)]
 pub enum BLSError {
     VerificationFailed,
+    HashToCurveFailed(Vec<u8>, Vec<u8>),
 }
 
 impl Display for BLSError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BLSError::VerificationFailed => write!(f, "signature verification failed"),
+            BLSError::HashToCurveFailed(msg, data) => write!(
+                f,
+                "could not hash to curve (msg: {}, extra data: {})",
+                hex::encode(msg),
+                hex::encode(data)
+            ),
         }
     }
 }
@@ -304,7 +311,44 @@ impl Signature {
         Signature { sig: asig }
     }
 
-    pub fn batch_verify(
+    /// Verifies the signature against a vector of pubkey & message tuples, for the provided
+    /// messages domain.
+    ///
+    /// For each message, an optional extra_data field can be provided (empty otherwise).
+    ///
+    /// The provided hash_to_g1 implementation will be used to hash each message-extra_data pair
+    /// to G1.
+    ///
+    /// The verification equation can be found in pg.11 from
+    /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
+    pub fn batch_verify<H: HashToG1>(
+        &self,
+        pubkeys: &[PublicKey],
+        domain: &[u8],
+        messages: &[&[u8]],
+        extra_data: &[&[u8]],
+        hash_to_g1: &H,
+    ) -> Result<(), BLSError> {
+        let message_hashes = messages
+            .iter()
+            .zip(extra_data)
+            .map(|(message, extra_data)| {
+                hash_to_g1
+                    .hash::<Bls12_377Parameters>(domain, message, extra_data)
+                    .map_err(|_| BLSError::HashToCurveFailed(message.to_vec(), extra_data.to_vec()))
+            })
+            .collect::<Result<Vec<G1Projective>, _>>()?;
+
+        self.batch_verify_hashes(pubkeys, &message_hashes)
+    }
+
+    /// Verifies the signature against a vector of pubkey & message hash tuples
+    /// This is a lower level method, if you prefer hashing to be done internally,
+    /// consider using the `batch_verify` method.
+    ///
+    /// The verification equation can be found in pg.11 from
+    /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
+    pub fn batch_verify_hashes(
         &self,
         pubkeys: &[PublicKey],
         message_hashes: &[G1Projective],
@@ -314,9 +358,15 @@ impl Signature {
             self.get_sig().into_affine().into(),
             G2Affine::prime_subgroup_generator().neg().into(),
         )];
-        message_hashes.iter().zip(pubkeys).for_each(|(hash, pubkey)| {
-            els.push((hash.into_affine().into(), pubkey.get_pk().into_affine().into()));
-        });
+        message_hashes
+            .iter()
+            .zip(pubkeys)
+            .for_each(|(hash, pubkey)| {
+                els.push((
+                    hash.into_affine().into(),
+                    pubkey.get_pk().into_affine().into(),
+                ));
+            });
 
         let pairing = Bls12_377::product_of_pairings(&els);
         if pairing == Fq12::one() {
@@ -441,13 +491,12 @@ impl PublicKeyCache {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_helpers::{keygen_batch, sign_batch, sum};
     use crate::{
         curve::hash::try_and_increment::TryAndIncrement,
         hash::{composite::CompositeHasher, direct::DirectHasher},
     };
     use rand::thread_rng;
-    use crate::test_helpers::{keygen_batch, sign_batch, sum};
-
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -527,7 +576,63 @@ mod test {
     }
 
     #[test]
-    fn batch_verify() {
+    fn test_batch_verify_direct() {
+        init();
+
+        let rng = &mut thread_rng();
+        let direct_hasher = DirectHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&direct_hasher);
+
+        let num_epochs = 10;
+        let num_validators = 7;
+
+        // generate some msgs and extra data
+        let mut msgs = Vec::new();
+        let mut extra_data_vec = Vec::new();
+        for _ in 0..num_epochs {
+            let message: Vec<u8> = (0..32).map(|_| rng.gen()).collect::<Vec<u8>>();
+            let extra_data: Vec<u8> = (0..32).map(|_| rng.gen()).collect::<Vec<u8>>();
+            msgs.push(message);
+            extra_data_vec.push(extra_data);
+        }
+        let msgs = msgs.iter().map(|m| m.as_ref()).collect::<Vec<&[u8]>>();
+        let extra_data_vec = extra_data_vec
+            .iter()
+            .map(|e| e.as_ref())
+            .collect::<Vec<&[u8]>>();
+
+        // get each signed by a committee _on the same domain_ and get the agg sigs of the commitee
+        let mut asig = G1Projective::zero();
+        let mut pubkeys = Vec::new();
+        for i in 0..num_epochs {
+            let mut epoch_pubkey = G2Projective::zero();
+            for _ in 0..num_validators {
+                let sk = PrivateKey::generate(rng);
+                let s = sk
+                    .sign(&msgs[i], &extra_data_vec[i], &try_and_increment)
+                    .unwrap();
+
+                asig += s.sig;
+                epoch_pubkey += sk.to_public().pk;
+            }
+            pubkeys.push(PublicKey::from_pk(epoch_pubkey));
+        }
+
+        let asig = Signature::from_sig(asig);
+
+        let res = asig.batch_verify(
+            &pubkeys,
+            SIG_DOMAIN,
+            &msgs,
+            &extra_data_vec,
+            &try_and_increment,
+        );
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn batch_verify_hashes() {
         // generate 5 (aggregate sigs, message hash pairs)
         // verify them all in 1 call
         let batch_size = 5;
@@ -556,10 +661,7 @@ mod test {
         let asig = sum(&asigs);
         let asig = Signature::from_sig(asig);
 
-        let res = asig.batch_verify(
-            &aggregate_pubkeys,
-            &messages,
-        );
+        let res = asig.batch_verify_hashes(&aggregate_pubkeys, &messages);
 
         assert!(res.is_ok());
     }
