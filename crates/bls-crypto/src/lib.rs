@@ -3,6 +3,9 @@ pub mod bls;
 pub mod curve;
 pub mod hash;
 
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_helpers;
+
 // Clean public API
 pub use bls::keys::{PrivateKey, PublicKey, Signature};
 pub use curve::hash::try_and_increment::TryAndIncrement;
