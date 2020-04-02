@@ -325,13 +325,11 @@ impl Signature {
         &self,
         pubkeys: &[PublicKey],
         domain: &[u8],
-        messages: &[&[u8]],
-        extra_data: &[&[u8]],
+        messages: &[(&[u8], &[u8])],
         hash_to_g1: &H,
     ) -> Result<(), BLSError> {
         let message_hashes = messages
             .iter()
-            .zip(extra_data)
             .map(|(message, extra_data)| {
                 hash_to_g1
                     .hash::<Bls12_377Parameters>(domain, message, extra_data)
@@ -588,18 +586,15 @@ mod test {
 
         // generate some msgs and extra data
         let mut msgs = Vec::new();
-        let mut extra_data_vec = Vec::new();
         for _ in 0..num_epochs {
             let message: Vec<u8> = (0..32).map(|_| rng.gen()).collect::<Vec<u8>>();
             let extra_data: Vec<u8> = (0..32).map(|_| rng.gen()).collect::<Vec<u8>>();
-            msgs.push(message);
-            extra_data_vec.push(extra_data);
+            msgs.push((message, extra_data));
         }
-        let msgs = msgs.iter().map(|m| m.as_ref()).collect::<Vec<&[u8]>>();
-        let extra_data_vec = extra_data_vec
+        let msgs = msgs
             .iter()
-            .map(|e| e.as_ref())
-            .collect::<Vec<&[u8]>>();
+            .map(|(m, d)| (m.as_ref(), d.as_ref()))
+            .collect::<Vec<_>>();
 
         // get each signed by a committee _on the same domain_ and get the agg sigs of the commitee
         let mut asig = G1Projective::zero();
@@ -608,9 +603,7 @@ mod test {
             let mut epoch_pubkey = G2Projective::zero();
             for _ in 0..num_validators {
                 let sk = PrivateKey::generate(rng);
-                let s = sk
-                    .sign(&msgs[i], &extra_data_vec[i], &try_and_increment)
-                    .unwrap();
+                let s = sk.sign(&msgs[i].0, &msgs[i].1, &try_and_increment).unwrap();
 
                 asig += s.sig;
                 epoch_pubkey += sk.to_public().pk;
@@ -620,13 +613,7 @@ mod test {
 
         let asig = Signature::from_sig(asig);
 
-        let res = asig.batch_verify(
-            &pubkeys,
-            SIG_DOMAIN,
-            &msgs,
-            &extra_data_vec,
-            &try_and_increment,
-        );
+        let res = asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, &try_and_increment);
 
         assert!(res.is_ok());
     }
