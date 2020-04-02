@@ -44,3 +44,6 @@ path = "examples/pop_csv.rs"
 
 [lib]
 crate-type = ["lib", "staticlib"]
+
+[features]
+test-helpers = []
