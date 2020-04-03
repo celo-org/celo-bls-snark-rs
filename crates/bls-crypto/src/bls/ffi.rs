@@ -12,9 +12,9 @@ pub struct Message<'a> {
     /// Extra data which was signed alongside the `data`
     pub extra: &'a [u8],
     /// The aggregate public key of the epoch which signed the data/extra pair
-    pub public_key: PublicKey,
+    pub public_key: &'a PublicKey,
     /// The aggregate signature corresponding the aggregate public key
-    pub sig: Signature,
+    pub sig: &'a Signature,
 }
 
 #[repr(C)]
@@ -38,8 +38,8 @@ impl<'a> From<&'a MessageFFI> for Message<'a> {
         Message {
             data,
             extra,
-            public_key: unsafe { &*src.public_key }.clone(),
-            sig: unsafe { &*src.sig }.clone(),
+            public_key: unsafe { &*src.public_key },
+            sig: unsafe { &*src.sig },
         }
     }
 }
@@ -49,8 +49,8 @@ impl From<&Message<'_>> for MessageFFI {
         MessageFFI {
             data: Buffer::from(src.data.as_ref()),
             extra: Buffer::from(src.extra.as_ref()),
-            public_key: &src.public_key as *const PublicKey,
-            sig: &src.sig as *const Signature,
+            public_key: src.public_key as *const PublicKey,
+            sig: src.sig as *const Signature,
         }
     }
 }
@@ -108,8 +108,8 @@ mod tests {
         let msg = Message {
             data: &[1, 2, 3, 4],
             extra: &[5, 6, 7, 8],
-            public_key,
-            sig,
+            public_key: &public_key,
+            sig: &sig,
         };
         let m = msg.clone();
         let msg_ffi = MessageFFI::from(&m);

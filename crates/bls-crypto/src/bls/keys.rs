@@ -1,7 +1,7 @@
 use crate::curve::hash::HashToG1;
-
 use lazy_static::lazy_static;
 use lru::LruCache;
+use std::borrow::Borrow;
 use std::{
     collections::HashSet,
     hash::{Hash, Hasher},
@@ -302,10 +302,11 @@ impl Signature {
         self.sig
     }
 
-    pub fn aggregate(signatures: &[Signature]) -> Signature {
+    /// Sums the provided signatures to produce the aggregate signature.
+    pub fn aggregate<S: Borrow<Signature>>(signatures: &[S]) -> Signature {
         let mut asig = G1Projective::zero();
         for i in signatures.iter() {
-            asig = asig + &(*i).sig;
+            asig = asig + &(*i).borrow().sig;
         }
 
         Signature { sig: asig }
@@ -321,9 +322,9 @@ impl Signature {
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
-    pub fn batch_verify<H: HashToG1>(
+    pub fn batch_verify<H: HashToG1, P: Borrow<PublicKey>>(
         &self,
-        pubkeys: &[PublicKey],
+        pubkeys: &[P],
         domain: &[u8],
         messages: &[(&[u8], &[u8])],
         hash_to_g1: &H,
@@ -346,9 +347,9 @@ impl Signature {
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
-    pub fn batch_verify_hashes(
+    pub fn batch_verify_hashes<P: Borrow<PublicKey>>(
         &self,
-        pubkeys: &[PublicKey],
+        pubkeys: &[P],
         message_hashes: &[G1Projective],
     ) -> Result<(), BLSError> {
         // `.into()` is needed to prepared the points
@@ -362,7 +363,7 @@ impl Signature {
             .for_each(|(hash, pubkey)| {
                 els.push((
                     hash.into_affine().into(),
-                    pubkey.get_pk().into_affine().into(),
+                    pubkey.borrow().get_pk().into_affine().into(),
                 ));
             });
 
@@ -491,8 +492,9 @@ mod test {
     use super::*;
     use crate::test_helpers::{keygen_batch, sign_batch, sum};
     use crate::{
+        bls::ffi::{Message, MessageFFI},
         curve::hash::try_and_increment::TryAndIncrement,
-        hash::{composite::CompositeHasher, direct::DirectHasher},
+        hash::{composite::CompositeHasher, direct::DirectHasher, XOF},
     };
     use rand::thread_rng;
 
@@ -584,7 +586,6 @@ mod test {
         test_batch_verify_with_hasher(composite_hasher, true);
     }
 
-    use crate::hash::XOF;
     fn test_batch_verify_with_hasher<X: XOF>(hasher: X, is_composite: bool) {
         let rng = &mut thread_rng();
         let try_and_increment = TryAndIncrement::new(&hasher);
@@ -602,8 +603,6 @@ mod test {
             .iter()
             .map(|(m, d)| (m.as_ref(), d.as_ref()))
             .collect::<Vec<_>>();
-
-        use crate::bls::ffi::{Message, MessageFFI};
 
         // get each signed by a committee _on the same domain_ and get the agg sigs of the commitee
         let mut asig = G1Projective::zero();
@@ -637,8 +636,8 @@ mod test {
             messages.push(Message {
                 data: msgs[i].0,
                 extra: msgs[i].1,
-                public_key: pubkeys[i].clone(),
-                sig: sigs[i].clone(),
+                public_key: &pubkeys[i],
+                sig: &sigs[i],
             });
         }
 

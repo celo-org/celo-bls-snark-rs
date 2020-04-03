@@ -379,6 +379,16 @@ pub extern "C" fn verify_signature(
 }
 
 #[no_mangle]
+/// Receives a list of messages composed of:
+/// 1. the data
+/// 1. the public keys which signed on the data
+/// 1. the signature produced by the public keys
+///
+/// It will create the aggregate signature from all messages and execute batch
+/// verification against each (data, publickey) pair. Internally calls `Signature::batch_verify`
+///
+/// The verification equation can be found in pg.11 from
+/// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
 pub extern "C" fn batch_verify_signature(
     messages_ptr: *const MessageFFI,
     messages_len: usize,
@@ -389,27 +399,22 @@ pub extern "C" fn batch_verify_signature(
         // Get the pointers slice
         let messages: &[MessageFFI] = unsafe { slice::from_raw_parts(messages_ptr, messages_len) };
 
+        // Get the data from the underlying pointers in the right format
         let messages = messages
             .iter()
             .map(|m| Message::from(m))
             .collect::<Vec<_>>();
 
-        let mut pubkeys = Vec::with_capacity(messages_len);
-        let mut data = Vec::with_capacity(messages_len);
-        let mut extra = Vec::with_capacity(messages_len);
-        let mut sigs = Vec::with_capacity(messages_len);
-        for msg in messages {
-            pubkeys.push(msg.public_key);
-            data.push(msg.data);
-            extra.push(msg.extra);
-            sigs.push(msg.sig);
-        }
-        let asig = Signature::aggregate(&sigs);
+        let asig = {
+            let sigs = messages.iter().map(|m| m.sig).collect::<Vec<_>>();
+            Signature::aggregate(&sigs)
+        };
 
-        let mut messages = Vec::with_capacity(messages_len);
-        for (d, e) in data.iter().zip(&extra) {
-            messages.push((d as &[u8], e as &[u8]))
-        }
+        let pubkeys = messages.iter().map(|m| m.public_key).collect::<Vec<_>>();
+        let messages = messages
+            .iter()
+            .map(|m| (m.data, m.extra))
+            .collect::<Vec<_>>();
 
         let is_verified = if should_use_composite {
             asig.batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*COMPOSITE_HASH_TO_G1)
