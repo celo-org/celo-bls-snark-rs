@@ -6,11 +6,11 @@ use std::slice;
 
 /// A per-epoch block witness to be used with the batch sig verification
 #[derive(Clone, Debug, PartialEq)]
-pub struct Message {
+pub struct Message<'a> {
     /// The data which was signed
-    pub data: Vec<u8>,
+    pub data: &'a [u8],
     /// Extra data which was signed alongside the `data`
-    pub extra: Vec<u8>,
+    pub extra: &'a [u8],
     /// The aggregate public key of the epoch which signed the data/extra pair
     pub public_key: PublicKey,
     /// The aggregate signature corresponding the aggregate public key
@@ -31,10 +31,10 @@ pub struct MessageFFI {
     pub sig: *const Signature,
 }
 
-impl From<&MessageFFI> for Message {
-    fn from(src: &MessageFFI) -> Message {
-        let data = <&[u8]>::from(&src.data).to_vec();
-        let extra = <&[u8]>::from(&src.extra).to_vec();
+impl<'a> From<&'a MessageFFI> for Message<'a> {
+    fn from(src: &'a MessageFFI) -> Message<'a> {
+        let data = <&[u8]>::from(&src.data);
+        let extra = <&[u8]>::from(&src.extra);
         Message {
             data,
             extra,
@@ -44,7 +44,7 @@ impl From<&MessageFFI> for Message {
     }
 }
 
-impl From<&Message> for MessageFFI {
+impl From<&Message<'_>> for MessageFFI {
     fn from(src: &Message) -> MessageFFI {
         MessageFFI {
             data: Buffer::from(src.data.as_ref()),
@@ -106,8 +106,8 @@ mod tests {
         let sig = G1Projective::rand(rng);
         let sig = Signature::from_sig(sig);
         let msg = Message {
-            data: vec![1, 2, 3, 4],
-            extra: vec![5, 6, 7, 8],
+            data: &[1, 2, 3, 4],
+            extra: &[5, 6, 7, 8],
             public_key,
             sig,
         };

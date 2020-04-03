@@ -635,8 +635,8 @@ mod test {
         let mut messages = Vec::new();
         for i in 0..num_epochs {
             messages.push(Message {
-                data: msgs[i].0.to_vec(),
-                extra: msgs[i].1.to_vec(),
+                data: msgs[i].0,
+                extra: msgs[i].1,
                 public_key: pubkeys[i].clone(),
                 sig: sigs[i].clone(),
             });

@@ -386,6 +386,7 @@ pub extern "C" fn batch_verify_signature(
     verified: *mut bool,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
+        // Get the pointers slice
         let messages: &[MessageFFI] = unsafe { slice::from_raw_parts(messages_ptr, messages_len) };
 
         let messages = messages
@@ -393,10 +394,10 @@ pub extern "C" fn batch_verify_signature(
             .map(|m| Message::from(m))
             .collect::<Vec<_>>();
 
-        let mut pubkeys = Vec::new();
-        let mut data = Vec::new();
-        let mut extra = Vec::new();
-        let mut sigs = Vec::new();
+        let mut pubkeys = Vec::with_capacity(messages_len);
+        let mut data = Vec::with_capacity(messages_len);
+        let mut extra = Vec::with_capacity(messages_len);
+        let mut sigs = Vec::with_capacity(messages_len);
         for msg in messages {
             pubkeys.push(msg.public_key);
             data.push(msg.data);
@@ -405,7 +406,7 @@ pub extern "C" fn batch_verify_signature(
         }
         let asig = Signature::aggregate(&sigs);
 
-        let mut messages = Vec::new();
+        let mut messages = Vec::with_capacity(messages_len);
         for (d, e) in data.iter().zip(&extra) {
             messages.push((d as &[u8], e as &[u8]))
         }
