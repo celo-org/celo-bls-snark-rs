@@ -259,6 +259,7 @@ func BatchVerifyEpochs(messages []*Message, shouldUseCompositeHasher bool) error
 	// Allocate a contiguous slice of memory for our Messages
 	size := int(unsafe.Sizeof(C.MessageFFI{}))
 	list := C.malloc(C.size_t(size * msg_len))
+	defer C.free(list)
 	for i := 0; i < msg_len; i++ {
 		// Get a reference to the memory where the i_th element will be at
 		ptr := unsafe.Pointer(uintptr(list) + uintptr(size*i))
