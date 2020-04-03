@@ -15,7 +15,10 @@ use lazy_static::lazy_static;
 use log::error;
 
 use crate::{
-    bls::keys::{PublicKeyCache, POP_DOMAIN, SIG_DOMAIN},
+    bls::{
+        ffi::{Message, MessageFFI},
+        keys::{BLSError, PublicKeyCache, POP_DOMAIN, SIG_DOMAIN},
+    },
     curve::hash::HashToG1,
 };
 use algebra::{
@@ -371,6 +374,51 @@ pub extern "C" fn verify_signature(
         };
         unsafe { *out_verified = verified };
 
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn batch_verify_signature(
+    messages_ptr: *const MessageFFI,
+    messages_len: usize,
+    should_use_composite: bool,
+    verified: *mut bool,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let messages: &[MessageFFI] = unsafe { slice::from_raw_parts(messages_ptr, messages_len) };
+
+        let messages = messages
+            .iter()
+            .map(|m| Message::from(m))
+            .collect::<Vec<_>>();
+
+        let mut pubkeys = Vec::new();
+        let mut data = Vec::new();
+        let mut extra = Vec::new();
+        let mut sigs = Vec::new();
+        for msg in messages {
+            pubkeys.push(msg.public_key);
+            data.push(msg.data);
+            extra.push(msg.extra);
+            sigs.push(msg.sig);
+        }
+        let asig = Signature::aggregate(&sigs);
+
+        let mut messages = Vec::new();
+        for (d, e) in data.iter().zip(&extra) {
+            messages.push((d as &[u8], e as &[u8]))
+        }
+
+        let is_verified = if should_use_composite {
+            asig.batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*COMPOSITE_HASH_TO_G1)
+                .is_ok()
+        } else {
+            asig.batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*DIRECT_HASH_TO_G1)
+                .is_ok()
+        };
+
+        unsafe { *verified = is_verified };
         Ok(())
     })
 }

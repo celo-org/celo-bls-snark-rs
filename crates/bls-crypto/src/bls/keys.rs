@@ -35,7 +35,7 @@ use std::{
     ops::Neg,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PrivateKey {
     sk: Fr,
 }
@@ -288,7 +288,7 @@ impl FromBytes for PublicKey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Signature {
     sig: G1Projective,
 }
@@ -574,13 +574,20 @@ mod test {
     }
 
     #[test]
-    fn test_batch_verify_direct() {
+    fn test_batch_verify() {
         init();
 
-        let rng = &mut thread_rng();
         let direct_hasher = DirectHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&direct_hasher);
+        let composite_hasher = CompositeHasher::new().unwrap();
 
+        test_batch_verify_with_hasher(direct_hasher, false);
+        test_batch_verify_with_hasher(composite_hasher, true);
+    }
+
+    use crate::hash::XOF;
+    fn test_batch_verify_with_hasher<X: XOF>(hasher: X, is_composite: bool) {
+        let rng = &mut thread_rng();
+        let try_and_increment = TryAndIncrement::new(&hasher);
         let num_epochs = 10;
         let num_validators = 7;
 
@@ -596,19 +603,27 @@ mod test {
             .map(|(m, d)| (m.as_ref(), d.as_ref()))
             .collect::<Vec<_>>();
 
+        use crate::bls::ffi::{Message, MessageFFI};
+
         // get each signed by a committee _on the same domain_ and get the agg sigs of the commitee
         let mut asig = G1Projective::zero();
         let mut pubkeys = Vec::new();
+        let mut sigs = Vec::new();
         for i in 0..num_epochs {
             let mut epoch_pubkey = G2Projective::zero();
+            let mut epoch_sig = G1Projective::zero();
             for _ in 0..num_validators {
                 let sk = PrivateKey::generate(rng);
                 let s = sk.sign(&msgs[i].0, &msgs[i].1, &try_and_increment).unwrap();
 
-                asig += s.sig;
+                epoch_sig += s.sig;
                 epoch_pubkey += sk.to_public().pk;
             }
+
             pubkeys.push(PublicKey::from_pk(epoch_pubkey));
+            sigs.push(Signature::from_sig(epoch_sig));
+
+            asig += epoch_sig;
         }
 
         let asig = Signature::from_sig(asig);
@@ -616,6 +631,32 @@ mod test {
         let res = asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, &try_and_increment);
 
         assert!(res.is_ok());
+
+        let mut messages = Vec::new();
+        for i in 0..num_epochs {
+            messages.push(Message {
+                data: msgs[i].0.to_vec(),
+                extra: msgs[i].1.to_vec(),
+                public_key: pubkeys[i].clone(),
+                sig: sigs[i].clone(),
+            });
+        }
+
+        let msgs_ffi = messages
+            .iter()
+            .map(|m| MessageFFI::from(m))
+            .collect::<Vec<_>>();
+
+        let mut verified: bool = false;
+
+        let success = crate::batch_verify_signature(
+            &msgs_ffi[0] as *const MessageFFI,
+            msgs_ffi.len(),
+            is_composite,
+            &mut verified as *mut bool,
+        );
+        assert!(success);
+        assert!(verified);
     }
 
     #[test]
