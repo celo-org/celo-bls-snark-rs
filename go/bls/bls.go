@@ -68,6 +68,17 @@ type Signature struct {
 	ptr *C.struct_Signature
 }
 
+type Message struct {
+	/// The seal for this epoch)
+	Data []byte
+	/// The extra data for this epoch (usually this will be left empty)
+	Extra []byte
+	/// The aggregate public key for this epoch
+	Pubkey *PublicKey
+	/// The aggregate signature for this epoch
+	Sig *Signature
+}
+
 func InitBLSCrypto() {
 	C.init()
 }
@@ -230,6 +241,57 @@ func (self *PublicKey) Serialize() ([]byte, error) {
 
 func (self *PublicKey) Destroy() {
 	C.destroy_public_key(self.ptr)
+}
+
+func toBuffer(data []byte) C.Buffer {
+	dataPtr, dataLen := sliceToPtr(data)
+	return C.Buffer{
+		ptr: dataPtr,
+		len: C.ulong(dataLen),
+	}
+}
+
+// Each epoch gets verified with a message,extraData,aggregate publickeys
+func BatchVerifyEpochs(messages []*Message, shouldUseCompositeHasher bool) error {
+	var verified C.bool
+	msg_len := len(messages)
+
+	// Allocate a contiguous slice of memory for our Messages
+	size := int(unsafe.Sizeof(C.MessageFFI{}))
+	list := C.malloc(C.size_t(size * msg_len))
+	for i := 0; i < msg_len; i++ {
+		// Get a reference to the memory where the i_th element will be at
+		ptr := unsafe.Pointer(uintptr(list) + uintptr(size*i))
+
+		data := toBuffer(messages[i].Data)
+		extra := toBuffer(messages[i].Extra)
+		msg := C.MessageFFI{
+			data:       data,
+			extra:      extra,
+			public_key: messages[i].Pubkey.ptr,
+			sig:        messages[i].Sig.ptr,
+		}
+
+		*(*C.MessageFFI)(ptr) = msg
+	}
+
+	// make the call
+	success := C.batch_verify_signature(
+		(*C.MessageFFI)(list),
+		C.ulong(msg_len),
+		C.bool(shouldUseCompositeHasher),
+		&verified,
+	)
+
+	if !success {
+		return GeneralError
+	}
+
+	if !verified {
+		return NotVerifiedError
+	}
+
+	return nil
 }
 
 func (self *PublicKey) VerifySignature(message []byte, extraData []byte, signature *Signature, shouldUseCompositeHasher bool) error {
