@@ -10,10 +10,14 @@ import (
 func TestBatchVerify(t *testing.T) {
 	InitBLSCrypto()
 
+	testBatchVerify(t, true)
+	testBatchVerify(t, false)
+}
+
+func testBatchVerify(t *testing.T, mode bool) {
 	num_epochs := 10
 	num_validators := 7
-
-	var msgs []*Message
+	var msgs []*SignedBlockHeader
 	for i := 0; i < num_epochs; i++ {
 		message := []byte(fmt.Sprintf("msg_%d", i))
 		extraData := []byte(fmt.Sprintf("extra_%d", i))
@@ -24,7 +28,7 @@ func TestBatchVerify(t *testing.T) {
 			privateKey, _ := GeneratePrivateKey()
 
 			// sign each message
-			signature, _ := privateKey.SignMessage(message, extraData, true)
+			signature, _ := privateKey.SignMessage(message, extraData, mode)
 			// save the sig to generate the epoch's asig
 			epoch_sigs = append(epoch_sigs, signature)
 
@@ -36,7 +40,7 @@ func TestBatchVerify(t *testing.T) {
 		epoch_asig, _ := AggregateSignatures(epoch_sigs)
 		epoch_apubkey, _ := AggregatePublicKeys(epoch_pubkeys)
 
-		msg := &Message{
+		msg := &SignedBlockHeader{
 			Data:   message,
 			Extra:  extraData,
 			Pubkey: epoch_apubkey,
@@ -45,7 +49,7 @@ func TestBatchVerify(t *testing.T) {
 		msgs = append(msgs, msg)
 	}
 
-	err := BatchVerifyEpochs(msgs, true)
+	err := BatchVerifyEpochs(msgs, mode)
 	if err != nil {
 		t.Fatalf("batch verification failed, err: %s", err)
 	}

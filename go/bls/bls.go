@@ -68,8 +68,8 @@ type Signature struct {
 	ptr *C.struct_Signature
 }
 
-type Message struct {
-	/// The seal for this epoch)
+type SignedBlockHeader struct {
+	/// The seal for this epoch
 	Data []byte
 	/// The extra data for this epoch (usually this will be left empty)
 	Extra []byte
@@ -251,34 +251,37 @@ func toBuffer(data []byte) C.Buffer {
 	}
 }
 
-// Each epoch gets verified with a message,extraData,aggregate publickeys
-func BatchVerifyEpochs(messages []*Message, shouldUseCompositeHasher bool) error {
+/// Performs batch BLS signature verification over a list of epochs
+func BatchVerifyEpochs(signedHeaders []*SignedBlockHeader, shouldUseCompositeHasher bool) error {
 	var verified C.bool
-	msg_len := len(messages)
+	msg_len := len(signedHeaders)
 
-	// Allocate a contiguous slice of memory for our Messages
+	// Allocate a contiguous slice of memory for the pointers
+	// NB: `make([]*C.MessageFFI, msg_len) results in `cgo argument has Go pointer to Go pointer`
 	size := int(unsafe.Sizeof(C.MessageFFI{}))
-	list := C.malloc(C.size_t(size * msg_len))
-	defer C.free(list)
-	for i := 0; i < msg_len; i++ {
-		// Get a reference to the memory where the i_th element will be at
-		ptr := unsafe.Pointer(uintptr(list) + uintptr(size*i))
+	messages_ptr := C.malloc(C.size_t(size * msg_len))
+	defer C.free(messages_ptr)
 
-		data := toBuffer(messages[i].Data)
-		extra := toBuffer(messages[i].Extra)
-		msg := C.MessageFFI{
+	// Get our data in the format the library expects
+	for i := 0; i < msg_len; i++ {
+		// convert the slices to pointers
+		data := toBuffer(signedHeaders[i].Data)
+		extra := toBuffer(signedHeaders[i].Extra)
+
+		// Get messages_ptr[i] (need to offset by i*size to take into account the size of C.MessageFFI)
+		msg := (*C.MessageFFI)(unsafe.Pointer(uintptr(messages_ptr) + uintptr(size*i)))
+		// ...and write to it
+		*msg = C.MessageFFI{
 			data:       data,
 			extra:      extra,
-			public_key: messages[i].Pubkey.ptr,
-			sig:        messages[i].Sig.ptr,
+			public_key: signedHeaders[i].Pubkey.ptr,
+			sig:        signedHeaders[i].Sig.ptr,
 		}
-
-		*(*C.MessageFFI)(ptr) = msg
 	}
 
-	// make the call
+	// make the batch verification call
 	success := C.batch_verify_signature(
-		(*C.MessageFFI)(list),
+		(*C.MessageFFI)(messages_ptr),
 		C.ulong(msg_len),
 		C.bool(shouldUseCompositeHasher),
 		&verified,
