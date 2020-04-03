@@ -130,7 +130,7 @@ bool hash_direct(const uint8_t *in_message,
                  bool use_pop);
 
 /**
- * Initializes the lazily evaluated hashers. Should
+ * Initializes the lazily evaluated hashers.
  */
 void init(void);
 
