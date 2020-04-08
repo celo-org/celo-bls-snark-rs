@@ -247,7 +247,7 @@ func toBuffer(data []byte) C.Buffer {
 	dataPtr, dataLen := sliceToPtr(data)
 	return C.Buffer{
 		ptr: dataPtr,
-		len: C.ulong(dataLen),
+		len: C.int(dataLen),
 	}
 }
 
@@ -282,7 +282,7 @@ func BatchVerifyEpochs(signedHeaders []*SignedBlockHeader, shouldUseCompositeHas
 	// make the batch verification call
 	success := C.batch_verify_signature(
 		(*C.MessageFFI)(messages_ptr),
-		C.ulong(msg_len),
+		C.int(msg_len),
 		C.bool(shouldUseCompositeHasher),
 		&verified,
 	)
