@@ -20,7 +20,7 @@ typedef struct {
   /**
    * The length of the buffer
    */
-  uintptr_t len;
+  int len;
 } Buffer;
 
 /**
@@ -71,7 +71,7 @@ bool aggregate_signatures(const Signature *const *in_signatures,
  * https://eprint.iacr.org/2018/483.pdf: "Batch verification"
  */
 bool batch_verify_signature(const MessageFFI *messages_ptr,
-                            uintptr_t messages_len,
+                            int messages_len,
                             bool should_use_composite,
                             bool *verified);
 
