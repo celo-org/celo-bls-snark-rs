@@ -50,14 +50,12 @@ pub fn prove(
     };
 
     // Generate the BLS proof
-    let asig = transitions.iter().fold(G1Projective::zero(), |acc, epoch| {
-        acc + epoch.aggregate_signature.get_sig()
-    });
+    let asig = Signature::aggregate(transitions.iter().map(|epoch| &epoch.aggregate_signature));
 
     let circuit = ValidatorSetUpdate::<BLSCurve> {
         initial_epoch: to_epoch_data(initial_epoch),
         epochs,
-        aggregated_signature: Some(asig),
+        aggregated_signature: Some(*asig.as_ref()),
         num_validators,
         hash_helper,
     };
@@ -117,7 +115,7 @@ pub fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
         public_keys: block
             .new_public_keys
             .iter()
-            .map(|pubkey| Some(pubkey.get_pk()))
+            .map(|pubkey| Some(*pubkey.as_ref()))
             .collect(),
     }
 }

@@ -68,7 +68,7 @@ unsafe fn read_serialized_pubkeys<'a>(ptr: *const u8, num: usize) -> &'a [u8] {
 pub fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError> {
     let mut v = Vec::new();
     for p in pubkeys {
-        p.get_pk().into_affine().serialize(&mut v)?
+        p.as_ref().into_affine().serialize(&mut v)?
     }
     Ok(v)
 }
@@ -85,7 +85,7 @@ unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, Enc
     for _ in 0..num {
         let key = G2Affine::deserialize(&mut data)?;
         let key = key.into_projective();
-        pubkeys.push(PublicKey::from_pk(key))
+        pubkeys.push(PublicKey::from(key))
     }
     Ok(pubkeys)
 }

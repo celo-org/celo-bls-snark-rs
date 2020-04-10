@@ -19,7 +19,7 @@ pub enum EncodingError {
 /// The function assumes that the public key is not the point in infinity, which is true for
 /// BLS public keys
 pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingError> {
-    let pk_affine = public_key.get_pk().into_affine();
+    let pk_affine = public_key.as_ref().into_affine();
     let x = pk_affine.x;
     let y = pk_affine.y;
 

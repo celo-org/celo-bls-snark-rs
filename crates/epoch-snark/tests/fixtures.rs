@@ -20,7 +20,7 @@ pub fn generate_test_data(
     let initial_pubkeys = initial_validator_set
         .1
         .iter()
-        .map(|pk| PublicKey::from_pk(*pk))
+        .map(|pk| PublicKey::from(*pk))
         .collect::<Vec<_>>();
     let first_epoch = generate_block(0, faults, &initial_pubkeys);
 
@@ -30,12 +30,7 @@ pub fn generate_test_data(
     let pubkeys = validators
         .1
         .iter()
-        .map(|epoch_keys| {
-            epoch_keys
-                .iter()
-                .map(|pk| PublicKey::from_pk(*pk))
-                .collect()
-        })
+        .map(|epoch_keys| epoch_keys.iter().map(|pk| PublicKey::from(*pk)).collect())
         .collect::<Vec<Vec<_>>>();
 
     // Signers will be from the 1st to the last-1 epoch
@@ -58,7 +53,7 @@ pub fn generate_test_data(
             }
             asig
         };
-        let asig = Signature::from_sig(asig);
+        let asig = Signature::from(asig);
 
         let transition = EpochTransition {
             block,
