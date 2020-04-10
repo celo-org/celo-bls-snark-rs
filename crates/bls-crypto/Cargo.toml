@@ -21,6 +21,7 @@ blake2s_simd = "0.5.8"
 csv = "1.1"
 lazy_static = "1.3.0"
 rand_chacha = "0.2.1"
+thiserror = "1.0.14"
 
 [dev-dependencies]
 criterion = "0.2"

@@ -5,7 +5,7 @@ use algebra::{
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
 use super::{constrain_bool, MultipackGadget};
-use bls_crypto::bls::keys::SIG_DOMAIN;
+use bls_crypto::bls::SIG_DOMAIN;
 use bls_gadgets::hash_to_bits;
 use tracing::{debug, info, span, trace, Level};
 
