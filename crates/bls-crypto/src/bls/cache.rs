@@ -1,9 +1,8 @@
 use lazy_static::lazy_static;
 use lru::LruCache;
+use std::io::Result as IoResult;
 
 use std::{collections::HashSet, sync::Mutex};
-
-use std::io::Result as IoResult;
 
 use algebra::{bls12_377::G2Projective, Zero};
 

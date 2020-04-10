@@ -1,23 +1,18 @@
-extern crate hex;
-
-use super::direct::DirectHasher;
-use crate::hash::XOF;
+use crate::{hashers::DirectHasher, BLSError, XOF};
 
 use algebra::{bytes::ToBytes, edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
+
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
     bowe_hopwood::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenParameters},
     pedersen::PedersenWindow,
     FixedLengthCRH,
 };
+use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use std::error::Error;
-
-pub type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
-pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
-
+/// The window which will be used with the Fixed Length CRH
 #[derive(Clone)]
 pub struct Window;
 
@@ -26,19 +21,30 @@ impl PedersenWindow for Window {
     const NUM_WINDOWS: usize = 560;
 }
 
-pub struct CompositeHasher {
-    parameters: CRHParameters,
-    direct_hasher: DirectHasher,
+pub type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
+pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
+
+/// Lazily evaluated composite hasher instantiated over the
+/// Bowe-Hopwood-Pedersen CRH.
+pub static COMPOSITE_HASHER: Lazy<CompositeHasher<CRH>> =
+    Lazy::new(|| CompositeHasher::<CRH>::new().unwrap());
+
+/// A composite hasher which uses the provided CRH independently of domain/message length
+/// provided
+#[derive(Clone, Debug)]
+pub struct CompositeHasher<H: FixedLengthCRH> {
+    parameters: H::Parameters,
 }
 
-impl CompositeHasher {
-    pub fn new() -> Result<CompositeHasher, Box<dyn Error>> {
+impl<H: FixedLengthCRH> CompositeHasher<H> {
+    /// Initializes the CRH and returns a new hasher
+    pub fn new() -> Result<CompositeHasher<H>, BLSError> {
         Ok(CompositeHasher {
-            parameters: CompositeHasher::setup_crh()?,
-            direct_hasher: DirectHasher {},
+            parameters: Self::setup_crh()?,
         })
     }
-    fn prng() -> Result<impl Rng, Box<dyn Error>> {
+
+    fn prng() -> impl Rng {
         let hash_result = Params::new()
             .hash_length(32)
             .personal(b"UL_prngs") // personalization
@@ -49,18 +55,21 @@ impl CompositeHasher {
             .to_vec();
         let mut seed = [0; 32];
         seed.copy_from_slice(&hash_result[..32]);
-        Ok(ChaChaRng::from_seed(seed))
+        ChaChaRng::from_seed(seed)
     }
 
-    pub fn setup_crh() -> Result<CRHParameters, Box<dyn Error>> {
-        let mut rng = CompositeHasher::prng()?;
-        CRH::setup::<_>(&mut rng)
+    /// Instantiates the CRH's parameters
+    pub fn setup_crh() -> Result<H::Parameters, BLSError> {
+        let mut rng = Self::prng();
+        Ok(H::setup::<_>(&mut rng)?)
     }
 }
 
-impl XOF for CompositeHasher {
-    fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let h = CRH::evaluate(&self.parameters, message)?.into_affine();
+impl<H: FixedLengthCRH<Output = Edwards>> XOF for CompositeHasher<H> {
+    type Error = BLSError;
+
+    fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Self::Error> {
+        let h = H::evaluate(&self.parameters, message)?.into_affine();
         let mut res = vec![];
         h.x.write(&mut res)?;
 
@@ -72,40 +81,29 @@ impl XOF for CompositeHasher {
         domain: &[u8],
         hashed_message: &[u8],
         xof_digest_length: usize,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
-        self.direct_hasher
-            .xof(domain, hashed_message, xof_digest_length)
-    }
-
-    fn hash(
-        &self,
-        domain: &[u8],
-        message: &[u8],
-        xof_digest_length: usize,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
-        let prepared_message = self.crh(domain, message, xof_digest_length)?;
-        self.xof(domain, &prepared_message, xof_digest_length)
+    ) -> Result<Vec<u8>, Self::Error> {
+        DirectHasher.xof(domain, hashed_message, xof_digest_length)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::CompositeHasher as Hasher;
-    use crate::hash::XOF;
+    use super::*;
+    use crate::hashers::XOF;
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let result = hasher.crh(&[], &msg, 96).unwrap();
         assert_eq!(hex::encode(result), "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
     }
 
     #[test]
     fn test_crh_random() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -120,7 +118,7 @@ mod test {
 
     #[test]
     fn test_xof_random_768() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -136,7 +134,7 @@ mod test {
 
     #[test]
     fn test_xof_random_769() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x0d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -152,7 +150,7 @@ mod test {
 
     #[test]
     fn test_xof_random_96() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -168,7 +166,7 @@ mod test {
 
     #[test]
     fn test_hash_random() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -184,7 +182,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_invalid_message() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = &*COMPOSITE_HASHER;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,

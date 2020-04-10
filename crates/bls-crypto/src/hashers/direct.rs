@@ -1,23 +1,13 @@
-extern crate hex;
-
-use crate::hash::XOF;
-
+use crate::{hashers::XOF, BLSError};
 use blake2s_simd::Params;
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::error::Error;
 
-pub struct DirectHasher {}
-
-impl DirectHasher {
-    pub fn new() -> Result<DirectHasher, Box<dyn Error>> {
-        Ok(DirectHasher {})
-    }
-}
+pub struct DirectHasher;
 
 fn xof_digest_length_to_node_offset(
     node_offset: u64,
     xof_digest_length: usize,
-) -> Result<u64, Box<dyn Error>> {
+) -> Result<u64, BLSError> {
     let mut xof_digest_length_bytes: [u8; 2] = [0; 2];
     (&mut xof_digest_length_bytes[..]).write_u16::<LittleEndian>(xof_digest_length as u16)?;
     let offset = node_offset as u64
@@ -27,12 +17,14 @@ fn xof_digest_length_to_node_offset(
 }
 
 impl XOF for DirectHasher {
+    type Error = BLSError;
+
     fn crh(
         &self,
         domain: &[u8],
         message: &[u8],
         xof_digest_length: usize,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>, Self::Error> {
         let hash_result = Params::new()
             .hash_length(32)
             .node_offset(xof_digest_length_to_node_offset(0, xof_digest_length)?)
@@ -50,9 +42,9 @@ impl XOF for DirectHasher {
         domain: &[u8],
         hashed_message: &[u8],
         xof_digest_length: usize,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>, Self::Error> {
         if domain.len() > 8 {
-            return Err(format!("domain length is too large: {}", domain.len()).into());
+            return Err(BLSError::DomainTooLarge(domain.len()));
         }
         let num_hashes = (xof_digest_length + 32 - 1) / 32;
 
@@ -84,31 +76,18 @@ impl XOF for DirectHasher {
 
         Ok(result)
     }
-
-    // Implements blake2x as described in: https://blake2.net/blake2x.pdf
-    fn hash(
-        &self,
-        domain: &[u8],
-        message: &[u8],
-        xof_digest_length: usize,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
-        let prepared_message = self.crh(domain, message, xof_digest_length)?;
-        self.xof(domain, &prepared_message, xof_digest_length)
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::DirectHasher as Hasher;
-    use crate::hash::XOF;
+    use super::*;
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
-        let hasher = Hasher::new().unwrap();
-        let result = hasher.crh(&[], &msg, 96).unwrap();
+        let result = DirectHasher.crh(&[], &msg, 96).unwrap();
         assert_eq!(
             hex::encode(result),
             "7a746244ad211d351f57a218255888174e719b54e683651e9314f55402eed414"
@@ -117,7 +96,6 @@ mod test {
 
     #[test]
     fn test_crh_random() {
-        let hasher = Hasher::new().unwrap();
         let mut rng = XorShiftRng::from_seed([
             0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -126,7 +104,7 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let result = hasher.crh(&[], &msg, 96).unwrap();
+        let result = DirectHasher.crh(&[], &msg, 96).unwrap();
         assert_eq!(
             hex::encode(result),
             "b5a31242cffbefda914dc6d655fd200ee72e0297f951c345409936d45b5f080b"
@@ -135,7 +113,7 @@ mod test {
 
     #[test]
     fn test_xof_random_96() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = DirectHasher;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -153,7 +131,7 @@ mod test {
 
     #[test]
     fn test_hash_random() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = DirectHasher;
         let mut rng = XorShiftRng::from_seed([
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
@@ -168,7 +146,7 @@ mod test {
 
     #[test]
     fn test_blake2s_test_vectors() {
-        let hasher = Hasher::new().unwrap();
+        let hasher = DirectHasher;
         let test_vectors = [(
             "7f8a56d8b5fb1f038ffbfce79f185f4aad9d603094edb85457d6c84d6bc02a82644ee42da51e9c3bb18395f450092d39721c32e7f05ec4c1f22a8685fcb89721738335b57e4ee88a3b32df3762503aa98e4a9bd916ed385d265021391745f08b27c37dc7bc6cb603cc27e19baf47bf00a2ab2c32250c98d79d5e1170dee4068d9389d146786c2a0d1e08ade5"   ,
             "87009aa74342449e10a3fd369e736fcb9ad1e7bd70ef007e6e2394b46c094074c86adf6c980be077fa6c4dc4af1ca0450a4f00cdd1a87e0c4f059f512832c2d92a1cde5de26d693ccd246a1530c0d6926185f9330d3524710b369f6d2976a44d",

@@ -1,26 +1,23 @@
-use crate::curve::hash::HashToG1;
-
-use std::hash::{Hash, Hasher};
+use crate::{BLSError, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 use algebra::{
     bls12_377::{
-        g2::Parameters as Bls12_377G2Parameters, Bls12_377, Fq, Fq12, Fq2, G2Affine, G2Projective,
-        Parameters as Bls12_377Parameters,
+        g2::Parameters as Bls12_377G2Parameters, Bls12_377, Fq, Fq12, Fq2, G1Projective, G2Affine,
+        G2Projective,
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, Field, One, PairingEngine, PrimeField,
     ProjectiveCurve, SerializationError, SquareRootField, Zero,
 };
+use std::hash::{Hash, Hasher};
 
-use std::error::Error;
+use crate::BlsResult;
 
 use std::{
     io::{self, Read, Result as IoResult, Write},
     ops::Neg,
 };
-
-use super::{cache::PublicKeyCache, BLSError, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 /// A BLS public key on G2
 #[derive(Clone, Eq, Debug)]
@@ -50,7 +47,6 @@ impl PublicKey {
         for pk in public_keys.iter() {
             apk = apk + pk.as_ref();
         }
-
         apk.into()
     }
 
@@ -89,33 +85,33 @@ impl PublicKey {
         Ok(PublicKey::from(pk.into_projective()))
     }
 
-    pub fn verify<H: HashToG1>(
+    pub fn verify<H: HashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         extra_data: &[u8],
         signature: &Signature,
         hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> BlsResult<()> {
         self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g1)
     }
 
-    pub fn verify_pop<H: HashToG1>(
+    pub fn verify_pop<H: HashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         signature: &Signature,
         hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> BlsResult<()> {
         self.verify_sig(POP_DOMAIN, &message, &[], signature, hash_to_g1)
     }
 
-    fn verify_sig<H: HashToG1>(
+    fn verify_sig<H: HashToCurve<Output = G1Projective>>(
         &self,
         domain: &[u8],
         message: &[u8],
         extra_data: &[u8],
         signature: &Signature,
         hash_to_g1: &H,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> BlsResult<()> {
         let pairing = Bls12_377::product_of_pairings(&vec![
             (
                 signature.as_ref().into_affine().into(),
@@ -123,7 +119,7 @@ impl PublicKey {
             ),
             (
                 hash_to_g1
-                    .hash::<Bls12_377Parameters>(domain, message, extra_data)?
+                    .hash(domain, message, extra_data)?
                     .into_affine()
                     .into(),
                 self.0.into_affine().into(),
