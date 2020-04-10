@@ -1,6 +1,6 @@
 use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 use bls_crypto::{
-    hash_to_curve::try_and_increment::get_point_from_x_g1,
+    hash_to_curve::try_and_increment::get_point_from_x,
     hashers::{
         composite::{CompositeHasher, CRH},
         DirectHasher, XOF,
@@ -254,7 +254,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                let p = get_point_from_x_g1::<P>(x, greatest)
+                let p = get_point_from_x::<P::G1Parameters>(x, greatest)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
