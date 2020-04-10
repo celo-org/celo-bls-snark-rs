@@ -197,7 +197,7 @@ mod tests {
         G2Projective::batch_normalization(&mut points);
         points
             .iter()
-            .map(|p| PublicKey::from_pk(*p))
+            .map(|p| PublicKey::from(*p))
             .collect::<Vec<_>>()
     }
 }
