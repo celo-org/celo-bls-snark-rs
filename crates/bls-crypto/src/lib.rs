@@ -33,6 +33,8 @@ pub type BlsResult<T> = std::result::Result<T, BLSError>;
 pub static SIG_DOMAIN: &[u8] = b"ULforxof";
 /// Domain separator for Proofs of Posession
 pub static POP_DOMAIN: &[u8] = b"ULforpop";
+/// Domain separator for public inputs to the snark
+pub static OUT_DOMAIN: &[u8] = b"ULforout";
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers;

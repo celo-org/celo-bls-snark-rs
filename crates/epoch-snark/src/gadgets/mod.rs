@@ -30,7 +30,9 @@ pub mod test_helpers {
     use super::*;
     use crate::epoch_block::EpochBlock;
     use algebra::{bls12_377::G1Projective, Bls12_377};
-    use bls_crypto::{bls::SIG_DOMAIN, CompositeHasher, PublicKey, TryAndIncrement};
+    use bls_crypto::{
+        hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PublicKey, SIG_DOMAIN,
+    };
 
     pub fn to_option_iter<T: Copy>(it: &[T]) -> Vec<Option<T>> {
         it.iter().map(|t| Some(*t)).collect()
@@ -46,10 +48,8 @@ pub mod test_helpers {
         let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bytes()
             .unwrap();
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let (hash, _) = try_and_increment
-            .hash_with_attempt::<Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
+        let (hash, _) = COMPOSITE_HASH_TO_G1
+            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();
 
         hash
