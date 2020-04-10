@@ -3,7 +3,7 @@ use crate::curve::hash::HashToG1;
 use algebra::{
     bls12_377::{Fr, G2Projective, Parameters as Bls12_377Parameters},
     bytes::{FromBytes, ToBytes},
-    ProjectiveCurve, UniformRand,
+    CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve, SerializationError, UniformRand,
 };
 use rand::Rng;
 
@@ -13,7 +13,7 @@ use std::io::{Read, Result as IoResult, Write};
 
 use super::{PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct PrivateKey {
     sk: Fr,
 }

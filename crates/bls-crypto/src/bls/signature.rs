@@ -7,7 +7,8 @@ use algebra::{
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
-    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField, Zero,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, Field, One, PairingEngine, PrimeField,
+    ProjectiveCurve, SerializationError, SquareRootField, Zero,
 };
 use std::borrow::Borrow;
 
@@ -21,6 +22,34 @@ use super::{BLSError, PublicKey};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Signature {
     sig: G1Projective,
+}
+
+impl CanonicalSerialize for Signature {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.sig.into_affine().serialize(writer)
+    }
+
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.sig.into_affine().serialize_uncompressed(writer)
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.sig.into_affine().serialized_size()
+    }
+}
+
+impl CanonicalDeserialize for Signature {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Signature::from_sig(
+            G1Affine::deserialize(reader)?.into_projective(),
+        ))
+    }
+
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Signature::from_sig(
+            G1Affine::deserialize_uncompressed(reader)?.into_projective(),
+        ))
+    }
 }
 
 impl Signature {
