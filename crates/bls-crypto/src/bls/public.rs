@@ -9,7 +9,8 @@ use algebra::{
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
-    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField, Zero,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, Field, One, PairingEngine, PrimeField,
+    ProjectiveCurve, SerializationError, SquareRootField, Zero,
 };
 
 use std::error::Error;
@@ -182,6 +183,34 @@ impl FromBytes for PublicKey {
         let mut x_bytes_with_y: Vec<u8> = vec![];
         reader.read_to_end(&mut x_bytes_with_y)?;
         PublicKeyCache::from_vec(&x_bytes_with_y)
+    }
+}
+
+impl CanonicalSerialize for PublicKey {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.pk.into_affine().serialize(writer)
+    }
+
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.pk.into_affine().serialize_uncompressed(writer)
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.pk.into_affine().serialized_size()
+    }
+}
+
+impl CanonicalDeserialize for PublicKey {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(PublicKey::from_pk(
+            G2Affine::deserialize(reader)?.into_projective(),
+        ))
+    }
+
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(PublicKey::from_pk(
+            G2Affine::deserialize_uncompressed(reader)?.into_projective(),
+        ))
     }
 }
 
