@@ -144,7 +144,6 @@ dependencies = [
  "csv",
  "env_logger",
  "hex",
- "lazy_static",
  "log",
  "lru",
  "once_cell",

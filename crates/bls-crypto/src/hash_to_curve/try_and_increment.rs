@@ -28,10 +28,10 @@ use algebra::{
 use once_cell::sync::Lazy;
 
 /// Composite Try-and-Increment hasher for BLS 12-377.
-pub const COMPOSITE_HASH_TO_G1: Lazy<TryAndIncrement<CompositeHasher<CRH>, Parameters>> =
+pub static COMPOSITE_HASH_TO_G1: Lazy<TryAndIncrement<CompositeHasher<CRH>, Parameters>> =
     Lazy::new(|| TryAndIncrement::new(&*COMPOSITE_HASHER));
 
-pub const DIRECT_HASH_TO_G1: Lazy<TryAndIncrement<DirectHasher, Parameters>> =
+pub static DIRECT_HASH_TO_G1: Lazy<TryAndIncrement<DirectHasher, Parameters>> =
     Lazy::new(|| TryAndIncrement::new(&DirectHasher));
 
 /// A try-and-increment method for hashing to G1 and G2. See page 521 in
