@@ -55,6 +55,8 @@ pub enum BLSError {
     DomainTooLarge(usize),
     #[error("Could not hash to curve")]
     HashToCurveError,
+    #[error("{0}")]
+    SerializationError(#[from] algebra::SerializationError),
 }
 
 #[no_mangle]
