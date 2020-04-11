@@ -7,7 +7,8 @@ use algebra::{
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
-    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField, Zero,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, Field, One, PairingEngine, PrimeField,
+    ProjectiveCurve, SerializationError, SquareRootField, Zero,
 };
 use std::borrow::Borrow;
 
@@ -18,28 +19,59 @@ use std::{
 
 use super::{BLSError, PublicKey};
 
+/// A BLS signature on G1.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Signature {
-    sig: G1Projective,
+pub struct Signature(G1Projective);
+
+impl From<G1Projective> for Signature {
+    fn from(sig: G1Projective) -> Signature {
+        Signature(sig)
+    }
+}
+
+impl AsRef<G1Projective> for Signature {
+    fn as_ref(&self) -> &G1Projective {
+        &self.0
+    }
+}
+
+impl CanonicalSerialize for Signature {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize(writer)
+    }
+
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize_uncompressed(writer)
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.0.into_affine().serialized_size()
+    }
+}
+
+impl CanonicalDeserialize for Signature {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Signature::from(
+            G1Affine::deserialize(reader)?.into_projective(),
+        ))
+    }
+
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Signature::from(
+            G1Affine::deserialize_uncompressed(reader)?.into_projective(),
+        ))
+    }
 }
 
 impl Signature {
-    pub fn from_sig(sig: G1Projective) -> Signature {
-        Signature { sig }
-    }
-
-    pub fn get_sig(&self) -> G1Projective {
-        self.sig
-    }
-
     /// Sums the provided signatures to produce the aggregate signature.
-    pub fn aggregate<S: Borrow<Signature>>(signatures: &[S]) -> Signature {
+    pub fn aggregate<S: Borrow<Signature>>(signatures: impl IntoIterator<Item = S>) -> Signature {
         let mut asig = G1Projective::zero();
-        for i in signatures.iter() {
-            asig = asig + &(*i).borrow().sig;
+        for sig in signatures {
+            asig = asig + sig.borrow().as_ref();
         }
 
-        Signature { sig: asig }
+        asig.into()
     }
 
     /// Verifies the signature against a vector of pubkey & message tuples, for the provided
@@ -84,7 +116,7 @@ impl Signature {
     ) -> Result<(), BLSError> {
         // `.into()` is needed to prepared the points
         let mut els = vec![(
-            self.get_sig().into_affine().into(),
+            self.as_ref().into_affine().into(),
             G2Affine::prime_subgroup_generator().neg().into(),
         )];
         message_hashes
@@ -93,7 +125,7 @@ impl Signature {
             .for_each(|(hash, pubkey)| {
                 els.push((
                     hash.into_affine().into(),
-                    pubkey.borrow().get_pk().into_affine().into(),
+                    pubkey.borrow().as_ref().into_affine().into(),
                 ));
             });
 
@@ -109,7 +141,7 @@ impl Signature {
 impl ToBytes for Signature {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        let affine = self.sig.into_affine();
+        let affine = self.0.into_affine();
         let mut x_bytes: Vec<u8> = vec![];
         let y_big = affine.y.into_repr();
         let half = Fq::modulus_minus_one_div_two();
@@ -142,7 +174,7 @@ impl FromBytes for Signature {
         let negy = -y;
         let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
         let sig = G1Affine::new(x, chosen_y, false);
-        Ok(Signature::from_sig(sig.into_projective()))
+        Ok(Signature::from(sig.into_projective()))
     }
 }
 
@@ -245,17 +277,17 @@ mod tests {
                 let sk = PrivateKey::generate(rng);
                 let s = sk.sign(&msgs[i].0, &msgs[i].1, &try_and_increment).unwrap();
 
-                epoch_sig += s.sig;
+                epoch_sig += s.as_ref();
                 epoch_pubkey += sk.to_public().as_ref();
             }
 
-            pubkeys.push(PublicKey::from_pk(epoch_pubkey));
-            sigs.push(Signature::from_sig(epoch_sig));
+            pubkeys.push(PublicKey::from(epoch_pubkey));
+            sigs.push(Signature::from(epoch_sig));
 
             asig += epoch_sig;
         }
 
-        let asig = Signature::from_sig(asig);
+        let asig = Signature::from(asig);
 
         let res = asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, &try_and_increment);
 
@@ -308,7 +340,7 @@ mod tests {
         let aggregate_pubkeys = public_keys_batches
             .iter()
             .map(|pks| sum(pks))
-            .map(PublicKey::from_pk)
+            .map(PublicKey::from)
             .collect::<Vec<_>>();
 
         // the keys from each epoch sign the messages from the corresponding epoch
@@ -316,7 +348,7 @@ mod tests {
 
         // get the complete aggregate signature
         let asig = sum(&asigs);
-        let asig = Signature::from_sig(asig);
+        let asig = Signature::from(asig);
 
         let res = asig.batch_verify_hashes(&aggregate_pubkeys, &messages);
 

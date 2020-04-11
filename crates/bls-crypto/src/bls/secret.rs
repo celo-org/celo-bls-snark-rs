@@ -1,9 +1,9 @@
 use crate::curve::hash::HashToG1;
 
 use algebra::{
-    bls12_377::{Fr, G2Projective, Parameters as Bls12_377Parameters},
+    bls12_377::{Fr, G1Projective, Parameters as Bls12_377Parameters},
     bytes::{FromBytes, ToBytes},
-    ProjectiveCurve, UniformRand,
+    CanonicalDeserialize, CanonicalSerialize, Group, SerializationError, UniformRand,
 };
 use rand::Rng;
 
@@ -13,24 +13,30 @@ use std::io::{Read, Result as IoResult, Write};
 
 use super::{PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-#[derive(Clone, Debug)]
-pub struct PrivateKey {
-    sk: Fr,
+/// A Private Key using a pairing friendly curve's Fr point
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct PrivateKey(Fr);
+
+impl From<Fr> for PrivateKey {
+    fn from(sk: Fr) -> PrivateKey {
+        PrivateKey(sk)
+    }
+}
+
+impl AsRef<Fr> for PrivateKey {
+    fn as_ref(&self) -> &Fr {
+        &self.0
+    }
 }
 
 impl PrivateKey {
+    /// Generates a new private key from the provided RNG
     pub fn generate<R: Rng>(rng: &mut R) -> PrivateKey {
-        PrivateKey { sk: Fr::rand(rng) }
+        PrivateKey(Fr::rand(rng))
     }
 
-    pub fn from_sk(sk: &Fr) -> PrivateKey {
-        PrivateKey { sk: sk.clone() }
-    }
-
-    pub fn get_sk(&self) -> Fr {
-        self.sk.clone()
-    }
-
+    /// Hashes the message/extra_data tuple with the provided `hash_to_g1` function
+    /// and then signs it in the SIG_DOMAIN
     pub fn sign<H: HashToG1>(
         &self,
         message: &[u8],
@@ -40,6 +46,8 @@ impl PrivateKey {
         self.sign_message(SIG_DOMAIN, message, extra_data, hash_to_g1)
     }
 
+    /// Hashes the message/extra_data tuple with the provided `hash_to_g1` function
+    /// and then signs it in the POP_DOMAIN
     pub fn sign_pop<H: HashToG1>(
         &self,
         message: &[u8],
@@ -48,6 +56,7 @@ impl PrivateKey {
         self.sign_message(POP_DOMAIN, &message, &[], hash_to_g1)
     }
 
+    /// Hashes to G1 and signs the hash
     fn sign_message<H: HashToG1>(
         &self,
         domain: &[u8],
@@ -55,22 +64,24 @@ impl PrivateKey {
         extra_data: &[u8],
         hash_to_g1: &H,
     ) -> Result<Signature, Box<dyn Error>> {
-        Ok(Signature::from_sig(
-            hash_to_g1
-                .hash::<Bls12_377Parameters>(domain, message, extra_data)?
-                .mul(self.sk),
-        ))
+        let hash = hash_to_g1.hash::<Bls12_377Parameters>(domain, message, extra_data)?;
+        Ok(self.sign_raw(&hash))
     }
 
+    fn sign_raw(&self, message: &G1Projective) -> Signature {
+        message.mul(self.as_ref()).into()
+    }
+
+    /// Converts the private key to a public key
     pub fn to_public(&self) -> PublicKey {
-        PublicKey::from_pk(G2Projective::prime_subgroup_generator().mul(self.sk))
+        PublicKey::from(self)
     }
 }
 
 impl ToBytes for PrivateKey {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.sk.write(&mut writer)
+        self.0.write(&mut writer)
     }
 }
 
@@ -78,7 +89,7 @@ impl FromBytes for PrivateKey {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let sk = Fr::read(&mut reader)?;
-        Ok(PrivateKey::from_sk(&sk))
+        Ok(PrivateKey::from(sk))
     }
 }
 

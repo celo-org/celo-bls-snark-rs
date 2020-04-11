@@ -246,7 +246,7 @@ pub extern "C" fn compress_signature(
         let x = Fq::read(&signature[0..48]).unwrap();
         let y = Fq::read(&signature[48..96]).unwrap();
         let affine = G1Affine::new(x, y, false);
-        let sig = Signature::from_sig(affine.into_projective());
+        let sig = Signature::from(affine.into_projective());
         let mut obj_bytes = vec![];
         sig.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
@@ -271,7 +271,7 @@ pub extern "C" fn compress_pubkey(
         let x = Fq2::read(&pubkey[0..96]).unwrap();
         let y = Fq2::read(&pubkey[96..192]).unwrap();
         let affine = G2Affine::new(x, y, false);
-        let pk = PublicKey::from_pk(affine.into_projective());
+        let pk = PublicKey::from(affine.into_projective());
         let mut obj_bytes = vec![];
         pk.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
@@ -405,10 +405,7 @@ pub extern "C" fn batch_verify_signature(
             .map(|m| Message::from(m))
             .collect::<Vec<_>>();
 
-        let asig = {
-            let sigs = messages.iter().map(|m| m.sig).collect::<Vec<_>>();
-            Signature::aggregate(&sigs)
-        };
+        let asig = Signature::aggregate(messages.iter().map(|m| m.sig));
 
         let pubkeys = messages.iter().map(|m| m.public_key).collect::<Vec<_>>();
         let messages = messages
@@ -490,8 +487,8 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
         let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
-        let prepared_aggregated_public_key = PublicKey::from_pk(
-            aggregated_public_key.get_pk() - aggregated_public_key_to_subtract.get_pk(),
+        let prepared_aggregated_public_key = PublicKey::from(
+            *aggregated_public_key.as_ref() - *aggregated_public_key_to_subtract.as_ref(),
         );
         unsafe {
             *out_public_key = Box::into_raw(Box::new(prepared_aggregated_public_key));

@@ -39,7 +39,7 @@ pub mod test_helpers {
     pub fn hash_epoch(epoch: &EpochData<Bls12_377>) -> G1Projective {
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
+            pubkeys.push(PublicKey::from(pk.unwrap()));
         }
 
         // Calculate the hash from our to_bytes function

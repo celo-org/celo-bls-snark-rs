@@ -101,10 +101,10 @@ mod tests {
     fn msg_convert_ok() {
         let rng = &mut rand::thread_rng();
         let public_key = G2Projective::rand(rng);
-        let public_key = PublicKey::from_pk(public_key);
+        let public_key = PublicKey::from(public_key);
 
         let sig = G1Projective::rand(rng);
-        let sig = Signature::from_sig(sig);
+        let sig = Signature::from(sig);
         let msg = Message {
             data: &[1, 2, 3, 4],
             extra: &[5, 6, 7, 8],

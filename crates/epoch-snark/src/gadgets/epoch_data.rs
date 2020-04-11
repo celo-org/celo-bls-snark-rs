@@ -227,7 +227,7 @@ mod tests {
         let epoch = test_epoch(10);
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
+            pubkeys.push(PublicKey::from(pk.unwrap()));
         }
 
         // Calculate the hash from our to_bytes function
@@ -269,7 +269,7 @@ mod tests {
         let epoch = test_epoch(18);
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
-            pubkeys.push(PublicKey::from_pk(pk.unwrap()));
+            pubkeys.push(PublicKey::from(pk.unwrap()));
         }
 
         // calculate the bits from our helper function

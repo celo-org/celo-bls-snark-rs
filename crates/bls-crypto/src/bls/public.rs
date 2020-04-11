@@ -9,7 +9,8 @@ use algebra::{
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
-    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField, Zero,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, Field, One, PairingEngine, PrimeField,
+    ProjectiveCurve, SerializationError, SquareRootField, Zero,
 };
 
 use std::error::Error;
@@ -19,38 +20,38 @@ use std::{
     ops::Neg,
 };
 
-use super::{cache::PublicKeyCache, BLSError, Signature, POP_DOMAIN, SIG_DOMAIN};
+use super::{cache::PublicKeyCache, BLSError, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
+/// A BLS public key on G2
 #[derive(Clone, Eq, Debug)]
-pub struct PublicKey {
-    pk: G2Projective,
+pub struct PublicKey(G2Projective);
+
+impl From<G2Projective> for PublicKey {
+    fn from(pk: G2Projective) -> PublicKey {
+        PublicKey(pk)
+    }
+}
+
+impl From<&PrivateKey> for PublicKey {
+    fn from(pk: &PrivateKey) -> PublicKey {
+        PublicKey::from(G2Projective::prime_subgroup_generator().mul(*pk.as_ref()))
+    }
 }
 
 impl AsRef<G2Projective> for PublicKey {
     fn as_ref(&self) -> &G2Projective {
-        &self.pk
+        &self.0
     }
 }
 
 impl PublicKey {
-    pub fn from_pk(pk: G2Projective) -> PublicKey {
-        PublicKey { pk }
-    }
-
-    pub fn get_pk(&self) -> G2Projective {
-        self.pk.clone()
-    }
-
-    pub fn clone(&self) -> PublicKey {
-        PublicKey::from_pk(self.pk)
-    }
-
     pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
         let mut apk = G2Projective::zero();
-        for i in public_keys.iter() {
-            apk = apk + &(*i).pk;
+        for pk in public_keys.iter() {
+            apk = apk + pk.as_ref();
         }
-        PublicKey { pk: apk }
+
+        apk.into()
     }
 
     pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
@@ -85,7 +86,7 @@ impl PublicKey {
 
         let chosen_y = if y_over_half { bigger } else { smaller };
         let pk = G2Affine::new(x, chosen_y, false);
-        Ok(PublicKey::from_pk(pk.into_projective()))
+        Ok(PublicKey::from(pk.into_projective()))
     }
 
     pub fn verify<H: HashToG1>(
@@ -117,7 +118,7 @@ impl PublicKey {
     ) -> Result<(), Box<dyn Error>> {
         let pairing = Bls12_377::product_of_pairings(&vec![
             (
-                signature.get_sig().into_affine().into(),
+                signature.as_ref().into_affine().into(),
                 G2Affine::prime_subgroup_generator().neg().into(),
             ),
             (
@@ -125,7 +126,7 @@ impl PublicKey {
                     .hash::<Bls12_377Parameters>(domain, message, extra_data)?
                     .into_affine()
                     .into(),
-                self.pk.into_affine().into(),
+                self.0.into_affine().into(),
             ),
         ]);
         if pairing == Fq12::one() {
@@ -142,14 +143,16 @@ impl PartialEq for PublicKey {
         // equality operator in G2Projective.  We require byte-level equality here
         // for HashSet to work correctly.  HashSet requires that item equality
         // implies hash equality.
-        self.pk.x == other.pk.x && self.pk.y == other.pk.y && self.pk.z == other.pk.z
+        let a = self.as_ref();
+        let b = other.as_ref();
+        a.x == b.x && a.y == b.y && a.z == b.z
     }
 }
 
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Only hash based on `y` for slight speed improvement
-        self.pk.y.hash(state);
+        self.0.y.hash(state);
         // self.pk.x.hash(state);
         // self.pk.z.hash(state);
     }
@@ -158,7 +161,7 @@ impl Hash for PublicKey {
 impl ToBytes for PublicKey {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        let affine = self.pk.into_affine();
+        let affine = self.0.into_affine();
         let mut x_bytes: Vec<u8> = vec![];
         let y_c0_big = affine.y.c0.into_repr();
         let y_c1_big = affine.y.c1.into_repr();
@@ -185,6 +188,34 @@ impl FromBytes for PublicKey {
     }
 }
 
+impl CanonicalSerialize for PublicKey {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize(writer)
+    }
+
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize_uncompressed(writer)
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.0.into_affine().serialized_size()
+    }
+}
+
+impl CanonicalDeserialize for PublicKey {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(PublicKey::from(
+            G2Affine::deserialize(reader)?.into_projective(),
+        ))
+    }
+
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(PublicKey::from(
+            G2Affine::deserialize_uncompressed(reader)?.into_projective(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -202,8 +233,8 @@ mod test {
             let mut pk_bytes = vec![];
             pk.write(&mut pk_bytes).unwrap();
             let pk2 = PublicKey::read(pk_bytes.as_slice()).unwrap();
-            assert_eq!(pk.get_pk().into_affine().x, pk2.get_pk().into_affine().x);
-            assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
+            assert_eq!(pk.as_ref().into_affine().x, pk2.as_ref().into_affine().x);
+            assert_eq!(pk.as_ref().into_affine().y, pk2.as_ref().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
     }
