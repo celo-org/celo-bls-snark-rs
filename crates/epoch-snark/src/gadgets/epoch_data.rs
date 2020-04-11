@@ -12,7 +12,7 @@ use r1cs_std::{
 };
 
 use bls_crypto::{
-    bls::keys::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement,
+    bls::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement,
     hash::composite::CompositeHasher,
 };
 use bls_gadgets::{is_setup, HashToGroupGadget};

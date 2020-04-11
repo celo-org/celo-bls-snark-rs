@@ -1,7 +1,7 @@
 /// FFI Utilities
 ///
 /// Utilities for working with variable length data structures.
-use crate::{PublicKey, Signature};
+use super::{PublicKey, Signature};
 use std::slice;
 
 /// A per-epoch block witness to be used with the batch sig verification

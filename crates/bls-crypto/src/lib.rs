@@ -7,7 +7,7 @@ pub mod hash;
 pub mod test_helpers;
 
 // Clean public API
-pub use bls::keys::{PrivateKey, PublicKey, Signature};
+pub use bls::{PrivateKey, PublicKey, Signature};
 pub use curve::hash::try_and_increment::TryAndIncrement;
 pub use hash::{composite::CompositeHasher, direct::DirectHasher};
 
@@ -17,7 +17,7 @@ use log::error;
 use crate::{
     bls::{
         ffi::{Message, MessageFFI},
-        keys::{BLSError, PublicKeyCache, POP_DOMAIN, SIG_DOMAIN},
+        BLSError, PublicKeyCache, POP_DOMAIN, SIG_DOMAIN,
     },
     curve::hash::HashToG1,
 };

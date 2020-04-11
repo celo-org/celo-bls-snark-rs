@@ -2,8 +2,7 @@ use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
 use algebra::{bls12_377::G1Projective, bls12_377::Parameters};
 use blake2s_simd::Params;
 use bls_crypto::{
-    bls::keys::SIG_DOMAIN, curve::hash::HashToG1, CompositeHasher, PublicKey, Signature,
-    TryAndIncrement,
+    bls::SIG_DOMAIN, curve::hash::HashToG1, CompositeHasher, PublicKey, Signature, TryAndIncrement,
 };
 use bls_gadgets::{bits_to_bytes, bytes_to_bits};
 

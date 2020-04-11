@@ -30,7 +30,7 @@ pub mod test_helpers {
     use super::*;
     use crate::epoch_block::EpochBlock;
     use algebra::{bls12_377::G1Projective, Bls12_377};
-    use bls_crypto::{bls::keys::SIG_DOMAIN, CompositeHasher, PublicKey, TryAndIncrement};
+    use bls_crypto::{bls::SIG_DOMAIN, CompositeHasher, PublicKey, TryAndIncrement};
 
     pub fn to_option_iter<T: Copy>(it: &[T]) -> Vec<Option<T>> {
         it.iter().map(|t| Some(*t)).collect()
