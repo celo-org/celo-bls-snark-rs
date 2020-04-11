@@ -1,12 +1,9 @@
-use super::{CPCurve, Parameters};
-use crate::convert_result_to_bool;
-use crate::epoch_block::{EpochBlock, EpochTransition};
+use crate::epoch_block::EpochBlock;
 use crate::EncodingError;
 use algebra::{
     bls12_377::G2Affine, AffineCurve, CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve,
 };
 use bls_crypto::PublicKey;
-use groth16::{Proof, VerifyingKey};
 use std::convert::TryFrom;
 use std::slice;
 
@@ -46,11 +43,11 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
 ///
 /// This WILL read invalid data if you give it a larger `num` argument
 /// than expected. Use with caution.
-pub(super) fn read_slice<C: CanonicalDeserialize>(
+pub unsafe fn read_slice<C: CanonicalDeserialize>(
     ptr: *const u8,
     len: usize,
 ) -> Result<C, EncodingError> {
-    let mut data = unsafe { slice::from_raw_parts(ptr, len) };
+    let mut data = slice::from_raw_parts(ptr, len);
     Ok(C::deserialize(&mut data)?)
 }
 
@@ -80,7 +77,7 @@ pub fn serialize_pubkeys(pubkeys: &[PublicKey]) -> Result<Vec<u8>, EncodingError
 /// simply return an array of `PublicKeys` whose internals will be whatever data was in the memory.
 /// Use with caution.
 unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, EncodingError> {
-    let mut data = unsafe { read_serialized_pubkeys(ptr, num) };
+    let mut data = read_serialized_pubkeys(ptr, num);
     let mut pubkeys = Vec::new();
     for _ in 0..num {
         let key = G2Affine::deserialize(&mut data)?;
@@ -99,7 +96,7 @@ mod tests {
         serialize::CanonicalSerialize,
         Bls12_377, ProjectiveCurve, UniformRand,
     };
-    use groth16::{create_proof_no_zk, generate_random_parameters};
+    use groth16::{create_proof_no_zk, generate_random_parameters, Proof, VerifyingKey};
 
     #[test]
     fn ffi_block_conversion() {

@@ -1,52 +1,60 @@
+//! # BLS Cryptography
+//!
+//! This crate implements cryptographic operations for BLS signatures
 #![allow(clippy::all)]
-pub mod bls;
-pub mod curve;
-pub mod hash;
+/// BLS signing
+mod bls;
+pub use bls::{ffi, PrivateKey, PublicKey, PublicKeyCache, Signature};
+
+/// Hashing to curve utilities
+pub mod hash_to_curve;
+pub use hash_to_curve::HashToCurve;
+
+/// Useful hash functions
+pub mod hashers;
+pub use hashers::XOF;
+
+use ffi::{Message, MessageFFI};
+use hash_to_curve::try_and_increment::{COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1};
+
+use algebra::{
+    bls12_377::{Fq, Fq2, G1Affine, G2Affine},
+    AffineCurve, FromBytes, ProjectiveCurve, ToBytes,
+};
+use log::error;
+use rand::thread_rng;
+use std::{error::Error, fmt::Display, os::raw::c_int, slice};
+use thiserror::Error;
+
+/// Convenience result alias
+pub type BlsResult<T> = std::result::Result<T, BLSError>;
+
+/// Domain separator for signing messages
+pub static SIG_DOMAIN: &[u8] = b"ULforxof";
+/// Domain separator for Proofs of Posession
+pub static POP_DOMAIN: &[u8] = b"ULforpop";
+/// Domain separator for public inputs to the snark
+pub static OUT_DOMAIN: &[u8] = b"ULforout";
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers;
-
-// Clean public API
-pub use bls::{PrivateKey, PublicKey, Signature};
-pub use curve::hash::try_and_increment::TryAndIncrement;
-pub use hash::{composite::CompositeHasher, direct::DirectHasher};
-
-use lazy_static::lazy_static;
-use log::error;
-
-use crate::{
-    bls::{
-        ffi::{Message, MessageFFI},
-        BLSError, PublicKeyCache, POP_DOMAIN, SIG_DOMAIN,
-    },
-    curve::hash::HashToG1,
-};
-use algebra::{
-    bls12_377::{Fq, Fq2, G1Affine, G2Affine, Parameters as Bls12_377Parameters},
-    AffineCurve, FromBytes, ProjectiveCurve, ToBytes,
-};
-use rand::thread_rng;
-use std::os::raw::c_int;
-use std::slice;
-use std::{error::Error, fmt::Display};
-
-lazy_static! {
-    static ref COMPOSITE_HASHER: CompositeHasher = { CompositeHasher::new().unwrap() };
-    static ref DIRECT_HASHER: DirectHasher = { DirectHasher::new().unwrap() };
-    static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> =
-        { TryAndIncrement::new(&*COMPOSITE_HASHER) };
-    static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> =
-        { TryAndIncrement::new(&*DIRECT_HASHER) };
-}
-
-fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
-    match f() {
-        Err(e) => {
-            error!("BLS library error: {}", e.to_string());
-            false
-        }
-        _ => true,
-    }
+#[derive(Debug, Error)]
+/// Error type
+pub enum BLSError {
+    /// Error
+    #[error("signature verification failed")]
+    VerificationFailed,
+    /// An IO error
+    #[error("io error {0}")]
+    IoError(#[from] std::io::Error),
+    /// Error while hashing
+    #[error("error in hasher {0}")]
+    HashingError(#[from] Box<dyn std::error::Error>),
+    /// Personalization string cannot be larger than 8 bytes
+    #[error("domain length is too large: {0}")]
+    DomainTooLarge(usize),
+    #[error("Could not hash to curve")]
+    HashToCurveError,
 }
 
 #[no_mangle]
@@ -190,11 +198,8 @@ pub extern "C" fn hash_direct(
 ) -> bool {
     convert_result_to_bool::<_, Box<dyn Error>, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
-        let hash = if use_pop {
-            DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(POP_DOMAIN, message, &[])?
-        } else {
-            DIRECT_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, &[])?
-        };
+        let domain = if use_pop { POP_DOMAIN } else { SIG_DOMAIN };
+        let hash = DIRECT_HASH_TO_G1.hash(domain, message, &[])?;
         let mut obj_bytes = vec![];
         hash.into_affine().write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
@@ -220,8 +225,7 @@ pub extern "C" fn hash_composite(
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let hash =
-            COMPOSITE_HASH_TO_G1.hash::<Bls12_377Parameters>(SIG_DOMAIN, message, extra_data)?;
+        let hash = COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, message, extra_data)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
@@ -519,4 +523,12 @@ pub extern "C" fn aggregate_signatures(
 
         Ok(())
     })
+}
+
+fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
+    if let Err(e) = f() {
+        error!("BLS library error: {}", e.to_string());
+        return false;
+    }
+    true
 }

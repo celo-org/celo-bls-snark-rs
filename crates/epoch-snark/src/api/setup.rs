@@ -1,19 +1,16 @@
 /// Prover Verifier Generator
 ///
 /// Setup: Trusted setup over Groth16 for the Hash To Bits and the Epoch Transition circuits
-use std::marker::PhantomData;
-
 use crate::gadgets::{HashToBits, ValidatorSetUpdate};
 
 use algebra::PairingEngine;
-use r1cs_core::ConstraintSynthesizer;
 use r1cs_core::SynthesisError;
 use rand::Rng;
 
 use super::{BLSCurve, CPCurve, CPFrParams};
 
-use groth16::{generate_random_parameters, Parameters as Groth16Parameters, VerifyingKey};
-use tracing::{debug, error, info, span, warn, Level};
+use groth16::{generate_random_parameters, Parameters as Groth16Parameters};
+use tracing::{info, span, Level};
 
 type Result<T> = std::result::Result<T, SynthesisError>;
 

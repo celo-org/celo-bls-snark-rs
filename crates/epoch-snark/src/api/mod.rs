@@ -1,4 +1,3 @@
-#![allow(unused)]
 pub mod prover;
 /// API for setting up, generating and verifying proofs for the
 /// SNARK instantiated over BLS12-377 / SW6 which proves language
