@@ -108,7 +108,11 @@ mod test {
     fn test_crh_empty() {
         let msg: Vec<u8> = vec![];
         let hasher = Hasher::new().unwrap();
-        let _result = hasher.crh(&[], &msg, 96).unwrap();
+        let result = hasher.crh(&[], &msg, 96).unwrap();
+        assert_eq!(
+            hex::encode(result),
+            "7a746244ad211d351f57a218255888174e719b54e683651e9314f55402eed414"
+        )
     }
 
     #[test]
@@ -122,7 +126,11 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.crh(&[], &msg, 96).unwrap();
+        let result = hasher.crh(&[], &msg, 96).unwrap();
+        assert_eq!(
+            hex::encode(result),
+            "b5a31242cffbefda914dc6d655fd200ee72e0297f951c345409936d45b5f080b"
+        )
     }
 
     #[test]
@@ -137,7 +145,10 @@ mod test {
             *i = rng.gen();
         }
         let result = hasher.crh(&[], &msg, 96).unwrap();
-        let _xof_result = hasher.xof(b"ULforxof", &result, 96).unwrap();
+        let xof_result = hasher.xof(b"ULforxof", &result, 96).unwrap();
+        assert_eq!(
+            hex::encode(xof_result),
+            "5801c1a4b06a9329109326c0fbccb028c5d7f0fb03ff5345f681f65f8b81dbb1c8c48d4cd4f5a4f1698dfc53a87db8865895a484f9c5d0d120709333418e6d2ac4787d996b564bbf5d6d506f1e280e4695599e42cd9e668c0ed9444a7b58a781");
     }
 
     #[test]
@@ -151,7 +162,8 @@ mod test {
         for i in msg.iter_mut() {
             *i = rng.gen();
         }
-        let _result = hasher.hash(b"ULforxof", &msg, 96).unwrap();
+        let result = hasher.hash(b"ULforxof", &msg, 96).unwrap();
+        assert_eq!(hex::encode(result), "8ed2c28681f8be94c08c6ff066bf7ab514e1d68b5b71e0e9097e6e2834f8c3eba7c4a41efc9c34e839a8a2577c08ed2273fc6ec7611b5fa62446e7b6f01827ba7860c49174afdf6d26e5cef44d7f8530ca8ccdd3febe55a1401ac83d63e00eba")
     }
 
     #[test]
