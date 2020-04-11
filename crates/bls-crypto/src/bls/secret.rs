@@ -3,7 +3,7 @@ use crate::curve::hash::HashToG1;
 use algebra::{
     bls12_377::{Fr, G1Projective, Parameters as Bls12_377Parameters},
     bytes::{FromBytes, ToBytes},
-    CanonicalDeserialize, CanonicalSerialize, SerializationError, UniformRand,
+    CanonicalDeserialize, CanonicalSerialize, Group, SerializationError, UniformRand,
 };
 use rand::Rng;
 
@@ -69,7 +69,7 @@ impl PrivateKey {
     }
 
     fn sign_raw(&self, message: &G1Projective) -> Signature {
-        Signature::new(self.as_ref(), &message)
+        message.mul(self.as_ref()).into()
     }
 
     /// Converts the private key to a public key

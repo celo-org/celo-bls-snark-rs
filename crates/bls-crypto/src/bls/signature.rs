@@ -2,7 +2,7 @@ use crate::curve::hash::HashToG1;
 
 use algebra::{
     bls12_377::{
-        g1::Parameters as Bls12_377G1Parameters, Bls12_377, Fq, Fq12, Fr, G1Affine, G1Projective,
+        g1::Parameters as Bls12_377G1Parameters, Bls12_377, Fq, Fq12, G1Affine, G1Projective,
         G2Affine, Parameters as Bls12_377Parameters,
     },
     bytes::{FromBytes, ToBytes},
@@ -64,11 +64,6 @@ impl CanonicalDeserialize for Signature {
 }
 
 impl Signature {
-    /// Signs the provided message with the secret.
-    pub fn new(secret: &Fr, message: &G1Projective) -> Signature {
-        message.mul(*secret).into()
-    }
-
     /// Sums the provided signatures to produce the aggregate signature.
     pub fn aggregate<S: Borrow<Signature>>(signatures: impl IntoIterator<Item = S>) -> Signature {
         let mut asig = G1Projective::zero();
