@@ -30,26 +30,26 @@ fn main() {
     let try_and_increment = TryAndIncrement::new(&composite_hasher);
     println!("try_and_increment");
     let sk1 = PrivateKey::generate(rng);
-    println!("sk1: {}", hex::encode(to_bytes!(sk1.get_sk()).unwrap()));
+    println!("sk1: {}", hex::encode(to_bytes!(sk1.as_ref()).unwrap()));
     let sk2 = PrivateKey::generate(rng);
-    println!("sk2: {}", hex::encode(to_bytes!(sk2.get_sk()).unwrap()));
+    println!("sk2: {}", hex::encode(to_bytes!(sk2.as_ref()).unwrap()));
     let sk3 = PrivateKey::generate(rng);
-    println!("sk3: {}", hex::encode(to_bytes!(sk3.get_sk()).unwrap()));
+    println!("sk3: {}", hex::encode(to_bytes!(sk3.as_ref()).unwrap()));
 
     println!("Starting!\n\n");
 
     let sig1 = sk1
         .sign(&message.as_bytes(), &[], &try_and_increment)
         .unwrap();
-    println!("sig1: {}", hex::encode(to_bytes!(sig1.get_sig()).unwrap()));
+    println!("sig1: {}", hex::encode(to_bytes!(sig1.as_ref()).unwrap()));
     let sig2 = sk2
         .sign(&message.as_bytes(), &[], &try_and_increment)
         .unwrap();
-    println!("sig2: {}", hex::encode(to_bytes!(sig2.get_sig()).unwrap()));
+    println!("sig2: {}", hex::encode(to_bytes!(sig2.as_ref()).unwrap()));
     let sig3 = sk3
         .sign(&message.as_bytes(), &[], &try_and_increment)
         .unwrap();
-    println!("sig3: {}", hex::encode(to_bytes!(sig3.get_sig()).unwrap()));
+    println!("sig3: {}", hex::encode(to_bytes!(sig3.as_ref()).unwrap()));
 
     let apk = PublicKey::aggregate(&[
         sk1.to_public(),
@@ -57,11 +57,11 @@ fn main() {
         sk3.to_public(),
         sk3.to_public(),
     ]);
-    println!("apk: {}", hex::encode(to_bytes!(apk.get_pk()).unwrap()));
+    println!("apk: {}", hex::encode(to_bytes!(apk.as_ref()).unwrap()));
     let asig1 = Signature::aggregate(&[sig1, sig3.clone()]);
     let asig2 = Signature::aggregate(&[sig2, sig3]);
     let asig = Signature::aggregate(&[asig1, asig2]);
-    println!("asig: {}", hex::encode(to_bytes!(asig.get_sig()).unwrap()));
+    println!("asig: {}", hex::encode(to_bytes!(asig.as_ref()).unwrap()));
     apk.verify(&message.as_bytes(), &[], &asig, &try_and_increment)
         .unwrap();
     println!("aggregated signature verified successfully");

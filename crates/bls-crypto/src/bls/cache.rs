@@ -77,6 +77,6 @@ impl PublicKeyCache {
 
         cache.keys = keys;
         cache.combined = combined;
-        PublicKey::from_pk(combined)
+        PublicKey::from(combined)
     }
 }
