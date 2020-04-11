@@ -222,23 +222,28 @@ mod test {
     fn test_public_key_serialization() {
         PublicKeyCache::resize(256);
         PublicKeyCache::clear_cache();
+
         let rng = &mut thread_rng();
-        for _i in 0..100 {
+        for _ in 0..100 {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
+
             let mut pk_bytes = vec![];
             pk.write(&mut pk_bytes).unwrap();
+
             let mut pk_bytes2 = vec![];
-            pk.as_ref().into_affine().serialize(&mut pk_bytes2).unwrap();
-            let pk2 = PublicKey::read(pk_bytes.as_slice()).unwrap();
-            assert_eq!(pk.as_ref().into_affine().x, pk2.as_ref().into_affine().x);
-            assert_eq!(pk.as_ref().into_affine().y, pk2.as_ref().into_affine().y);
-            assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
-            assert_eq!(
-                pk2.eq(&PublicKey::read(pk_bytes2.as_slice()).unwrap()),
-                true
-            );
+            pk.serialize(&mut pk_bytes2).unwrap();
+
             assert_eq!(pk_bytes, pk_bytes2);
+
+            let de_pk = PublicKey::read(&pk_bytes[..]).unwrap();
+            let de_pk2 = PublicKey::deserialize(&mut &pk_bytes[..]).unwrap();
+
+            assert_eq!(de_pk, de_pk2);
+
+            // check that the points match (the PartialEq does only bytes equality)
+            assert_eq!(de_pk.as_ref().x, de_pk2.as_ref().x);
+            assert_eq!(de_pk.as_ref().y, de_pk2.as_ref().y);
         }
     }
 }

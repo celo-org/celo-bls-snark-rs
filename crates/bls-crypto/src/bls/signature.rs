@@ -351,34 +351,28 @@ mod tests {
     }
 
     #[test]
-    fn test_signature_serialization() {
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+    fn to_bytes_canonical_serialize_same() {
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let rng = &mut thread_rng();
-        for _i in 0..100 {
+        for _ in 0..100 {
             let message = b"hello";
-
             let sk = PrivateKey::generate(rng);
-            let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
+            let sig = sk.sign(&message[..], &[], try_and_increment).unwrap();
+
             let mut sig_bytes = vec![];
             sig.write(&mut sig_bytes).unwrap();
+
             let mut sig_bytes2 = vec![];
-            sig.as_ref()
-                .into_affine()
-                .serialize(&mut sig_bytes2)
-                .unwrap();
-            let sig2 = Signature::read(sig_bytes.as_slice()).unwrap();
-            assert_eq!(sig.as_ref().into_affine().x, sig2.as_ref().into_affine().x);
-            assert_eq!(sig.as_ref().into_affine().y, sig2.as_ref().into_affine().y);
-            assert_eq!(
-                sig2.eq(&Signature::read(sig_bytes.as_slice()).unwrap()),
-                true
-            );
-            assert_eq!(
-                sig2.eq(&Signature::read(sig_bytes2.as_slice()).unwrap()),
-                true
-            );
+            sig.serialize(&mut sig_bytes2).unwrap();
+
+            // both methods have the same ersult
             assert_eq!(sig_bytes, sig_bytes2);
+
+            let de_sig1 = Signature::read(&sig_bytes[..]).unwrap();
+            let de_sig2 = Signature::deserialize(&mut &sig_bytes[..]).unwrap();
+
+            // both deserialization methods have the same result
+            assert_eq!(de_sig1, de_sig2);
         }
     }
 }
