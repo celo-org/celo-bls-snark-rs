@@ -354,4 +354,27 @@ mod tests {
 
         assert!(res.is_ok());
     }
+
+    #[test]
+    fn test_signature_serialization() {
+        let composite_hasher = CompositeHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+        let rng = &mut thread_rng();
+        for _i in 0..100 {
+            let message = b"hello";
+
+            let sk = PrivateKey::generate(rng);
+            let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
+            let mut sig_bytes = vec![];
+            sig.write(&mut sig_bytes).unwrap();
+            let mut sig_bytes2 = vec![];
+            sig.as_ref().into_affine().serialize(&mut sig_bytes2).unwrap();
+            let sig2 = Signature::read(sig_bytes.as_slice()).unwrap();
+            assert_eq!(sig.as_ref().into_affine().x, sig2.as_ref().into_affine().x);
+            assert_eq!(sig.as_ref().into_affine().y, sig2.as_ref().into_affine().y);
+            assert_eq!(sig2.eq(&Signature::read(sig_bytes.as_slice()).unwrap()), true);
+            assert_eq!(sig2.eq(&Signature::read(sig_bytes2.as_slice()).unwrap()), true);
+            assert_eq!(sig_bytes, sig_bytes2);
+        }
+    }
 }

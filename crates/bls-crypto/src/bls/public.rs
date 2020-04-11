@@ -232,10 +232,14 @@ mod test {
             let pk = sk.to_public();
             let mut pk_bytes = vec![];
             pk.write(&mut pk_bytes).unwrap();
+            let mut pk_bytes2 = vec![];
+            pk.as_ref().into_affine().serialize(&mut pk_bytes2).unwrap();
             let pk2 = PublicKey::read(pk_bytes.as_slice()).unwrap();
             assert_eq!(pk.as_ref().into_affine().x, pk2.as_ref().into_affine().x);
             assert_eq!(pk.as_ref().into_affine().y, pk2.as_ref().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
+            assert_eq!(pk2.eq(&PublicKey::read(pk_bytes2.as_slice()).unwrap()), true);
+            assert_eq!(pk_bytes, pk_bytes2);
         }
     }
 }
