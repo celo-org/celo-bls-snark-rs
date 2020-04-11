@@ -1,9 +1,8 @@
-use lazy_static::lazy_static;
 use lru::LruCache;
+use once_cell::sync::Lazy;
+use std::io::Result as IoResult;
 
 use std::{collections::HashSet, sync::Mutex};
-
-use std::io::Result as IoResult;
 
 use algebra::{bls12_377::G2Projective, Zero};
 
@@ -14,13 +13,14 @@ struct AggregateCacheState {
     combined: G2Projective,
 }
 
-lazy_static! {
-    static ref FROM_VEC_CACHE: Mutex<LruCache<Vec<u8>, PublicKey>> = Mutex::new(LruCache::new(128));
-    static ref AGGREGATE_CACHE: Mutex<AggregateCacheState> = Mutex::new(AggregateCacheState {
+static FROM_VEC_CACHE: Lazy<Mutex<LruCache<Vec<u8>, PublicKey>>> =
+    Lazy::new(|| Mutex::new(LruCache::new(128)));
+static AGGREGATE_CACHE: Lazy<Mutex<AggregateCacheState>> = Lazy::new(|| {
+    Mutex::new(AggregateCacheState {
         keys: HashSet::new(),
-        combined: G2Projective::zero().clone()
-    });
-}
+        combined: G2Projective::zero().clone(),
+    })
+});
 
 pub struct PublicKeyCache;
 

@@ -1,12 +1,11 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
-use algebra::{bls12_377::G1Projective, bls12_377::Parameters};
+use algebra::bls12_377::G1Projective;
 use blake2s_simd::Params;
 use bls_crypto::{
-    bls::SIG_DOMAIN, curve::hash::HashToG1, CompositeHasher, PublicKey, Signature, TryAndIncrement,
+    hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
+    PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::{bits_to_bytes, bytes_to_bits};
-
-pub static OUT_DOMAIN: &[u8] = b"ULforout";
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -41,11 +40,8 @@ impl EpochBlock {
 
     pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
         let input = self.encode_to_bytes()?;
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let expected_hash: G1Projective = try_and_increment
-            .hash::<Parameters>(SIG_DOMAIN, &input, &[])
-            .unwrap();
+        let expected_hash: G1Projective =
+            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &[]).unwrap();
         Ok(expected_hash)
     }
 

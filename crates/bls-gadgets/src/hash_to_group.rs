@@ -1,19 +1,11 @@
-use std::{borrow::Borrow, marker::PhantomData};
-
-use algebra::{
-    curves::{
-        bls12::G1Projective, models::bls12::Bls12Parameters,
-        short_weierstrass_jacobian::GroupProjective, SWModelParameters,
+use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
+use bls_crypto::{
+    hash_to_curve::try_and_increment::get_point_from_x_g1,
+    hashers::{
+        composite::{CompositeHasher, CRH},
+        DirectHasher, XOF,
     },
-    AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
-};
-use crypto_primitives::prf::{
-    blake2s::constraints::blake2s_gadget_with_parameters, Blake2sWithParameterBlock,
-};
-use r1cs_core::{ConstraintSystem, SynthesisError};
-use r1cs_std::{
-    alloc::AllocGadget, bits::ToBitsGadget, boolean::Boolean, groups::bls12::G1Gadget,
-    groups::GroupGadget, uint8::UInt8, Assignment,
+    SIG_DOMAIN,
 };
 
 // Imported for the BLS12-377 API
@@ -21,21 +13,26 @@ use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     edwards_sw6::EdwardsProjective,
 };
-use bls_crypto::{
-    bls::SIG_DOMAIN,
-    curve::hash::try_and_increment::get_point_from_x_g1,
-    hash::{
-        composite::{CompositeHasher, CRH},
-        XOF,
+use algebra::{
+    curves::{
+        bls12::G1Projective, models::bls12::Bls12Parameters,
+        short_weierstrass_jacobian::GroupProjective, SWModelParameters,
     },
+    AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
 };
 use crypto_primitives::{
-    crh::bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
+    crh::{
+        bowe_hopwood::constraints::BoweHopwoodPedersenCRHGadget as BHHash, FixedLengthCRHGadget,
+    },
+    prf::{blake2s::constraints::blake2s_gadget_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_std::edwards_sw6::EdwardsSWGadget;
+use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_std::{
+    alloc::AllocGadget, bits::ToBitsGadget, boolean::Boolean, edwards_sw6::EdwardsSWGadget,
+    groups::bls12::G1Gadget, groups::GroupGadget, uint8::UInt8, Assignment,
+};
+use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
-
-use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 
 /// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
 type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
@@ -124,7 +121,7 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc(
             cs.ns(|| "pedersen parameters"),
-            || CompositeHasher::setup_crh().ok().get(),
+            || CompositeHasher::<CRH>::setup_crh().ok().get(),
         )?;
 
         let pedersen_hash = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
@@ -208,8 +205,7 @@ pub fn hash_to_bits<F: PrimeField, CS: ConstraintSystem<F>>(
                 .map(|m| m.get_value().get())
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
-            let hasher = bls_crypto::DirectHasher::new().unwrap();
-            let hash_result = hasher.xof(&personalization, &message, 64).unwrap();
+            let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
             let mut bits = bytes_to_bits(&hash_result, 512);
             bits.reverse();
             bits
@@ -340,7 +336,7 @@ mod test {
     use algebra::bls12_377;
     use r1cs_std::{groups::GroupGadget, test_constraint_system::TestConstraintSystem};
 
-    use bls_crypto::curve::hash::try_and_increment::TryAndIncrement;
+    use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
     use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
 
@@ -359,10 +355,9 @@ mod test {
     }
 
     fn hash_to_group(input: &[u8]) {
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let (expected_hash, attempt) = try_and_increment
-            .hash_with_attempt::<bls12_377::Parameters>(SIG_DOMAIN, input, &[])
+            .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
 
         let mut cs = TestConstraintSystem::<bls12_377::Fq>::new();

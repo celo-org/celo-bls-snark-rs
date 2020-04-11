@@ -4,10 +4,8 @@ use utils::{read_slice, EpochBlockFFI};
 #[cfg(test)]
 mod test_helpers;
 
-use crate::api::{CPCurve, Parameters};
 use crate::convert_result_to_bool;
-use crate::epoch_block::{EpochBlock, EpochTransition};
-use algebra::{bls12_377::G2Affine, AffineCurve, CanonicalDeserialize};
+use crate::epoch_block::EpochBlock;
 use std::convert::TryFrom;
 
 #[no_mangle]

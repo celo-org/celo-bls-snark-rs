@@ -1,6 +1,5 @@
 use super::{BLSCurve, CPCurve, Parameters};
 use crate::{
-    api::CPField,
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{
         epochs::{HashToBitsHelper, ValidatorSetUpdate},
@@ -9,16 +8,16 @@ use crate::{
     },
 };
 use bls_crypto::{
-    bls::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement, hash::composite::CRH,
-    hash::XOF, CompositeHasher, PublicKey, Signature,
+    hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1,
+    hashers::{COMPOSITE_HASHER, XOF},
+    Signature, SIG_DOMAIN,
 };
 use bls_gadgets::bytes_to_bits;
 
-use algebra::{bls12_377::G1Projective, Zero};
 use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
-use r1cs_core::{ConstraintSynthesizer, SynthesisError};
+use r1cs_core::SynthesisError;
 
-use tracing::{debug, error, info, span, warn, Level};
+use tracing::{info, span, Level};
 
 pub fn prove(
     parameters: &Parameters,
@@ -70,8 +69,8 @@ pub fn generate_hash_helper(
     params: &Groth16Parameters<BLSCurve>,
     transitions: &[EpochTransition],
 ) -> Result<HashToBitsHelper<BLSCurve>, SynthesisError> {
-    let composite_hasher = CompositeHasher::new().unwrap();
-    let try_and_increment = TryAndIncrement::new(&composite_hasher);
+    let hash_to_g1 = &COMPOSITE_HASH_TO_G1;
+    let composite_hasher = &COMPOSITE_HASHER;
 
     // Generate the CRH per epoch
     let message_bits = transitions
@@ -81,8 +80,8 @@ pub fn generate_hash_helper(
             let epoch_bytes = block.encode_to_bytes().unwrap();
 
             // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
-            let (_, counter) = try_and_increment
-                .hash_with_attempt::<algebra::bls12_377::Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
+            let (_, counter) = hash_to_g1
+                .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
                 .unwrap();
             let crh_bytes = composite_hasher
                 .crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0)

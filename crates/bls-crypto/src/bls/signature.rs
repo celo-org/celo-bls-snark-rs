@@ -1,9 +1,9 @@
-use crate::curve::hash::HashToG1;
+use crate::HashToCurve;
 
 use algebra::{
     bls12_377::{
         g1::Parameters as Bls12_377G1Parameters, Bls12_377, Fq, Fq12, G1Affine, G1Projective,
-        G2Affine, Parameters as Bls12_377Parameters,
+        G2Affine,
     },
     bytes::{FromBytes, ToBytes},
     curves::SWModelParameters,
@@ -17,7 +17,8 @@ use std::{
     ops::Neg,
 };
 
-use super::{BLSError, PublicKey};
+use super::PublicKey;
+use crate::BLSError;
 
 /// A BLS signature on G1.
 #[derive(Clone, Debug, PartialEq)]
@@ -84,7 +85,7 @@ impl Signature {
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
-    pub fn batch_verify<H: HashToG1, P: Borrow<PublicKey>>(
+    pub fn batch_verify<H: HashToCurve<Output = G1Projective>, P: Borrow<PublicKey>>(
         &self,
         pubkeys: &[P],
         domain: &[u8],
@@ -93,11 +94,7 @@ impl Signature {
     ) -> Result<(), BLSError> {
         let message_hashes = messages
             .iter()
-            .map(|(message, extra_data)| {
-                hash_to_g1
-                    .hash::<Bls12_377Parameters>(domain, message, extra_data)
-                    .map_err(|_| BLSError::HashToCurveFailed(message.to_vec(), extra_data.to_vec()))
-            })
+            .map(|(message, extra_data)| hash_to_g1.hash(domain, message, extra_data))
             .collect::<Result<Vec<G1Projective>, _>>()?;
 
         self.batch_verify_hashes(pubkeys, &message_hashes)
@@ -181,16 +178,18 @@ impl FromBytes for Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{keygen_batch, sign_batch, sum};
     use crate::{
-        bls::{
-            ffi::{Message, MessageFFI},
-            PrivateKey, PublicKeyCache, SIG_DOMAIN,
-        },
-        curve::hash::try_and_increment::TryAndIncrement,
-        hash::{composite::CompositeHasher, direct::DirectHasher, XOF},
+        ffi::{Message, MessageFFI},
+        hash_to_curve::try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
+        hashers::{composite::COMPOSITE_HASHER, DirectHasher, XOF},
+        test_helpers::{keygen_batch, sign_batch, sum},
+        PrivateKey, PublicKeyCache, SIG_DOMAIN,
     };
-    use algebra::{bls12_377::G2Projective, UniformRand};
+
+    use algebra::{
+        bls12_377::{G2Projective, Parameters},
+        UniformRand,
+    };
     use rand::{thread_rng, Rng};
 
     #[test]
@@ -198,59 +197,55 @@ mod tests {
         let message = b"hello";
         let rng = &mut thread_rng();
 
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let sk1 = PrivateKey::generate(rng);
         let sk2 = PrivateKey::generate(rng);
 
-        let sig1 = sk1.sign(&message[..], &[], &try_and_increment).unwrap();
-        let sig2 = sk2.sign(&message[..], &[], &try_and_increment).unwrap();
+        let sig1 = sk1.sign(&message[..], &[], try_and_increment).unwrap();
+        let sig2 = sk2.sign(&message[..], &[], try_and_increment).unwrap();
         let sigs = &[sig1, sig2];
 
         let apk = PublicKeyCache::aggregate(&[sk1.to_public(), sk2.to_public()]);
         let asig = Signature::aggregate(sigs);
-        apk.verify(&message[..], &[], &asig, &try_and_increment)
+        apk.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
-        apk.verify(&message[..], &[], &sigs[0], &try_and_increment)
+        apk.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap_err();
         sk1.to_public()
-            .verify(&message[..], &[], &asig, &try_and_increment)
+            .verify(&message[..], &[], &asig, try_and_increment)
             .unwrap_err();
         let message2 = b"goodbye";
-        apk.verify(&message2[..], &[], &asig, &try_and_increment)
+        apk.verify(&message2[..], &[], &asig, try_and_increment)
             .unwrap_err();
 
         let apk2 = PublicKeyCache::aggregate(&[sk1.to_public()]);
-        apk2.verify(&message[..], &[], &asig, &try_and_increment)
+        apk2.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap_err();
-        apk2.verify(&message[..], &[], &sigs[0], &try_and_increment)
+        apk2.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap();
 
         let apk3 = PublicKeyCache::aggregate(&[sk2.to_public(), sk1.to_public()]);
-        apk3.verify(&message[..], &[], &asig, &try_and_increment)
+        apk3.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
-        apk3.verify(&message[..], &[], &sigs[0], &try_and_increment)
+        apk3.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap_err();
 
         let apk4 = PublicKey::aggregate(&[sk1.to_public(), sk2.to_public()]);
-        apk4.verify(&message[..], &[], &asig, &try_and_increment)
+        apk4.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
-        apk4.verify(&message[..], &[], &sigs[0], &try_and_increment)
+        apk4.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap_err();
     }
 
     #[test]
     fn test_batch_verify() {
-        let direct_hasher = DirectHasher::new().unwrap();
-        let composite_hasher = CompositeHasher::new().unwrap();
-
-        test_batch_verify_with_hasher(direct_hasher, false);
-        test_batch_verify_with_hasher(composite_hasher, true);
+        test_batch_verify_with_hasher(&DirectHasher, false);
+        test_batch_verify_with_hasher(&*COMPOSITE_HASHER, true);
     }
 
-    fn test_batch_verify_with_hasher<X: XOF>(hasher: X, is_composite: bool) {
+    fn test_batch_verify_with_hasher<X: XOF<Error = BLSError>>(hasher: &X, is_composite: bool) {
         let rng = &mut thread_rng();
-        let try_and_increment = TryAndIncrement::new(&hasher);
+        let try_and_increment = TryAndIncrement::<_, Parameters>::new(hasher);
         let num_epochs = 10;
         let num_validators = 7;
 

@@ -8,7 +8,7 @@ use algebra::{
     ProjectiveCurve,
 };
 
-use bls_crypto::curve::cofactor::{scale_by_cofactor_fuentes, scale_by_cofactor_scott};
+use bls_crypto::hash_to_curve::cofactor::{scale_by_cofactor_fuentes, scale_by_cofactor_scott};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

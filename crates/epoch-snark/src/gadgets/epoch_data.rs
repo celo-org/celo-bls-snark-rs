@@ -3,19 +3,16 @@ use algebra::{
     sw6::Fr,
     One, PairingEngine,
 };
+use bls_gadgets::{is_setup, HashToGroupGadget};
 use r1cs_core::{ConstraintSystem, SynthesisError};
-use r1cs_std::prelude::*;
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget},
     fields::fp::FpGadget,
+    prelude::*,
     Assignment,
 };
 
-use bls_crypto::{
-    bls::SIG_DOMAIN, curve::hash::try_and_increment::TryAndIncrement,
-    hash::composite::CompositeHasher,
-};
-use bls_gadgets::{is_setup, HashToGroupGadget};
+use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
 use super::{fr_to_bits, g2_to_bits, to_fr};
 use tracing::{span, trace, Level};
@@ -164,14 +161,13 @@ impl EpochData<Bls12_377> {
             0
         } else {
             // find the counter value for the hash
-            let composite_hasher = CompositeHasher::new().unwrap();
-            let try_and_increment = TryAndIncrement::new(&composite_hasher);
             let input_bytes = input_bytes_var
                 .iter()
                 .map(|b| b.get_value().get())
                 .collect::<Result<Vec<_>, _>>()?;
-            let (_, counter) = try_and_increment
-                .hash_with_attempt::<Parameters>(SIG_DOMAIN, &input_bytes, &[])
+
+            let (_, counter) = COMPOSITE_HASH_TO_G1
+                .hash_with_attempt(SIG_DOMAIN, &input_bytes, &[])
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
             counter
         };
@@ -234,10 +230,8 @@ mod tests {
         let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bytes()
             .unwrap();
-        let composite_hasher = CompositeHasher::new().unwrap();
-        let try_and_increment = TryAndIncrement::new(&composite_hasher);
-        let (hash, _) = try_and_increment
-            .hash_with_attempt::<Parameters>(SIG_DOMAIN, &epoch_bytes, &[])
+        let (hash, _) = COMPOSITE_HASH_TO_G1
+            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes

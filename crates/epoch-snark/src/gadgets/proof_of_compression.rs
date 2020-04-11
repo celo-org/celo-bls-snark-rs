@@ -20,13 +20,12 @@ use crypto_primitives::{
     prf::blake2s::{constraints::blake2s_gadget_with_parameters, Blake2sWithParameterBlock},
 };
 
-pub static OUT_DOMAIN: &[u8] = b"ULforout";
-
 use r1cs_std::fields::fp::FpGadget;
 type FrGadget = FpGadget<Fr>;
 
 use super::epochs::HashToBitsHelper;
 use crate::gadgets::{HashToBits, MultipackGadget};
+use bls_crypto::OUT_DOMAIN;
 
 /// Parameters for compressing the public inputs of the R1CS system
 pub struct ProofOfCompression {

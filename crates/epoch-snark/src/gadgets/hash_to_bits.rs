@@ -3,11 +3,12 @@ use algebra::{
     FpParameters,
 };
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
+use tracing::{debug, info, span, trace, Level};
+
+use bls_crypto::SIG_DOMAIN;
+use bls_gadgets::hash_to_bits;
 
 use super::{constrain_bool, MultipackGadget};
-use bls_crypto::bls::SIG_DOMAIN;
-use bls_gadgets::hash_to_bits;
-use tracing::{debug, info, span, trace, Level};
 
 #[derive(Clone)]
 /// Gadget which
@@ -87,7 +88,7 @@ mod tests {
     use super::*;
     use crate::gadgets::pack;
     use algebra::{sw6::FrParameters as SW6FrParameters, Bls12_377};
-    use bls_crypto::hash::XOF;
+    use bls_crypto::hashers::{DirectHasher, XOF};
     use bls_gadgets::{bits_to_bytes, bytes_to_bits};
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
@@ -99,8 +100,7 @@ mod tests {
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
         let message = bits_to_bytes(&message);
-        let hasher = bls_crypto::DirectHasher::new().unwrap();
-        let hash_result = hasher.xof(&personalization, &message, 64).unwrap();
+        let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
         let mut bits = bytes_to_bits(&hash_result, 512);
         bits.reverse();
         bits

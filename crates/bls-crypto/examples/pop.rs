@@ -1,4 +1,4 @@
-use bls_crypto::{DirectHasher, PrivateKey, TryAndIncrement};
+use bls_crypto::{hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1, PrivateKey};
 
 use algebra::bytes::{FromBytes, ToBytes};
 
@@ -20,23 +20,16 @@ fn main() {
 
     let key_bytes = hex::decode(key).unwrap();
 
-    let direct_hasher = DirectHasher::new().unwrap();
-    let try_and_increment = TryAndIncrement::new(&direct_hasher);
+    let try_and_increment = &*DIRECT_HASH_TO_G1;
     let sk = PrivateKey::read(key_bytes.as_slice()).unwrap();
     let pk = sk.to_public();
     let mut pk_bytes = vec![];
     pk.write(&mut pk_bytes).unwrap();
-    let pop = sk.sign_pop(&pk_bytes, &try_and_increment).unwrap();
+    let pop = sk.sign_pop(&pk_bytes, try_and_increment).unwrap();
     let mut pop_bytes = vec![];
     pop.write(&mut pop_bytes).unwrap();
 
-    /*
-    let mut pk_bytes = vec![];
-    pk.write(&mut pk_bytes).unwrap();
-    println!("{}", hex::encode(&pk_bytes));
-    */
-
-    pk.verify_pop(&pk_bytes, &pop, &try_and_increment).unwrap();
+    pk.verify_pop(&pk_bytes, &pop, try_and_increment).unwrap();
 
     let pop_hex = hex::encode(&pop_bytes);
     println!("{}", pop_hex);
