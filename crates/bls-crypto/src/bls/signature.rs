@@ -368,12 +368,21 @@ mod tests {
             let mut sig_bytes = vec![];
             sig.write(&mut sig_bytes).unwrap();
             let mut sig_bytes2 = vec![];
-            sig.as_ref().into_affine().serialize(&mut sig_bytes2).unwrap();
+            sig.as_ref()
+                .into_affine()
+                .serialize(&mut sig_bytes2)
+                .unwrap();
             let sig2 = Signature::read(sig_bytes.as_slice()).unwrap();
             assert_eq!(sig.as_ref().into_affine().x, sig2.as_ref().into_affine().x);
             assert_eq!(sig.as_ref().into_affine().y, sig2.as_ref().into_affine().y);
-            assert_eq!(sig2.eq(&Signature::read(sig_bytes.as_slice()).unwrap()), true);
-            assert_eq!(sig2.eq(&Signature::read(sig_bytes2.as_slice()).unwrap()), true);
+            assert_eq!(
+                sig2.eq(&Signature::read(sig_bytes.as_slice()).unwrap()),
+                true
+            );
+            assert_eq!(
+                sig2.eq(&Signature::read(sig_bytes2.as_slice()).unwrap()),
+                true
+            );
             assert_eq!(sig_bytes, sig_bytes2);
         }
     }

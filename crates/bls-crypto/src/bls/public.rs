@@ -238,7 +238,10 @@ mod test {
             assert_eq!(pk.as_ref().into_affine().x, pk2.as_ref().into_affine().x);
             assert_eq!(pk.as_ref().into_affine().y, pk2.as_ref().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
-            assert_eq!(pk2.eq(&PublicKey::read(pk_bytes2.as_slice()).unwrap()), true);
+            assert_eq!(
+                pk2.eq(&PublicKey::read(pk_bytes2.as_slice()).unwrap()),
+                true
+            );
             assert_eq!(pk_bytes, pk_bytes2);
         }
     }
