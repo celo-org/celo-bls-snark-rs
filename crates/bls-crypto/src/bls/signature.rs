@@ -351,4 +351,30 @@ mod tests {
 
         assert!(res.is_ok());
     }
+
+    #[test]
+    fn to_bytes_canonical_serialize_same() {
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+        let rng = &mut thread_rng();
+        for _ in 0..100 {
+            let message = b"hello";
+            let sk = PrivateKey::generate(rng);
+            let sig = sk.sign(&message[..], &[], try_and_increment).unwrap();
+
+            let mut sig_bytes = vec![];
+            sig.write(&mut sig_bytes).unwrap();
+
+            let mut sig_bytes2 = vec![];
+            sig.serialize(&mut sig_bytes2).unwrap();
+
+            // both methods have the same ersult
+            assert_eq!(sig_bytes, sig_bytes2);
+
+            let de_sig1 = Signature::read(&sig_bytes[..]).unwrap();
+            let de_sig2 = Signature::deserialize(&mut &sig_bytes[..]).unwrap();
+
+            // both deserialization methods have the same result
+            assert_eq!(de_sig1, de_sig2);
+        }
+    }
 }
