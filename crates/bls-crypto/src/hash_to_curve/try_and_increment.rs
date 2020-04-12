@@ -15,7 +15,7 @@ use algebra::{
     bls12_377::Parameters,
     curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
     curves::models::{bls12::Bls12Parameters, SWModelParameters},
-    Zero,
+    AffineCurve, Zero,
 };
 
 use algebra::ConstantSerializedSize;
