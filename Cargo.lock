@@ -21,9 +21,9 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
 ]
 
 [[package]]
@@ -42,9 +42,9 @@ dependencies = [
 [[package]]
 name = "algebra-core"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core-derive 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core-derive 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "derivative",
  "num-traits",
  "rand",
@@ -65,7 +65,7 @@ dependencies = [
 [[package]]
 name = "algebra-core-derive"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -124,7 +124,7 @@ source = "git+https://github.com/celo-org/zexe#e1db7c5fede8ba5a0f5b3958692de44da
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
  "colored",
 ]
@@ -163,7 +163,7 @@ name = "bls-crypto"
 version = "0.1.0"
 dependencies = [
  "algebra",
- "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "blake2s_simd",
  "byteorder",
  "clap",
@@ -189,7 +189,7 @@ dependencies = [
  "bls-crypto",
  "crypto-primitives",
  "groth16 0.1.0 (git+https://github.com/celo-org/zexe)",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "r1cs-std",
  "rand",
  "rand_xorshift",
@@ -405,17 +405,17 @@ dependencies = [
 [[package]]
 name = "crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "blake2",
  "derivative",
  "digest",
- "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "gm17",
- "groth16 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "groth16 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "r1cs-std",
  "rand",
  "rayon",
@@ -487,16 +487,16 @@ name = "epoch-snark"
 version = "0.1.0"
 dependencies = [
  "algebra",
- "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
  "byteorder",
  "crypto-primitives",
- "groth16 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "groth16 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "hex",
  "log",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "r1cs-std",
  "rand",
  "rand_xorshift",
@@ -518,9 +518,9 @@ dependencies = [
 [[package]]
 name = "ff-fft"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "rand",
  "rayon",
 ]
@@ -554,12 +554,12 @@ dependencies = [
 [[package]]
 name = "gm17"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "rand",
  "rayon",
  "smallvec",
@@ -581,12 +581,12 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "bench-utils 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "ff-fft 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "rand",
  "rayon",
 ]
@@ -807,20 +807,20 @@ dependencies = [
 [[package]]
 name = "r1cs-core"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
- "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "algebra-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
  "smallvec",
 ]
 
 [[package]]
 name = "r1cs-std"
 version = "0.1.0"
-source = "git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff#3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"
+source = "git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8#e2184027312fe10f7e7ca638fd4076cdfa16d3b8"
 dependencies = [
  "algebra",
  "derivative",
- "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff)",
+ "r1cs-core 0.1.0 (git+https://github.com/celo-org/zexe?rev=e2184027312fe10f7e7ca638fd4076cdfa16d3b8)",
 ]
 
 [[package]]

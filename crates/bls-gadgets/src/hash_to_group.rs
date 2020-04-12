@@ -14,8 +14,10 @@ use algebra::{
 };
 use algebra::{
     curves::{
-        bls12::G1Projective, models::bls12::Bls12Parameters,
-        short_weierstrass_jacobian::{GroupAffine, GroupProjective}, SWModelParameters,
+        bls12::G1Projective,
+        models::bls12::Bls12Parameters,
+        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
+        SWModelParameters,
     },
     AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
 };
