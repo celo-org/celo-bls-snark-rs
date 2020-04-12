@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
 ]
@@ -29,7 +29,7 @@ dependencies = [
 [[package]]
 name = "algebra-core"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core-derive",
  "derivative",
@@ -42,7 +42,7 @@ dependencies = [
 [[package]]
 name = "algebra-core-derive"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "proc-macro2 1.0.9",
  "quote 1.0.3",
@@ -96,12 +96,7 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
-
-[[package]]
-name = "bench-utils"
-version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#a0592b066c29032d97f65f0b25cc374e9904b248"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "colored",
 ]
@@ -140,7 +135,7 @@ name = "bls-crypto"
 version = "0.1.0"
 dependencies = [
  "algebra",
- "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils",
  "blake2s_simd",
  "byteorder",
  "clap",
@@ -391,10 +386,10 @@ dependencies = [
 [[package]]
 name = "crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
- "bench-utils 0.1.0 (git+https://github.com/gakonst/zexe?branch=field-from-random-bytes)",
+ "bench-utils",
  "blake2",
  "derivative",
  "digest",
@@ -473,7 +468,7 @@ name = "epoch-snark"
 version = "0.1.0"
 dependencies = [
  "algebra",
- "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
@@ -494,7 +489,7 @@ dependencies = [
 [[package]]
 name = "ff-fft"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
  "rand",
@@ -530,10 +525,10 @@ dependencies = [
 [[package]]
 name = "gm17"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
- "bench-utils 0.1.0 (git+https://github.com/gakonst/zexe?branch=field-from-random-bytes)",
+ "bench-utils",
  "ff-fft",
  "r1cs-core",
  "rand",
@@ -544,10 +539,10 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
- "bench-utils 0.1.0 (git+https://github.com/gakonst/zexe?branch=field-from-random-bytes)",
+ "bench-utils",
  "ff-fft",
  "r1cs-core",
  "rand",
@@ -766,7 +761,7 @@ dependencies = [
 [[package]]
 name = "r1cs-core"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra-core",
  "smallvec",
@@ -775,7 +770,7 @@ dependencies = [
 [[package]]
 name = "r1cs-std"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/zexe?branch=field-from-random-bytes#25a15de8be551c5ed1d9f72aa15b27f560a4dc57"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/fix_from_random_bytes#21c33f1119b5f04679bed5f0a8f981518a4517c1"
 dependencies = [
  "algebra",
  "derivative",

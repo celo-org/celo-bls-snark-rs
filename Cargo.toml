@@ -31,10 +31,11 @@ debug-assertions = true
 debug = true
 
 [patch."https://github.com/scipr-lab/zexe"]
-algebra = { version = "0.1.0", package = "algebra", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" }
-ff-fft = { package = "ff-fft", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" }
-groth16 = { package = "groth16", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" }
-r1cs-core = { package = "r1cs-core", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" } 
-r1cs-std = { package = "r1cs-std", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" } 
-gm17 = { package = "gm17", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" } 
-crypto-primitives = { package = "crypto-primitives", git = "https://github.com/gakonst/zexe", branch = "field-from-random-bytes" }  
+algebra = { version = "0.1.0", package = "algebra", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" }
+ff-fft = { package = "ff-fft", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" }
+groth16 = { package = "groth16", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" }
+r1cs-core = { package = "r1cs-core", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" } 
+r1cs-std = { package = "r1cs-std", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" } 
+gm17 = { package = "gm17", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" } 
+crypto-primitives = { package = "crypto-primitives", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" }  
+bench-utils = { package = "bench-utils", git = "https://github.com/celo-org/zexe", branch = "kobigurk/fix_from_random_bytes" }  
