@@ -5,9 +5,9 @@ authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org
 edition = "2018"
 
 [dependencies]
-algebra = { git = "https://github.com/scipr-lab/zexe", features = ["derive", "bls12_377", "edwards_sw6", "parallel"] }
-crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
-bench-utils = { git = "https://github.com/scipr-lab/zexe" }
+algebra = { git = "https://github.com/celo-org/zexe", features = ["derive", "bls12_377", "edwards_sw6", "parallel"], rev = "3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff" }
+crypto-primitives = { git = "https://github.com/celo-org/zexe", features = ["parallel"], rev = "3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff"  }
+bench-utils = { git = "https://github.com/celo-org/zexe", rev = "3ec3bcca4a9b2bb25022b1dac7997b639c8fa3ff" }
 
 # other deps
 rand = { version = "0.7" }

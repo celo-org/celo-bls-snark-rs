@@ -15,18 +15,14 @@ use algebra::{
     bls12_377::Parameters,
     curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
     curves::models::{bls12::Bls12Parameters, SWModelParameters},
-    fields::{Field, SquareRootField},
     Zero,
 };
 
-use algebra::CanonicalDeserialize;
 use algebra::ConstantSerializedSize;
 
 use once_cell::sync::Lazy;
 
 const NUM_TRIES: u8 = 255;
-const LAST_BYTE_MASK: u8 = 1;
-const GREATEST_MASK: u8 = 2;
 
 /// Composite Try-and-Increment hasher for BLS 12-377.
 pub static COMPOSITE_HASH_TO_G1: Lazy<
@@ -91,9 +87,6 @@ where
         extra_data: &[u8],
     ) -> Result<(GroupProjective<P>, usize), BLSError> {
         let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
-        // TODO: How can we properly find the extension?
-        const BASE_SIZE: usize = 48;
-        let extension_degree = num_bytes / BASE_SIZE;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
 
@@ -105,22 +98,9 @@ where
             let msg = &[&counter, extra_data, &message].concat();
 
             // produce a hash with sufficient length
-            let mut candidate_hash = self.hasher.hash(domain, msg, hash_bytes)?;
+            let candidate_hash = self.hasher.hash(domain, msg, hash_bytes)?;
 
-            // get the greatest flag by comparing the last bit with the greatest mask
-            let greatest = (candidate_hash[num_bytes - 1] & GREATEST_MASK) == GREATEST_MASK;
-
-            for i in 0..extension_degree {
-                // apply the mask to the last byte of each chunk
-                candidate_hash[(i + 1) * BASE_SIZE - 1] &= LAST_BYTE_MASK;
-            }
-
-            let possible_x = P::BaseField::deserialize(&mut &candidate_hash[..num_bytes])?;
-            if possible_x == P::BaseField::zero() {
-                continue;
-            }
-
-            if let Some(x) = get_point_from_x::<P>(possible_x, greatest) {
+            if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
                     "succeeded hashing \"{}\" to curve in {} tries",
                     hex::encode(message),
@@ -128,7 +108,7 @@ where
                 );
                 end_timer!(hash_loop_time);
 
-                let scaled = x.scale_by_cofactor();
+                let scaled = p.scale_by_cofactor();
                 if scaled.is_zero() {
                     continue;
                 }
@@ -138,22 +118,6 @@ where
         }
         Err(BLSError::HashToCurveError)
     }
-}
-
-/// computes y = sqrt(x^3+ax+b) and returns the corresponding group element
-pub fn get_point_from_x<P: SWModelParameters>(
-    x: P::BaseField,
-    greatest: bool,
-) -> Option<GroupAffine<P>> {
-    // Compute x^3 + ax + b
-    let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
-
-    x3b.sqrt().map(|y| {
-        let negy = -y;
-
-        let y = if (y < negy) ^ greatest { y } else { negy };
-        GroupAffine::<P>::new(x, y, false)
-    })
 }
 
 /// Given `n` bytes, it returns the value rounded to the nearest multiple of 256 bits (in bytes)
@@ -266,16 +230,16 @@ mod test {
         ]);
 
         let expected_hashes = vec![
-"9408ca1cd5db427e40c4ef1e77f595b030671d810b02ef602e7af09318c93d2bd3a7e8334fb70a6e1b5eb209c63ba2018bd22d93e0c3bd8041f85f3811a4a718c5945b6d9914d87099e1ba0eb1664fd4a8e0d2889001cd3afc5f97c63d771081",
-"ffb0b3275d2188bee71e0f626b2bc422ee4ce23692e6d329e085ec74413410cedd354d9571e9de149a286dc48ba83d012ad171f4280acbc3c3d946086fe2a0c9f56d271f0c9bb13e78774cb6244b2e84c24116d8ff76311cf2f76db741ab7200",
-"c836983c83ecf46143e91b5fcb93fafc35b21caeb12bafbd18023e8f95d6569cd793c35393c57c07632a0e89b36c7201fa93ee26e06f7919c38ae32a82d5000e207f523c2795bd58dd9d6afe1e826b07391b45ee6cdf2db09e88d10793eb0501",
-"5a1610b23a5a5be0ee255fcc766d0f6d384b3d51b4364d5587102e8905b7233fd5b274973451cb56ca69a945832c1000d0b2744278ffdf5cd33f11bcc4ecc5759b0d5b90f54d454909d73f49c1226e428acfb25995d83ba44826adb8158f1201",
-"d82143317b1a5b90e633a4a208129edd526f9137b9c47221c827aa6317be94cb1bc006ba8afce455be5bf51ee6f184011c535bee7ab3e954731a6a96edb3ea9a6c1d02916817147355a2406757023e27fb2f58fec61f37ddb6125c797bfa5700",
-"48bfa38e3c4a6a7de2a5c4b8c57671c7b1bfb2c225d89786cbcd065b2b7844b910b5cbfc334eff1956bc7245127d970154c38985b770d11994c20072a053f0f720028615753c9c42372580782dd49653b4c0fee2a8e88de1697678a505ffc980",
-"ddc0e29af05439bcb5157802afd9a112394fb190e0dda7b5c7852693da3b3403c911751c24b28af1d05e76326d1117007f14cc765d5c3e73adbbcf7a1d59cf58186d7b576d3e58ccafd2ea527bf31651f4b0d0ba44ee5b54ec6c86c2e1bf1b81",
-"ddc865ffe876a3e19c1401f784eaf88b50c4f04cfaadf7690173a33385cb5af899189478cdbc1abbe8d8a89768e411003a5000c7866f3a5648d7944e97bcbff87f89cd26045dc15494036ce4ce799de532438576bfe32389269a6e3a4ce98201",
-"7e5f5d4caa7b323a494088b2220abd9cb729f2c309d53ec05de505132db1c50f484a77421070afe418fda810fe823901cb080bfaa9e15e885e023f6d5811e75db1d940004fc1167ae3fe464b3b6ffbdeaace63cefb8dc6a076da317b9828e180",
-"8e6ca6820f207fe8f08a66becd20ff3c0dd4d2a004816c8b6b10106bedeee69c73cb72b4888d98eb60e342abbcf60101315abf555032b5f61a5192af70aabea0f2cdec89fa3769fd711c45e5983a5092a29ad8bf74b3211b451af6ef776d5581",
+            "9c76f364d39ce5747f475088f459a11cb32d39033245c039104dfe88a71047ea078d6f15ed9fc64539410167ffe1800020ec8138f9f8b03c675f4ff33d621c76f41784bf994aa8cf53b2e11961f4c77caaab6681dc29bb2f90e14ecd05a5f580",
+            "ffb0b3275d2188bee71e0f626b2bc422ee4ce23692e6d329e085ec74413410cedd354d9571e9de149a286dc48ba83d012ad171f4280acbc3c3d946086fe2a0c9f56d271f0c9bb13e78774cb6244b2e84c24116d8ff76311cf2f76db741ab7200",
+            "59af04e977ac914d077d1488639b90dfb5b723bf8516157b9ebc8b584a0f507f20c3b758284fe3c91bc93df86244a9017e06d3f930163642a3c85965aac19ea8a18b0bd08d7bd44e99e343acfe24f98ff6f2401432187a07dd97320f73fa7300",
+            "5a1610b23a5a5be0ee255fcc766d0f6d384b3d51b4364d5587102e8905b7233fd5b274973451cb56ca69a945832c1000d0b2744278ffdf5cd33f11bcc4ecc5759b0d5b90f54d454909d73f49c1226e428acfb25995d83ba44826adb8158f1201",
+            "d82143317b1a5b90e633a4a208129edd526f9137b9c47221c827aa6317be94cb1bc006ba8afce455be5bf51ee6f184011c535bee7ab3e954731a6a96edb3ea9a6c1d02916817147355a2406757023e27fb2f58fec61f37ddb6125c797bfa5700",
+            "48bfa38e3c4a6a7de2a5c4b8c57671c7b1bfb2c225d89786cbcd065b2b7844b910b5cbfc334eff1956bc7245127d970154c38985b770d11994c20072a053f0f720028615753c9c42372580782dd49653b4c0fee2a8e88de1697678a505ffc980",
+            "ddc0e29af05439bcb5157802afd9a112394fb190e0dda7b5c7852693da3b3403c911751c24b28af1d05e76326d1117007f14cc765d5c3e73adbbcf7a1d59cf58186d7b576d3e58ccafd2ea527bf31651f4b0d0ba44ee5b54ec6c86c2e1bf1b81",
+            "ddc865ffe876a3e19c1401f784eaf88b50c4f04cfaadf7690173a33385cb5af899189478cdbc1abbe8d8a89768e411003a5000c7866f3a5648d7944e97bcbff87f89cd26045dc15494036ce4ce799de532438576bfe32389269a6e3a4ce98201",
+            "8de37ce0a7105c14880d9201f2ac1c724e031904f9c88614fa414ad57f00c89e596fadb4f5151c84f4ea04d576931c008fc43faec79d0e300d2192a8e376b25f920f14f467f050e4f2869012fce196e9af5f2041889031e2bbe81c6b3d344480",
+            "10341299c41179084a0bfee8b65bac0f48af827daad4f01d3e9925a3b0335736c5d13f44765fecec45941781da5a1000d0bb26a4faa4dc8060b0b2dd0cb6acce7dd10bd081dac7f263b97aec89d6434a55b31a65b3e25f59c40ea92887b03180",
         ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
         let hasher_g2 = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G2Parameters>::new(
             &*COMPOSITE_HASHER,

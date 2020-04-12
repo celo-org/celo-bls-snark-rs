@@ -1,6 +1,5 @@
 use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
 use bls_crypto::{
-    hash_to_curve::try_and_increment::get_point_from_x,
     hashers::{
         composite::{CompositeHasher, CRH},
         DirectHasher, XOF,
@@ -16,7 +15,7 @@ use algebra::{
 use algebra::{
     curves::{
         bls12::G1Projective, models::bls12::Bls12Parameters,
-        short_weierstrass_jacobian::GroupProjective, SWModelParameters,
+        short_weierstrass_jacobian::{GroupAffine, GroupProjective}, SWModelParameters,
     },
     AffineCurve, BigInteger, BitIterator, One, PrimeField, ProjectiveCurve,
 };
@@ -254,7 +253,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                let p = get_point_from_x::<P::G1Parameters>(x, greatest)
+                let p = GroupAffine::<P::G1Parameters>::get_point_from_x(x, greatest)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
