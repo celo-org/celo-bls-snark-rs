@@ -228,6 +228,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
+        let xof_bits = [&xof_bits[..377], &[xof_bits[383]]].concat();
+
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             G1Gadget::<P>::alloc(cs.ns(|| "expected point before cofactor"), || {
