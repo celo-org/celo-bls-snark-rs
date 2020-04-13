@@ -188,6 +188,7 @@ mod tests {
 
     use algebra::{
         bls12_377::{G2Projective, Parameters},
+        curves::bls12::Bls12Parameters,
         UniformRand,
     };
     use rand::{thread_rng, Rng};
@@ -245,7 +246,8 @@ mod tests {
 
     fn test_batch_verify_with_hasher<X: XOF<Error = BLSError>>(hasher: &X, is_composite: bool) {
         let rng = &mut thread_rng();
-        let try_and_increment = TryAndIncrement::<_, Parameters>::new(hasher);
+        let try_and_increment =
+            TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(hasher);
         let num_epochs = 10;
         let num_validators = 7;
 
