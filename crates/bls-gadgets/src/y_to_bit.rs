@@ -1,6 +1,6 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 
-use algebra::{Field, curves::bls12::Bls12Parameters, Zero, One, PrimeField};
+use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
 use r1cs_core::SynthesisError;
 use r1cs_std::{
     alloc::AllocGadget,
@@ -96,7 +96,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         {
             let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
             let lhs = pk.y.c1.add_constant(cs.ns(|| "c1 - half"), &half_neg)?;
-            let inv = FpGadget::alloc(cs.ns( || "alloc (c1 - half) inv" ), || {
+            let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - half) inv"), || {
                 if lhs.get_value().is_some() {
                     Ok(lhs.get_value().get()?.inverse().unwrap_or(P::Fp::zero()))
                 } else {
@@ -208,13 +208,13 @@ mod test {
     use algebra::{
         bls12_377::{
             Fr as Bls12_377Fr, G1Projective as Bls12_377G1Projective,
-            G2Affine as Bls12_377G2Affine, G2Projective as Bls12_377G2Projective, Parameters as Bls12_377Parameters,
+            G2Affine as Bls12_377G2Affine, G2Projective as Bls12_377G2Projective,
+            Parameters as Bls12_377Parameters,
         },
         curves::bls12::Bls12Parameters,
-        sw6::Fr as SW6Fr,
-        PrimeField, ProjectiveCurve, UniformRand,
         fields::Fp2,
-        AffineCurve,
+        sw6::Fr as SW6Fr,
+        AffineCurve, PrimeField, ProjectiveCurve, UniformRand,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
@@ -317,7 +317,10 @@ mod test {
             let generator = Bls12_377G2Projective::prime_subgroup_generator();
             let pub_key = generator.clone().mul(secret_key).into_affine();
             let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(pub_key.y.c0, half.into());
+            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
+                pub_key.y.c0,
+                half.into(),
+            );
             let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
             let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
