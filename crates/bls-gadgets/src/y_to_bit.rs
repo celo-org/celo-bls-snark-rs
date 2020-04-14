@@ -1,6 +1,6 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 
-use algebra::{curves::bls12::Bls12Parameters, One, PrimeField};
+use algebra::{Field, curves::bls12::Bls12Parameters, Zero, One, PrimeField};
 use r1cs_core::SynthesisError;
 use r1cs_std::{
     alloc::AllocGadget,
@@ -83,6 +83,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 Err(SynthesisError::AssignmentMissing)
             }
         })?;
+
         let y_eq_bit = Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
             if pk.y.c1.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -91,6 +92,31 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 Err(SynthesisError::AssignmentMissing)
             }
         })?;
+
+        {
+            let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
+            let lhs = pk.y.c1.add_constant(cs.ns(|| "c1 - half"), &half_neg)?;
+            let inv = FpGadget::alloc(cs.ns( || "alloc (c1 - half) inv" ), || {
+                if lhs.get_value().is_some() {
+                    Ok(lhs.get_value().get()?.inverse().unwrap_or(P::Fp::zero()))
+                } else {
+                    Err(SynthesisError::AssignmentMissing)
+                }
+            })?;
+            cs.enforce(
+                || "enforce y_eq_bit",
+                |lc| lhs.get_variable() + lc,
+                |lc| inv.get_variable() + lc,
+                |lc| lc + (P::Fp::one(), CS::one()) + y_eq_bit.lc(CS::one(), P::Fp::one().neg()),
+            );
+            cs.enforce(
+                || "enforce y_eq_bit 2",
+                |lc| lhs.get_variable() + lc,
+                |_| y_eq_bit.lc(CS::one(), P::Fp::one()),
+                |lc| lc,
+            );
+        }
+
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
             if pk.y.c1.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
