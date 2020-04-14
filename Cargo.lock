@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
 ]
@@ -29,7 +29,7 @@ dependencies = [
 [[package]]
 name = "algebra-core"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core-derive",
  "derivative",
@@ -42,7 +42,7 @@ dependencies = [
 [[package]]
 name = "algebra-core-derive"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "proc-macro2 1.0.9",
  "quote 1.0.3",
@@ -96,7 +96,7 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "colored",
 ]
@@ -386,7 +386,7 @@ dependencies = [
 [[package]]
 name = "crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -489,7 +489,7 @@ dependencies = [
 [[package]]
 name = "ff-fft"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
  "rand",
@@ -525,7 +525,7 @@ dependencies = [
 [[package]]
 name = "gm17"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -539,7 +539,7 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -761,7 +761,7 @@ dependencies = [
 [[package]]
 name = "r1cs-core"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra-core",
  "smallvec",
@@ -770,7 +770,7 @@ dependencies = [
 [[package]]
 name = "r1cs-std"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#9d267f65733b9684ad6da9af31b945515f1a9474"
+source = "git+https://github.com/celo-org/zexe?branch=kobigurk/alloc_constant#e3f7089cc4c3c23d68ad07f4f4f94911e015bd0b"
 dependencies = [
  "algebra",
  "derivative",

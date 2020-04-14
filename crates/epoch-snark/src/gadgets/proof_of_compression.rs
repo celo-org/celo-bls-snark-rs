@@ -117,9 +117,9 @@ impl ProofOfCompression {
         })?;
 
         // Allocate the VK
-        let verifying_key = VerifyingKeyGadget::<_, _, PairingGadget>::alloc(
+        let verifying_key = VerifyingKeyGadget::<_, _, PairingGadget>::alloc_constant(
             cs.ns(|| "allocate verifying key"),
-            || Ok(helper.verifying_key.clone()),
+            helper.verifying_key.clone(),
         )?;
 
         // The public inputs are the CRH and XOF bits split in `Fr::CAPACITY` chunks
