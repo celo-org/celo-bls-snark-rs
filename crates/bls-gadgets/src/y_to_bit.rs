@@ -98,7 +98,11 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             let lhs = pk.y.c1.add_constant(cs.ns(|| "c1 - half"), &half_neg)?;
             let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - half) inv"), || {
                 if lhs.get_value().is_some() {
-                    Ok(lhs.get_value().get()?.inverse().unwrap_or(P::Fp::zero()))
+                    Ok(lhs
+                        .get_value()
+                        .get()?
+                        .inverse()
+                        .unwrap_or_else(|| P::Fp::zero()))
                 } else {
                     Err(SynthesisError::AssignmentMissing)
                 }
