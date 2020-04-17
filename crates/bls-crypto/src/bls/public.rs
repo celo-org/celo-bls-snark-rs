@@ -1,20 +1,17 @@
 use crate::{BLSError, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 use algebra::{
-    bls12_377::{
-        Bls12_377, Fq12, G1Projective, G2Affine,
-        G2Projective,
-    },
+    bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
     bytes::{FromBytes, ToBytes},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine,
-    ProjectiveCurve, SerializationError,Zero,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
+    SerializationError, Zero,
 };
 use std::hash::{Hash, Hasher};
 
 use crate::BlsResult;
 
 use std::{
-    io::{self, Read, Result as IoResult, Write, Cursor},
+    io::{self, Cursor, Read, Result as IoResult, Write},
     ops::Neg,
 };
 
@@ -50,7 +47,8 @@ impl PublicKey {
     }
 
     pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
-        PublicKey::deserialize(&mut Cursor::new(data)).map_err(|_| io::ErrorKind::InvalidInput.into())
+        PublicKey::deserialize(&mut Cursor::new(data))
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -125,7 +123,8 @@ impl Hash for PublicKey {
 impl ToBytes for PublicKey {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.serialize(&mut writer).map_err(|_| io::ErrorKind::InvalidInput.into())
+        self.serialize(&mut writer)
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 }
 
@@ -170,12 +169,12 @@ impl CanonicalDeserialize for PublicKey {
 mod test {
     use super::*;
     use crate::bls::PrivateKey;
-    use rand::thread_rng;
     use algebra::{
-        fields::{Field, PrimeField, SquareRootField},
-        curves::SWModelParameters,
         bls12_377::{g2::Parameters as Bls12_377G2Parameters, Fq, Fq2},
+        curves::SWModelParameters,
+        fields::{Field, PrimeField, SquareRootField},
     };
+    use rand::thread_rng;
     use std::io::{self, Result as IoResult, Write};
 
     #[test]
@@ -241,7 +240,7 @@ mod test {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
             if pk.as_ref().into_affine().y.c1 == Fq::zero() {
-                continue
+                continue;
             }
 
             let mut pk_bytes = vec![];
@@ -267,10 +266,9 @@ mod test {
 
             i += 1;
             if i == 1000 {
-                break
+                break;
             }
         }
-
 
         // check cases where c1 = 0
         for _ in 0..1000 {
