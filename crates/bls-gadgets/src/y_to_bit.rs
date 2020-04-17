@@ -86,32 +86,33 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
 
         let y_eq_bit = Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
             if pk.y.c1.get_value().is_some() {
-                let half = P::Fp::modulus_minus_one_div_two();
-                Ok(pk.y.c1.get_value().get()?.into_repr() == half)
+                Ok(pk.y.c1.get_value().get()?.into_repr() == pk.y.c0.get_value().get()?.into_repr())
             } else {
                 Err(SynthesisError::AssignmentMissing)
             }
         })?;
 
         {
-            let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
-            let lhs = pk.y.c1.add_constant(cs.ns(|| "c1 - half"), &half_neg)?;
-            let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - half) inv"), || {
-                if lhs.get_value().is_some() {
+            let neg_c0 = pk.y.c0.negate(cs.ns(|| "neg c0"))?;
+            let lhs = pk.y.c1.add(cs.ns(|| "lhs"), &neg_c0)?;
+            let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - c0) inv"), || {
+                if pk.y.c1.get_value().is_some() {
                     Ok(lhs.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
                 } else {
                     Err(SynthesisError::AssignmentMissing)
                 }
             })?;
+            // (y * y_inv == 1 - y_eq_bit)
             cs.enforce(
                 || "enforce y_eq_bit",
                 |lc| lhs.get_variable() + lc,
                 |lc| inv.get_variable() + lc,
                 |lc| lc + (P::Fp::one(), CS::one()) + y_eq_bit.lc(CS::one(), P::Fp::one().neg()),
             );
+            // (y*y_eq_bit == 0)
             cs.enforce(
                 || "enforce y_eq_bit 2",
-                |lc| lhs.get_variable() + lc,
+                |lc| pk.y.c1.get_variable() + lc,
                 |_| y_eq_bit.lc(CS::one(), P::Fp::one()),
                 |lc| lc,
             );
@@ -122,7 +123,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 let half = P::Fp::modulus_minus_one_div_two();
                 let y_c1 = pk.y.c1.get_value().get()?.into_repr();
                 let y_c0 = pk.y.c0.get_value().get()?.into_repr();
-                Ok(y_c1 > half || (y_c1 == half && y_c0 > half))
+                Ok(y_c1 > half || (y_c1 == y_c0 && y_c0 > half))
             } else {
                 Err(SynthesisError::AssignmentMissing)
             }
@@ -292,7 +293,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == half
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == pk.y.c0.get_value().get().unwrap().into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -337,7 +338,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == half
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == pk.y.c0.get_value().get().unwrap().into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
