@@ -84,13 +84,15 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             }
         })?;
 
-        let y_eq_bit = Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
-            if pk.y.c1.get_value().is_some() {
-                Ok(pk.y.c1.get_value().get()?.into_repr() == pk.y.c0.get_value().get()?.into_repr())
-            } else {
-                Err(SynthesisError::AssignmentMissing)
-            }
-        })?;
+        let y_eq_bit =
+            Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
+                if pk.y.c1.get_value().is_some() {
+                    Ok(pk.y.c1.get_value().get()?.into_repr()
+                        == pk.y.c0.get_value().get()?.into_repr())
+                } else {
+                    Err(SynthesisError::AssignmentMissing)
+                }
+            })?;
 
         {
             let neg_c0 = pk.y.c0.negate(cs.ns(|| "neg c0"))?;
@@ -293,7 +295,8 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == pk.y.c0.get_value().get().unwrap().into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr()
+                        == pk.y.c0.get_value().get().unwrap().into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -338,7 +341,8 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == pk.y.c0.get_value().get().unwrap().into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr()
+                        == pk.y.c0.get_value().get().unwrap().into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
