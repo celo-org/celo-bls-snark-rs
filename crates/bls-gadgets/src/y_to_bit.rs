@@ -84,15 +84,13 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             }
         })?;
 
-        let y_eq_bit =
-            Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
-                if pk.y.c1.get_value().is_some() {
-                    Ok(pk.y.c1.get_value().get()?.into_repr()
-                        == P::Fp::zero().into_repr())
-                } else {
-                    Err(SynthesisError::AssignmentMissing)
-                }
-            })?;
+        let y_eq_bit = Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
+            if pk.y.c1.get_value().is_some() {
+                Ok(pk.y.c1.get_value().get()?.into_repr() == P::Fp::zero().into_repr())
+            } else {
+                Err(SynthesisError::AssignmentMissing)
+            }
+        })?;
 
         {
             let lhs = pk.y.c1.clone();
