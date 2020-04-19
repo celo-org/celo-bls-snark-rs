@@ -98,23 +98,23 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             let neg_c0 = pk.y.c0.negate(cs.ns(|| "neg c0"))?;
             let lhs = pk.y.c1.add(cs.ns(|| "lhs"), &neg_c0)?;
             let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - c0) inv"), || {
-                if pk.y.c1.get_value().is_some() {
+                if lhs.get_value().is_some() {
                     Ok(lhs.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
                 } else {
                     Err(SynthesisError::AssignmentMissing)
                 }
             })?;
-            // (y * y_inv == 1 - y_eq_bit)
+            // (lhs * lhs_inv == 1 - y_eq_bit)
             cs.enforce(
                 || "enforce y_eq_bit",
                 |lc| lhs.get_variable() + lc,
                 |lc| inv.get_variable() + lc,
                 |lc| lc + (P::Fp::one(), CS::one()) + y_eq_bit.lc(CS::one(), P::Fp::one().neg()),
             );
-            // (y*y_eq_bit == 0)
+            // (lhs*y_eq_bit == 0)
             cs.enforce(
                 || "enforce y_eq_bit 2",
-                |lc| pk.y.c1.get_variable() + lc,
+                |lc| lhs.get_variable() + lc,
                 |_| y_eq_bit.lc(CS::one(), P::Fp::one()),
                 |lc| lc,
             );
