@@ -88,15 +88,14 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
                 if pk.y.c1.get_value().is_some() {
                     Ok(pk.y.c1.get_value().get()?.into_repr()
-                        == pk.y.c0.get_value().get()?.into_repr())
+                        == P::Fp::zero().into_repr())
                 } else {
                     Err(SynthesisError::AssignmentMissing)
                 }
             })?;
 
         {
-            let neg_c0 = pk.y.c0.negate(cs.ns(|| "neg c0"))?;
-            let lhs = pk.y.c1.add(cs.ns(|| "lhs"), &neg_c0)?;
+            let lhs = pk.y.c1.clone();
             let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - c0) inv"), || {
                 if lhs.get_value().is_some() {
                     Ok(lhs.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
