@@ -329,6 +329,14 @@ mod test {
                 assert!(cs.is_satisfied());
             }
         }
+    }
+
+    #[test]
+    fn test_y_to_bit_g2_edges() {
+        let rng = &mut XorShiftRng::from_seed([
+            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+            0x06, 0x54,
+        ]);
 
         // Check points at the edge - c1 == half.
         for i in 0..10 {
@@ -388,10 +396,8 @@ mod test {
             let pub_key = generator.clone().mul(secret_key).into_affine();
             let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
             let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
-            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
-                pub_key.y.c0,
-                zero.into(),
-            );
+            let new_y =
+                Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(pub_key.y.c0, zero);
             let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
             {
@@ -486,7 +492,7 @@ mod test {
             let generator = Bls12_377G2Projective::prime_subgroup_generator();
             let pub_key = generator.clone().mul(secret_key).into_affine();
             let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-            let mut p_minus_one = half.clone();
+            let mut p_minus_one = half;
             p_minus_one.mul2();
             let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
             let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
