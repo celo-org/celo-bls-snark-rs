@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use crate::BlsResult;
 
 use std::{
-    io::{self, Cursor, Read, Result as IoResult, Write},
+    io::{self, Read, Result as IoResult, Write},
     ops::Neg,
 };
 
@@ -47,8 +47,7 @@ impl PublicKey {
     }
 
     pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
-        PublicKey::deserialize(&mut Cursor::new(data))
-            .map_err(|_| io::ErrorKind::InvalidInput.into())
+        PublicKey::deserialize(&mut &data[..]).map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
