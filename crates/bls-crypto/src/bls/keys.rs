@@ -10,14 +10,12 @@ use std::{
 
 use algebra::{
     bls12_377::{
-        g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters,
-        Bls12_377, Fq, Fq12, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective,
+        Bls12_377, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective,
         Parameters as Bls12_377Parameters,
     },
     bytes::{FromBytes, ToBytes},
-    curves::SWModelParameters,
-    AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, SquareRootField,
-    UniformRand, Zero,
+    serialize::{CanonicalDeserialize, CanonicalSerialize},
+    AffineCurve, One, PairingEngine, ProjectiveCurve, UniformRand, Zero,
 };
 use rand::Rng;
 
@@ -157,38 +155,10 @@ impl PublicKey {
     }
 
     pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
-        let mut x_bytes_with_y: Vec<u8> = data.to_owned();
-        let x_bytes_with_y_len = x_bytes_with_y.len();
-        let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
-        x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
-        let x = Fq2::read(x_bytes_with_y.as_slice())?;
-        let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
-            &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
-        );
-        let y = x3b.sqrt().ok_or(io::Error::new(
-            io::ErrorKind::NotFound,
-            "couldn't find square root for x",
-        ))?;
-
-        let y_c0_big = y.c0.into_repr();
-        let y_c1_big = y.c1.into_repr();
-
-        let negy = -y;
-
-        let (bigger, smaller) = {
-            let half = Fq::modulus_minus_one_div_two();
-            if y_c1_big > half {
-                (y, negy)
-            } else if y_c1_big == half && y_c0_big > half {
-                (y, negy)
-            } else {
-                (negy, y)
-            }
-        };
-
-        let chosen_y = if y_over_half { bigger } else { smaller };
-        let pk = G2Affine::new(x, chosen_y, false);
-        Ok(PublicKey::from_pk(pk.into_projective()))
+        let p = G2Affine::deserialize(&mut &data[..])
+            .map_err(|_| io::ErrorKind::InvalidInput)?
+            .into_projective();
+        Ok(PublicKey::from_pk(p))
     }
 
     pub fn verify<H: HashToG1>(
@@ -262,20 +232,9 @@ impl ToBytes for PublicKey {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let affine = self.pk.into_affine();
-        let mut x_bytes: Vec<u8> = vec![];
-        let y_c0_big = affine.y.c0.into_repr();
-        let y_c1_big = affine.y.c1.into_repr();
-        let half = Fq::modulus_minus_one_div_two();
-        affine.x.write(&mut x_bytes)?;
-        let num_x_bytes = x_bytes.len();
-        if y_c1_big > half {
-            x_bytes[num_x_bytes - 1] |= 0x80;
-        } else if y_c1_big == half && y_c0_big > half {
-            x_bytes[num_x_bytes - 1] |= 0x80;
-        }
-        writer.write(&x_bytes)?;
-
-        Ok(())
+        affine
+            .serialize(&mut writer)
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 }
 
@@ -380,39 +339,19 @@ impl ToBytes for Signature {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let affine = self.sig.into_affine();
-        let mut x_bytes: Vec<u8> = vec![];
-        let y_big = affine.y.into_repr();
-        let half = Fq::modulus_minus_one_div_two();
-        affine.x.write(&mut x_bytes)?;
-        if y_big > half {
-            let num_x_bytes = x_bytes.len();
-            x_bytes[num_x_bytes - 1] |= 0x80;
-        }
-        writer.write(&x_bytes)?;
-        Ok(())
+        affine
+            .serialize(&mut writer)
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 }
 
 impl FromBytes for Signature {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let mut x_bytes_with_y: Vec<u8> = vec![];
-        reader.read_to_end(&mut x_bytes_with_y)?;
-        let x_bytes_with_y_len = x_bytes_with_y.len();
-        let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
-        x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
-        let x = Fq::read(x_bytes_with_y.as_slice())?;
-        let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
-            &((x.square() * &x) + &<Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
-        );
-        let y = x3b.sqrt().ok_or(io::Error::new(
-            io::ErrorKind::NotFound,
-            "couldn't find square root for x",
-        ))?;
-        let negy = -y;
-        let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
-        let sig = G1Affine::new(x, chosen_y, false);
-        Ok(Signature::from_sig(sig.into_projective()))
+        let p = G1Affine::deserialize(&mut reader)
+            .map_err(|_| io::ErrorKind::InvalidInput)?
+            .into_projective();
+        Ok(Signature::from_sig(p))
     }
 }
 
@@ -496,7 +435,24 @@ mod test {
         curve::hash::try_and_increment::TryAndIncrement,
         hash::{composite::CompositeHasher, direct::DirectHasher, XOF},
     };
+    use algebra::{
+        bls12_377::{
+            g1::Parameters as Bls12_377G1Parameters, g2::Parameters as Bls12_377G2Parameters, Fq,
+            Fq2,
+        },
+        curves::{ProjectiveCurve, SWModelParameters},
+        fields::{Field, PrimeField, SquareRootField},
+    };
     use rand::thread_rng;
+
+    lazy_static! {
+        static ref COMPOSITE_HASHER: CompositeHasher = { CompositeHasher::new().unwrap() };
+        static ref DIRECT_HASHER: DirectHasher = { DirectHasher::new().unwrap() };
+        static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> =
+            { TryAndIncrement::new(&*COMPOSITE_HASHER) };
+        static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> =
+            { TryAndIncrement::new(&*DIRECT_HASHER) };
+    }
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -754,6 +710,121 @@ mod test {
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
+
+        // this has the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+        // c1 should have been checked to be equal to -c1 or equivalently 0.
+        let old_serialization_logic = |pk: PublicKey, writer: &mut Vec<u8>| -> IoResult<_> {
+            let affine = pk.get_pk().into_affine();
+            let mut x_bytes: Vec<u8> = vec![];
+            let y_c0_big = affine.y.c0.into_repr();
+            let y_c1_big = affine.y.c1.into_repr();
+            let half = Fq::modulus_minus_one_div_two();
+            affine.x.write(&mut x_bytes)?;
+            let num_x_bytes = x_bytes.len();
+            if y_c1_big > half {
+                x_bytes[num_x_bytes - 1] |= 0x80;
+            } else if y_c1_big == half && y_c0_big > half {
+                x_bytes[num_x_bytes - 1] |= 0x80;
+            }
+            writer.write(&x_bytes)?;
+
+            Ok(())
+        };
+
+        let old_deserialization_logic = |data: &[u8]| -> IoResult<_> {
+            let mut x_bytes_with_y: Vec<u8> = data.to_owned();
+            let x_bytes_with_y_len = x_bytes_with_y.len();
+            let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
+            x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
+            let x = Fq2::read(x_bytes_with_y.as_slice())?;
+            let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
+                &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
+            );
+            let y = x3b.sqrt().ok_or(io::Error::new(
+                io::ErrorKind::NotFound,
+                "couldn't find square root for x",
+            ))?;
+
+            let y_c0_big = y.c0.into_repr();
+            let y_c1_big = y.c1.into_repr();
+
+            let negy = -y;
+
+            let (bigger, smaller) = {
+                let half = Fq::modulus_minus_one_div_two();
+                if y_c1_big > half {
+                    (y, negy)
+                } else if y_c1_big == half && y_c0_big > half {
+                    (y, negy)
+                } else {
+                    (negy, y)
+                }
+            };
+
+            let chosen_y = if y_over_half { bigger } else { smaller };
+            Ok((x, chosen_y))
+        };
+
+        let rng = &mut thread_rng();
+        // Check cases where c1 != 0, which are the normal case.
+        for _ in 0..1000 {
+            let sk = PrivateKey::generate(rng);
+            let pk = sk.to_public();
+            if pk.get_pk().into_affine().y.c1 == Fq::zero() {
+                // If it happens, we want to know about it.
+                panic!(format!(
+                    "point had c1 = 0! point was: {}",
+                    pk.get_pk().into_affine()
+                ));
+            }
+
+            let mut pk_bytes = vec![];
+            pk.write(&mut pk_bytes).unwrap();
+
+            let mut pk_bytes3 = vec![];
+            old_serialization_logic(pk.clone(), &mut pk_bytes3).unwrap();
+
+            assert_eq!(pk_bytes, pk_bytes3);
+
+            let de_pk = PublicKey::read(&pk_bytes[..]).unwrap();
+
+            assert_eq!(de_pk.get_pk().into_affine(), pk.get_pk().into_affine());
+
+            // check that the points match (the PartialEq does only bytes equality)
+            assert_eq!(de_pk.get_pk().into_affine().x, pk.get_pk().into_affine().x);
+            assert_eq!(de_pk.get_pk().into_affine().y, pk.get_pk().into_affine().y);
+        }
+
+        // Check cases where c1 = 0. These don't occur normally and in fact the manually patched
+        // points are not on the curve.
+        for _ in 0..1000 {
+            let sk = PrivateKey::generate(rng);
+            let pk = sk.to_public();
+            let mut pk_affine = pk.get_pk().into_affine();
+            pk_affine.y.c1 = Fq::zero();
+            let pk = PublicKey::from_pk(pk_affine.into_projective());
+
+            let mut pk_bytes = vec![];
+            pk.write(&mut pk_bytes).unwrap();
+
+            let mut pk_bytes3 = vec![];
+            old_serialization_logic(pk.clone(), &mut pk_bytes3).unwrap();
+
+            // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+            // If c1 == 0, and c0 > half (or equivalently c0 > -c0), we get the wrong y bit, and
+            // serialization will produce the negative of the point.
+            if pk_affine.y > pk_affine.y.neg() {
+                assert_ne!(pk_bytes, pk_bytes3);
+            } else {
+                assert_eq!(pk_bytes, pk_bytes3);
+            }
+
+            let de_pk = PublicKey::read(&pk_bytes[..]).unwrap();
+            let pk_affine = de_pk.get_pk().into_affine();
+            let (x, y) = old_deserialization_logic(&pk_bytes[..]).unwrap();
+            assert_eq!(x, pk_affine.x);
+            assert_eq!(y, pk_affine.y);
+        }
     }
 
     #[test]
@@ -786,5 +857,66 @@ mod test {
         sig.write(&mut sig_bytes).unwrap();
 
         println!("sig: {}", hex::encode(&sig_bytes));
+    }
+
+    #[test]
+    fn test_signature_serialization() {
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+        let rng = &mut thread_rng();
+
+        let old_serialization_logic = |sig: Signature, writer: &mut Vec<u8>| -> IoResult<_> {
+            let affine = sig.get_sig().into_affine();
+            let mut x_bytes: Vec<u8> = vec![];
+            let y_big = affine.y.into_repr();
+            let half = Fq::modulus_minus_one_div_two();
+            affine.x.write(&mut x_bytes)?;
+            if y_big > half {
+                let num_x_bytes = x_bytes.len();
+                x_bytes[num_x_bytes - 1] |= 0x80;
+            }
+            writer.write(&x_bytes)?;
+            Ok(())
+        };
+
+        let old_deserialization_logic = |data: &[u8]| -> IoResult<_> {
+            let mut x_bytes_with_y: Vec<u8> = data.to_owned();
+            let x_bytes_with_y_len = x_bytes_with_y.len();
+            let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
+            x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
+            let x = Fq::read(x_bytes_with_y.as_slice())?;
+            let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
+                &((x.square() * &x) + &<Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
+            );
+            let y = x3b.sqrt().ok_or(io::Error::new(
+                io::ErrorKind::NotFound,
+                "couldn't find square root for x",
+            ))?;
+            let negy = -y;
+            let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
+            Ok((x, chosen_y))
+        };
+
+        for _ in 0..100 {
+            let message = b"hello";
+            let sk = PrivateKey::generate(rng);
+            let sig = sk.sign(&message[..], &[], try_and_increment).unwrap();
+
+            let mut sig_bytes = vec![];
+            sig.write(&mut sig_bytes).unwrap();
+
+            let mut sig_bytes3 = vec![];
+            old_serialization_logic(sig.clone(), &mut sig_bytes3).unwrap();
+
+            // both methods have the same ersult
+            assert_eq!(sig_bytes, sig_bytes3);
+
+            let de_sig1 = Signature::read(&sig_bytes[..]).unwrap();
+            let (x, y) = old_deserialization_logic(&sig_bytes[..]).unwrap();
+            assert_eq!(x, de_sig1.get_sig().x);
+            assert_eq!(y, de_sig1.get_sig().y);
+
+            // both deserialization methods have the same result
+            assert_eq!(de_sig1, sig);
+        }
     }
 }
