@@ -230,6 +230,7 @@ mod test {
         sw6::Fr as SW6Fr,
         AffineCurve, PrimeField, ProjectiveCurve, UniformRand,
         Zero,
+        BigInteger,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
@@ -287,6 +288,8 @@ mod test {
             0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
         ]);
+
+        // Check random points.
         for i in 0..10 {
             let secret_key = Bls12_377Fr::rand(rng);
 
@@ -328,6 +331,7 @@ mod test {
             }
         }
 
+        // Check points at the edge - c1 == half.
         for i in 0..10 {
             let secret_key = Bls12_377Fr::rand(rng);
 
@@ -340,8 +344,160 @@ mod test {
             );
             let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
-            let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
             let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
+
+            {
+                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+
+                let pk =
+                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
+                        .unwrap();
+
+                let y_bit =
+                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
+                        .unwrap();
+
+                if pk.y.c1.get_value().get().unwrap().into_repr() > half
+                    || (pk.y.c1.get_value().get().unwrap().into_repr()
+                        == zero.into_repr()
+                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
+                {
+                    assert_eq!(true, y_bit.get_value().get().unwrap());
+                } else {
+                    assert_eq!(false, y_bit.get_value().get().unwrap());
+                }
+
+                if i == 0 {
+                    println!("number of constraints: {}", cs.num_constraints());
+                }
+
+                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // and so we can't generate proper points on the curve
+                /*
+                if !cs.is_satisfied() {
+                    println!("{}", cs.which_is_unsatisfied().unwrap());
+                }
+                assert!(cs.is_satisfied());
+                */
+            }
+        }
+
+        // Check points at the edge - c1 == 0.
+        for i in 0..10 {
+            let secret_key = Bls12_377Fr::rand(rng);
+
+            let generator = Bls12_377G2Projective::prime_subgroup_generator();
+            let pub_key = generator.clone().mul(secret_key).into_affine();
+            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
+            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
+                pub_key.y.c0,
+                zero.into(),
+            );
+            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
+
+            {
+                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+
+                let pk =
+                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
+                        .unwrap();
+
+                let y_bit =
+                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
+                        .unwrap();
+
+                if pk.y.c1.get_value().get().unwrap().into_repr() > half
+                    || (pk.y.c1.get_value().get().unwrap().into_repr()
+                        == zero.into_repr()
+                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
+                {
+                    assert_eq!(true, y_bit.get_value().get().unwrap());
+                } else {
+                    assert_eq!(false, y_bit.get_value().get().unwrap());
+                }
+
+                if i == 0 {
+                    println!("number of constraints: {}", cs.num_constraints());
+                }
+
+                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // and so we can't generate proper points on the curve
+                /*
+                if !cs.is_satisfied() {
+                    println!("{}", cs.which_is_unsatisfied().unwrap());
+                }
+                assert!(cs.is_satisfied());
+                */
+            }
+        }
+
+        // Check points at the edge - c1 == p-1.
+        for i in 0..10 {
+            let secret_key = Bls12_377Fr::rand(rng);
+
+            let generator = Bls12_377G2Projective::prime_subgroup_generator();
+            let pub_key = generator.clone().mul(secret_key).into_affine();
+            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            let one = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from(1);
+            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
+            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
+                pub_key.y.c0,
+                one.into(),
+            );
+            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
+
+            {
+                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+
+                let pk =
+                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
+                        .unwrap();
+
+                let y_bit =
+                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
+                        .unwrap();
+
+                if pk.y.c1.get_value().get().unwrap().into_repr() > half
+                    || (pk.y.c1.get_value().get().unwrap().into_repr()
+                        == zero.into_repr()
+                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
+                {
+                    assert_eq!(true, y_bit.get_value().get().unwrap());
+                } else {
+                    assert_eq!(false, y_bit.get_value().get().unwrap());
+                }
+
+                if i == 0 {
+                    println!("number of constraints: {}", cs.num_constraints());
+                }
+
+                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // and so we can't generate proper points on the curve
+                /*
+                if !cs.is_satisfied() {
+                    println!("{}", cs.which_is_unsatisfied().unwrap());
+                }
+                assert!(cs.is_satisfied());
+                */
+            }
+        }
+
+        // Check points at the edge - c1 == half + 1.
+        for i in 0..10 {
+            let secret_key = Bls12_377Fr::rand(rng);
+
+            let generator = Bls12_377G2Projective::prime_subgroup_generator();
+            let pub_key = generator.clone().mul(secret_key).into_affine();
+            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            let mut p_minus_one = half.clone();
+            p_minus_one.mul2();
+            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
+            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
+                pub_key.y.c0,
+                p_minus_one.into(),
+            );
+            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
             {
                 let mut cs = TestConstraintSystem::<SW6Fr>::new();
