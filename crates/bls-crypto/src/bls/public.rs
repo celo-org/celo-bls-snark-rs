@@ -182,6 +182,8 @@ mod test {
         PublicKeyCache::resize(256);
         PublicKeyCache::clear_cache();
 
+        // this has the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+        // c1 should have been checked to be equal to -c1 or equivalently 0.
         let old_serialization_logic = |pk: PublicKey, writer: &mut Vec<u8>| -> IoResult<_> {
             let affine = pk.0.into_affine();
             let mut x_bytes: Vec<u8> = vec![];
@@ -236,6 +238,7 @@ mod test {
 
         let rng = &mut thread_rng();
         let mut i = 0;
+        // check cases where c1 != 0
         loop {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
@@ -288,7 +291,9 @@ mod test {
             old_serialization_logic(pk, &mut pk_bytes3).unwrap();
 
             assert_eq!(pk_bytes, pk_bytes2);
-            // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149
+            // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+            // If c1 == 0, and c0 > half (or equivalently c0 > -c0), we get the wrong y bit, and
+            // serialization will produce the negative of the point.
             if pk_affine.y > pk_affine.y.neg() {
                 assert_ne!(pk_bytes, pk_bytes3);
             } else {
