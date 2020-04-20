@@ -96,7 +96,12 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             }
         })?;
 
-        // this enforces y_eq_bit = 1 <=> c_1 != 0
+        // This enforces y_eq_bit = 1 <=> c_1 != 0.
+        // The idea is that if lhs is 0, then a constraint of the form lhs*lhs_inv == 1 -
+        // result forces result to be 1. If lhs is non-zero, then a constraint of the form
+        // lhs*result == 0 forces result to be 0. lhs_inv is set to be 0 in case lhs is 0 because
+        // the value of lhs_inv is not significant in that case (lhs is 0 anyway) and we need the
+        // witness calculation to pass.
         {
             let lhs = pk.y.c1.clone();
             let inv = FpGadget::alloc(cs.ns(|| "alloc c1 inv"), || {
