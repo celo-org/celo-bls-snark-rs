@@ -12,18 +12,25 @@ use r1cs_std::{
 };
 use std::{marker::PhantomData, ops::Neg};
 
+/// The goal of the gadgets is to provide the bit according to the value of y, as done in point
+/// compression. The idea is that given $half = \frac{p-1}{2}$, we cast the field element
+/// components from the range [half+1, p-1] to [1, half], if they satisfy that they are > half.
+/// Then we check that the cast element is <= half, which enforces that originall they were > half.
+/// For points in G2, we also check the lexicographical ordering.
+
 /// Enforces point compression on the provided element
 pub struct YToBitGadget<P: Bls12Parameters> {
     parameters_type: PhantomData<P>,
 }
+
 
 impl<P: Bls12Parameters> YToBitGadget<P> {
     pub fn y_to_bit_g1<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
         pk: &G1Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_plus_one_neg =
-            (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()) + &P::Fp::one()).neg();
+        let half_neg =
+            (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two())).neg();
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
             if pk.y.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -37,7 +44,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 let half = P::Fp::modulus_minus_one_div_two();
                 let y_value = pk.y.get_value().get()?;
                 if y_value.into_repr() > half {
-                    Ok(y_value - &(P::Fp::from_repr(half) + &P::Fp::one()))
+                    Ok(y_value - &P::Fp::from_repr(half))
                 } else {
                     Ok(y_value)
                 }
@@ -45,7 +52,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 Err(SynthesisError::AssignmentMissing)
             }
         })?;
-        let y_bit_lc = y_bit.lc(CS::one(), half_plus_one_neg);
+        let y_bit_lc = y_bit.lc(CS::one(), half_neg);
         cs.enforce(
             || "check y bit",
             |lc| lc + (P::Fp::one(), CS::one()),
@@ -65,8 +72,8 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         mut cs: CS,
         pk: &G2Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_plus_one_neg =
-            (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()) + &P::Fp::one()).neg();
+        let half_neg =
+            P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
         let y_c1_bit = Boolean::alloc(cs.ns(|| "alloc y c1 bit"), || {
             if pk.y.c1.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -92,9 +99,10 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             }
         })?;
 
+        // this enforces y_eq_bit = 1 <=> c_1 != 0
         {
             let lhs = pk.y.c1.clone();
-            let inv = FpGadget::alloc(cs.ns(|| "alloc (c1 - c0) inv"), || {
+            let inv = FpGadget::alloc(cs.ns(|| "alloc c1 inv"), || {
                 if lhs.get_value().is_some() {
                     Ok(lhs.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
                 } else {
@@ -122,7 +130,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 let half = P::Fp::modulus_minus_one_div_two();
                 let y_c1 = pk.y.c1.get_value().get()?.into_repr();
                 let y_c0 = pk.y.c0.get_value().get()?.into_repr();
-                Ok(y_c1 > half || (y_c1 == y_c0 && y_c0 > half))
+                Ok(y_c1 > half || (y_c1 == P::Fp::zero().into_repr() && y_c0 > half))
             } else {
                 Err(SynthesisError::AssignmentMissing)
             }
@@ -132,7 +140,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 let half = P::Fp::modulus_minus_one_div_two();
                 let y_value = pk.y.c1.get_value().get()?;
                 if y_value.into_repr() > half {
-                    Ok(y_value - &(P::Fp::from_repr(half) + &P::Fp::one()))
+                    Ok(y_value - &P::Fp::from_repr(half))
                 } else {
                     Ok(y_value)
                 }
@@ -145,7 +153,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 let half = P::Fp::modulus_minus_one_div_two();
                 let y_value = pk.y.c0.get_value().get()?;
                 if y_value.into_repr() > half {
-                    Ok(y_value - &(P::Fp::from_repr(half) + &P::Fp::one()))
+                    Ok(y_value - &P::Fp::from_repr(half))
                 } else {
                     Ok(y_value)
                 }
@@ -153,7 +161,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
                 Err(SynthesisError::AssignmentMissing)
             }
         })?;
-        let y_c1_bit_lc = y_c1_bit.lc(CS::one(), half_plus_one_neg);
+        let y_c1_bit_lc = y_c1_bit.lc(CS::one(), half_neg);
         cs.enforce(
             || "check y bit c1",
             |lc| lc + (P::Fp::one(), CS::one()),
@@ -166,7 +174,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             y_c1_adjusted_bits,
             P::Fp::modulus_minus_one_div_two(),
         )?;
-        let y_c0_bit_lc = y_c0_bit.lc(CS::one(), half_plus_one_neg);
+        let y_c0_bit_lc = y_c0_bit.lc(CS::one(), half_neg);
         cs.enforce(
             || "check y bit c0",
             |lc| lc + (P::Fp::one(), CS::one()),
@@ -184,6 +192,12 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         // a is c1
         // b is y_eq
         // c is c0
+        // (1-c1)*(y_eq*c0) == o - c1
+        // 
+        // previously we constrained y_eq to be 1 <==> c1 == 0
+        // either c1 is 1, and then o is 1
+        // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
+        // else c1 is 0 and c0 is 0 (then y_eq is 1), and then o is 0
 
         let bc = Boolean::and(cs.ns(|| "and bc"), &y_eq_bit, &y_c0_bit)?;
 
@@ -215,6 +229,7 @@ mod test {
         fields::Fp2,
         sw6::Fr as SW6Fr,
         AffineCurve, PrimeField, ProjectiveCurve, UniformRand,
+        Zero,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
@@ -279,6 +294,7 @@ mod test {
             let pub_key = generator.clone().mul(secret_key);
 
             let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
+            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
 
             {
                 let mut cs = TestConstraintSystem::<SW6Fr>::new();
@@ -293,7 +309,7 @@ mod test {
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
                     || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == pk.y.c0.get_value().get().unwrap().into_repr()
+                        == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -325,6 +341,7 @@ mod test {
             let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
             let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
+            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
 
             {
                 let mut cs = TestConstraintSystem::<SW6Fr>::new();
@@ -339,7 +356,7 @@ mod test {
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
                     || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == pk.y.c0.get_value().get().unwrap().into_repr()
+                        == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -351,8 +368,8 @@ mod test {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
 
-                // we're not checking this, because it can't happen for BLS12-377, and so we can't
-                // generate proper points on the curve
+                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // and so we can't generate proper points on the curve
                 /*
                 if !cs.is_satisfied() {
                     println!("{}", cs.which_is_unsatisfied().unwrap());
