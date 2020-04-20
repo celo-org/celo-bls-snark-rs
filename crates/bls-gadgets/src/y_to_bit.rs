@@ -23,14 +23,12 @@ pub struct YToBitGadget<P: Bls12Parameters> {
     parameters_type: PhantomData<P>,
 }
 
-
 impl<P: Bls12Parameters> YToBitGadget<P> {
     pub fn y_to_bit_g1<CS: r1cs_core::ConstraintSystem<P::Fp>>(
         mut cs: CS,
         pk: &G1Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_neg =
-            (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two())).neg();
+        let half_neg = (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two())).neg();
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
             if pk.y.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -72,8 +70,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         mut cs: CS,
         pk: &G2Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_neg =
-            P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
+        let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
         let y_c1_bit = Boolean::alloc(cs.ns(|| "alloc y c1 bit"), || {
             if pk.y.c1.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -193,7 +190,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         // b is y_eq
         // c is c0
         // (1-c1)*(y_eq*c0) == o - c1
-        // 
+        //
         // previously we constrained y_eq to be 1 <==> c1 == 0
         // either c1 is 1, and then o is 1
         // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
@@ -228,9 +225,7 @@ mod test {
         curves::bls12::Bls12Parameters,
         fields::Fp2,
         sw6::Fr as SW6Fr,
-        AffineCurve, PrimeField, ProjectiveCurve, UniformRand,
-        Zero,
-        BigInteger,
+        AffineCurve, BigInteger, PrimeField, ProjectiveCurve, UniformRand, Zero,
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
@@ -311,8 +306,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == zero.into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -358,8 +352,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == zero.into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -371,7 +364,7 @@ mod test {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
 
-                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // we're not checking this, because we couldn't find a matching point on BLS12-377,
                 // and so we can't generate proper points on the curve
                 /*
                 if !cs.is_satisfied() {
@@ -408,8 +401,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == zero.into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -421,7 +413,7 @@ mod test {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
 
-                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // we're not checking this, because we couldn't find a matching point on BLS12-377,
                 // and so we can't generate proper points on the curve
                 /*
                 if !cs.is_satisfied() {
@@ -459,8 +451,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == zero.into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -472,7 +463,7 @@ mod test {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
 
-                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // we're not checking this, because we couldn't find a matching point on BLS12-377,
                 // and so we can't generate proper points on the curve
                 /*
                 if !cs.is_satisfied() {
@@ -511,8 +502,7 @@ mod test {
                         .unwrap();
 
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr()
-                        == zero.into_repr()
+                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
                 {
                     assert_eq!(true, y_bit.get_value().get().unwrap());
@@ -524,7 +514,7 @@ mod test {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
 
-                // we're not checking this, because we couldn't find a matching point on BLS12-377, 
+                // we're not checking this, because we couldn't find a matching point on BLS12-377,
                 // and so we can't generate proper points on the curve
                 /*
                 if !cs.is_satisfied() {
