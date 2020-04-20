@@ -237,13 +237,16 @@ mod test {
         };
 
         let rng = &mut thread_rng();
-        let mut i = 0;
-        // check cases where c1 != 0
-        loop {
+        // Check cases where c1 != 0, which are the normal case.
+        for _ in 0..1000 {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
             if pk.as_ref().into_affine().y.c1 == Fq::zero() {
-                continue;
+                // If it happens, we want to know about it.
+                panic!(format!(
+                    "point had c1 = 0! point was: {}",
+                    pk.as_ref().into_affine()
+                ));
             }
 
             let mut pk_bytes = vec![];
@@ -266,14 +269,10 @@ mod test {
             // check that the points match (the PartialEq does only bytes equality)
             assert_eq!(de_pk.as_ref().x, de_pk2.as_ref().x);
             assert_eq!(de_pk.as_ref().y, de_pk2.as_ref().y);
-
-            i += 1;
-            if i == 1000 {
-                break;
-            }
         }
 
-        // check cases where c1 = 0
+        // Check cases where c1 = 0. These don't occur normally and in fact the manually patched
+        // points are not on the curve.
         for _ in 0..1000 {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
