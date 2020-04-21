@@ -701,62 +701,65 @@ mod test {
             assert_eq!(pk.get_pk().into_affine().y, pk2.get_pk().into_affine().y);
             assert_eq!(pk2.eq(&PublicKey::read(pk_bytes.as_slice()).unwrap()), true);
         }
+    }
 
-        // this has the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
-        // c1 should have been checked to be equal to -c1 or equivalently 0.
-        let old_serialization_logic = |pk: PublicKey, writer: &mut Vec<u8>| -> IoResult<_> {
-            let affine = pk.get_pk().into_affine();
-            let mut x_bytes: Vec<u8> = vec![];
-            let y_c0_big = affine.y.c0.into_repr();
-            let y_c1_big = affine.y.c1.into_repr();
+    // this has the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+    // c1 should have been checked to be equal to -c1 or equivalently 0.
+    fn old_serialization_logic(pk: PublicKey, writer: &mut Vec<u8>) -> IoResult<()> {
+        let affine = pk.get_pk().into_affine();
+        let mut x_bytes: Vec<u8> = vec![];
+        let y_c0_big = affine.y.c0.into_repr();
+        let y_c1_big = affine.y.c1.into_repr();
+        let half = Fq::modulus_minus_one_div_two();
+        affine.x.write(&mut x_bytes)?;
+        let num_x_bytes = x_bytes.len();
+        if y_c1_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
+        } else if y_c1_big == half && y_c0_big > half {
+            x_bytes[num_x_bytes - 1] |= 0x80;
+        }
+        writer.write(&x_bytes)?;
+
+        Ok(())
+    }
+
+    fn old_deserialization_logic(data: &[u8]) -> IoResult<PublicKey> {
+        let mut x_bytes_with_y: Vec<u8> = data.to_owned();
+        let x_bytes_with_y_len = x_bytes_with_y.len();
+        let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
+        x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
+        let x = Fq2::read(x_bytes_with_y.as_slice())?;
+        let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
+            &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
+        );
+        let y = x3b.sqrt().ok_or(io::Error::new(
+            io::ErrorKind::NotFound,
+            "couldn't find square root for x",
+        ))?;
+
+        let y_c0_big = y.c0.into_repr();
+        let y_c1_big = y.c1.into_repr();
+
+        let negy = -y;
+
+        let (bigger, smaller) = {
             let half = Fq::modulus_minus_one_div_two();
-            affine.x.write(&mut x_bytes)?;
-            let num_x_bytes = x_bytes.len();
             if y_c1_big > half {
-                x_bytes[num_x_bytes - 1] |= 0x80;
+                (y, negy)
             } else if y_c1_big == half && y_c0_big > half {
-                x_bytes[num_x_bytes - 1] |= 0x80;
+                (y, negy)
+            } else {
+                (negy, y)
             }
-            writer.write(&x_bytes)?;
-
-            Ok(())
         };
 
-        let old_deserialization_logic = |data: &[u8]| -> IoResult<_> {
-            let mut x_bytes_with_y: Vec<u8> = data.to_owned();
-            let x_bytes_with_y_len = x_bytes_with_y.len();
-            let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
-            x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
-            let x = Fq2::read(x_bytes_with_y.as_slice())?;
-            let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
-                &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
-            );
-            let y = x3b.sqrt().ok_or(io::Error::new(
-                io::ErrorKind::NotFound,
-                "couldn't find square root for x",
-            ))?;
+        let chosen_y = if y_over_half { bigger } else { smaller };
+        let pk = G2Affine::new(x, chosen_y, false);
+        Ok(PublicKey::from_pk(pk.into_projective()))
+    }
 
-            let y_c0_big = y.c0.into_repr();
-            let y_c1_big = y.c1.into_repr();
-
-            let negy = -y;
-
-            let (bigger, smaller) = {
-                let half = Fq::modulus_minus_one_div_two();
-                if y_c1_big > half {
-                    (y, negy)
-                } else if y_c1_big == half && y_c0_big > half {
-                    (y, negy)
-                } else {
-                    (negy, y)
-                }
-            };
-
-            let chosen_y = if y_over_half { bigger } else { smaller };
-            let pk = G2Affine::new(x, chosen_y, false);
-            Ok(PublicKey::from_pk(pk.into_projective()))
-        };
-
+    #[test]
+    fn old_serialization_logic_matches_new() {
         let rng = &mut thread_rng();
         // Check cases where c1 != 0, which are the normal case.
         for _ in 0..1000 {
@@ -781,7 +784,11 @@ mod test {
             assert_eq!(de_pk1, de_pk2);
             assert_eq!(pk.get_pk(), de_pk1);
         }
+    }
 
+    #[test]
+    fn issue_149() {
+        let rng = &mut thread_rng();
         // Check cases where c1 = 0. These don't occur normally and in fact the manually patched
         // points are not on the curve.
         for _ in 0..1000 {
