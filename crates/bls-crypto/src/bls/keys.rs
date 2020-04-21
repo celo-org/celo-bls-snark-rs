@@ -445,15 +445,6 @@ mod test {
     };
     use rand::thread_rng;
 
-    lazy_static! {
-        static ref COMPOSITE_HASHER: CompositeHasher = { CompositeHasher::new().unwrap() };
-        static ref DIRECT_HASHER: DirectHasher = { DirectHasher::new().unwrap() };
-        static ref COMPOSITE_HASH_TO_G1: TryAndIncrement<'static, CompositeHasher> =
-            { TryAndIncrement::new(&*COMPOSITE_HASHER) };
-        static ref DIRECT_HASH_TO_G1: TryAndIncrement<'static, DirectHasher> =
-            { TryAndIncrement::new(&*DIRECT_HASHER) };
-    }
-
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
     }
@@ -762,7 +753,8 @@ mod test {
             };
 
             let chosen_y = if y_over_half { bigger } else { smaller };
-            Ok((x, chosen_y))
+            let pk = G2Affine::new(x, chosen_y, false);
+            Ok(PublicKey::from_pk(pk.into_projective()))
         };
 
         let rng = &mut thread_rng();
@@ -778,52 +770,46 @@ mod test {
                 ));
             }
 
-            let mut pk_bytes = vec![];
-            pk.write(&mut pk_bytes).unwrap();
+            let mut pk_bytes1 = vec![];
+            let mut pk_bytes2 = vec![];
+            pk.write(&mut pk_bytes1).unwrap();
+            old_serialization_logic(pk.clone(), &mut pk_bytes2).unwrap();
+            assert_eq!(pk_bytes1, pk_bytes2);
 
-            let mut pk_bytes3 = vec![];
-            old_serialization_logic(pk.clone(), &mut pk_bytes3).unwrap();
-
-            assert_eq!(pk_bytes, pk_bytes3);
-
-            let de_pk = PublicKey::read(&pk_bytes[..]).unwrap();
-
-            assert_eq!(de_pk.get_pk().into_affine(), pk.get_pk().into_affine());
-
-            // check that the points match (the PartialEq does only bytes equality)
-            assert_eq!(de_pk.get_pk().into_affine().x, pk.get_pk().into_affine().x);
-            assert_eq!(de_pk.get_pk().into_affine().y, pk.get_pk().into_affine().y);
+            let de_pk1 = PublicKey::read(&pk_bytes1[..]).unwrap().get_pk();
+            let de_pk2 = old_deserialization_logic(&pk_bytes2[..]).unwrap().get_pk();
+            assert_eq!(de_pk1, de_pk2);
+            assert_eq!(pk.get_pk(), de_pk1);
         }
 
         // Check cases where c1 = 0. These don't occur normally and in fact the manually patched
         // points are not on the curve.
         for _ in 0..1000 {
             let sk = PrivateKey::generate(rng);
+
+            // construct a publickey with y.c1 == 0
             let pk = sk.to_public();
             let mut pk_affine = pk.get_pk().into_affine();
             pk_affine.y.c1 = Fq::zero();
             let pk = PublicKey::from_pk(pk_affine.into_projective());
 
-            let mut pk_bytes = vec![];
-            pk.write(&mut pk_bytes).unwrap();
-
-            let mut pk_bytes3 = vec![];
-            old_serialization_logic(pk.clone(), &mut pk_bytes3).unwrap();
-
+            let mut pk_bytes1 = vec![];
+            let mut pk_bytes2 = vec![];
+            pk.write(&mut pk_bytes1).unwrap();
+            old_serialization_logic(pk.clone(), &mut pk_bytes2).unwrap();
             // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
             // If c1 == 0, and c0 > half (or equivalently c0 > -c0), we get the wrong y bit, and
             // serialization will produce the negative of the point.
             if pk_affine.y > pk_affine.y.neg() {
-                assert_ne!(pk_bytes, pk_bytes3);
+                assert_ne!(pk_bytes1, pk_bytes2);
             } else {
-                assert_eq!(pk_bytes, pk_bytes3);
+                assert_eq!(pk_bytes1, pk_bytes2);
             }
 
-            let de_pk = PublicKey::read(&pk_bytes[..]).unwrap();
-            let pk_affine = de_pk.get_pk().into_affine();
-            let (x, y) = old_deserialization_logic(&pk_bytes[..]).unwrap();
-            assert_eq!(x, pk_affine.x);
-            assert_eq!(y, pk_affine.y);
+            let de_pk1 = PublicKey::read(&pk_bytes1[..]).unwrap().get_pk();
+            let de_pk2 = old_deserialization_logic(&pk_bytes2[..]).unwrap().get_pk();
+            assert_eq!(de_pk1, de_pk2);
+            assert_eq!(de_pk1, pk.get_pk());
         }
     }
 
@@ -861,7 +847,9 @@ mod test {
 
     #[test]
     fn test_signature_serialization() {
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+        let hasher = CompositeHasher::new().unwrap();
+        let try_and_increment = TryAndIncrement::new(&hasher);
+
         let rng = &mut thread_rng();
 
         let old_serialization_logic = |sig: Signature, writer: &mut Vec<u8>| -> IoResult<_> {
@@ -893,30 +881,30 @@ mod test {
             ))?;
             let negy = -y;
             let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
-            Ok((x, chosen_y))
+            let sig = G1Affine::new(x, chosen_y, false);
+            Ok(Signature::from_sig(sig.into_projective()))
         };
 
         for _ in 0..100 {
             let message = b"hello";
             let sk = PrivateKey::generate(rng);
-            let sig = sk.sign(&message[..], &[], try_and_increment).unwrap();
+            let sig = sk.sign(&message[..], &[], &try_and_increment).unwrap();
 
-            let mut sig_bytes = vec![];
-            sig.write(&mut sig_bytes).unwrap();
+            let mut sig_bytes1 = vec![];
+            sig.write(&mut sig_bytes1).unwrap();
 
-            let mut sig_bytes3 = vec![];
-            old_serialization_logic(sig.clone(), &mut sig_bytes3).unwrap();
+            let mut sig_bytes2 = vec![];
+            old_serialization_logic(sig.clone(), &mut sig_bytes2).unwrap();
 
-            // both methods have the same ersult
-            assert_eq!(sig_bytes, sig_bytes3);
+            // both methods have the same result
+            assert_eq!(sig_bytes1, sig_bytes2);
 
-            let de_sig1 = Signature::read(&sig_bytes[..]).unwrap();
-            let (x, y) = old_deserialization_logic(&sig_bytes[..]).unwrap();
-            assert_eq!(x, de_sig1.get_sig().x);
-            assert_eq!(y, de_sig1.get_sig().y);
+            let de_sig1 = Signature::read(&sig_bytes1[..]).unwrap();
+            let de_sig2 = old_deserialization_logic(&sig_bytes2[..]).unwrap();
 
             // both deserialization methods have the same result
             assert_eq!(de_sig1, sig);
+            assert_eq!(de_sig2, sig);
         }
     }
 }
