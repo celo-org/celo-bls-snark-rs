@@ -47,8 +47,7 @@ impl PublicKey {
     }
 
     pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
-        PublicKey::deserialize(&mut Cursor::new(data))
-            .map_err(|_| io::ErrorKind::InvalidInput.into())
+        PublicKey::deserialize(&mut &data[..]).map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -182,6 +181,8 @@ mod test {
         PublicKeyCache::resize(256);
         PublicKeyCache::clear_cache();
 
+        // this has the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+        // c1 should have been checked to be equal to -c1 or equivalently 0.
         let old_serialization_logic = |pk: PublicKey, writer: &mut Vec<u8>| -> IoResult<_> {
             let affine = pk.0.into_affine();
             let mut x_bytes: Vec<u8> = vec![];
@@ -235,12 +236,16 @@ mod test {
         };
 
         let rng = &mut thread_rng();
-        let mut i = 0;
-        loop {
+        // Check cases where c1 != 0, which are the normal case.
+        for _ in 0..1000 {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
             if pk.as_ref().into_affine().y.c1 == Fq::zero() {
-                continue;
+                // If it happens, we want to know about it.
+                panic!(format!(
+                    "point had c1 = 0! point was: {}",
+                    pk.as_ref().into_affine()
+                ));
             }
 
             let mut pk_bytes = vec![];
@@ -263,14 +268,10 @@ mod test {
             // check that the points match (the PartialEq does only bytes equality)
             assert_eq!(de_pk.as_ref().x, de_pk2.as_ref().x);
             assert_eq!(de_pk.as_ref().y, de_pk2.as_ref().y);
-
-            i += 1;
-            if i == 1000 {
-                break;
-            }
         }
 
-        // check cases where c1 = 0
+        // Check cases where c1 = 0. These don't occur normally and in fact the manually patched
+        // points are not on the curve.
         for _ in 0..1000 {
             let sk = PrivateKey::generate(rng);
             let pk = sk.to_public();
@@ -288,7 +289,9 @@ mod test {
             old_serialization_logic(pk, &mut pk_bytes3).unwrap();
 
             assert_eq!(pk_bytes, pk_bytes2);
-            // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149
+            // check for the bug mentioned in https://github.com/celo-org/bls-zexe/issues/149.
+            // If c1 == 0, and c0 > half (or equivalently c0 > -c0), we get the wrong y bit, and
+            // serialization will produce the negative of the point.
             if pk_affine.y > pk_affine.y.neg() {
                 assert_ne!(pk_bytes, pk_bytes3);
             } else {
