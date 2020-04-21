@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use crate::BlsResult;
 
 use std::{
-    io::{self, Cursor, Read, Result as IoResult, Write},
+    io::{self, Read, Result as IoResult, Write},
     ops::Neg,
 };
 
