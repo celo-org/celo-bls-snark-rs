@@ -815,8 +815,17 @@ mod test {
 
             let de_pk1 = PublicKey::read(&pk_bytes1[..]).unwrap().get_pk();
             let de_pk2 = old_deserialization_logic(&pk_bytes2[..]).unwrap().get_pk();
-            assert_eq!(de_pk1, de_pk2);
-            assert_eq!(de_pk1, pk.get_pk());
+
+            // if they had the same serialization, they have the same deserialization
+            if pk_affine.y > pk_affine.y.neg() {
+                assert_ne!(de_pk1, de_pk2);
+            } else {
+                assert_eq!(de_pk1, de_pk2);
+            }
+
+            // there's no way to make them equal to the original pk
+            assert_ne!(de_pk1, pk.get_pk());
+            assert_ne!(de_pk2, pk.get_pk());
         }
     }
 
