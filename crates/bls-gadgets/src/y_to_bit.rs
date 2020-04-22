@@ -1,5 +1,7 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 
+//! The goal of the gadgets is to provide the bit according to the value of y, as done in point compression. The idea is that given $half = \frac{p-1}{2}$, we can normalize any elements greater than $half$ (i.e. in the range [half+1, p-1]), by subtracting half (resulting in a number in the [1, half] range). Then we check that the cast element is <= half, which enforces that originally they were > half. For points in G2, we also check the lexicographical ordering.
+
 use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
 use r1cs_core::SynthesisError;
 use r1cs_std::{
@@ -12,12 +14,6 @@ use r1cs_std::{
 };
 use std::{marker::PhantomData, ops::Neg};
 
-/// The goal of the gadgets is to provide the bit according to the value of y, as done in point
-/// compression. The idea is that given $half = \frac{p-1}{2}$, we cast the field element
-/// components from the range [half+1, p-1] to [1, half], if they satisfy that they are > half.
-/// Then we check that the cast element is <= half, which enforces that originall they were > half.
-/// For points in G2, we also check the lexicographical ordering.
-
 /// Enforces point compression on the provided element
 pub struct YToBitGadget<P: Bls12Parameters> {
     parameters_type: PhantomData<P>,
@@ -28,7 +24,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         mut cs: CS,
         pk: &G1Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_neg = (P::Fp::from_repr(P::Fp::modulus_minus_one_div_two())).neg();
+        let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
             if pk.y.get_value().is_some() {
                 let half = P::Fp::modulus_minus_one_div_two();
@@ -59,7 +55,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         );
         let y_adjusted_bits = &y_adjusted.to_bits(cs.ns(|| "y adjusted to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
-            cs.ns(|| "enforce smaller than modulus minus one div two"),
+            cs.ns(|| "enforce smaller than or equal to modulus minus one div two"),
             y_adjusted_bits,
             P::Fp::modulus_minus_one_div_two(),
         )?;
@@ -310,6 +306,7 @@ mod test {
                     YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
                         .unwrap();
 
+                // if c1 > half or c1 == 0 && c0 > half" -> 1, else 0
                 if pk.y.c1.get_value().get().unwrap().into_repr() > half
                     || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
                         && pk.y.c0.get_value().get().unwrap().into_repr() > half)
@@ -331,14 +328,14 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_y_to_bit_g2_edges() {
+    fn test_y_to_bit_g2_edge(
+        edge: <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt,
+    ) {
         let rng = &mut XorShiftRng::from_seed([
             0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
         ]);
 
-        // Check points at the edge - c1 == half.
         for i in 0..10 {
             let secret_key = Bls12_377Fr::rand(rng);
 
@@ -347,7 +344,7 @@ mod test {
             let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
             let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
                 pub_key.y.c0,
-                half.into(),
+                edge.into(),
             );
             let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
 
@@ -387,153 +384,43 @@ mod test {
                 */
             }
         }
+    }
 
-        // Check points at the edge - c1 == 0.
-        for i in 0..10 {
-            let secret_key = Bls12_377Fr::rand(rng);
-
-            let generator = Bls12_377G2Projective::prime_subgroup_generator();
-            let pub_key = generator.clone().mul(secret_key).into_affine();
-            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
-            let new_y =
-                Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(pub_key.y.c0, zero);
-            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
-
-            {
-                let mut cs = TestConstraintSystem::<SW6Fr>::new();
-
-                let pk =
-                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
-                        .unwrap();
-
-                let y_bit =
-                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
-                        .unwrap();
-
-                if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
-                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
-                {
-                    assert_eq!(true, y_bit.get_value().get().unwrap());
-                } else {
-                    assert_eq!(false, y_bit.get_value().get().unwrap());
-                }
-
-                if i == 0 {
-                    println!("number of constraints: {}", cs.num_constraints());
-                }
-
-                // we're not checking this, because we couldn't find a matching point on BLS12-377,
-                // and so we can't generate proper points on the curve
-                /*
-                if !cs.is_satisfied() {
-                    println!("{}", cs.which_is_unsatisfied().unwrap());
-                }
-                assert!(cs.is_satisfied());
-                */
-            }
-        }
-
-        // Check points at the edge - c1 == p-1.
-        for i in 0..10 {
-            let secret_key = Bls12_377Fr::rand(rng);
-
-            let generator = Bls12_377G2Projective::prime_subgroup_generator();
-            let pub_key = generator.clone().mul(secret_key).into_affine();
-            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-            let one = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from(1);
-            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
-            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
-                pub_key.y.c0,
-                one.into(),
+    // Check points at the edge - c1 == half.
+    #[test]
+    fn test_y_to_bit_g2_c1_is_half() {
+        let half =
+            <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two(
             );
-            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
+        test_y_to_bit_g2_edge(half);
+    }
 
-            {
-                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+    // Check points at the edge - c1 == 0.
+    #[test]
+    fn test_y_to_bit_g2_c1_is_zero() {
+        let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
+        test_y_to_bit_g2_edge(zero.into_repr());
+    }
 
-                let pk =
-                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
-                        .unwrap();
-
-                let y_bit =
-                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
-                        .unwrap();
-
-                if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
-                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
-                {
-                    assert_eq!(true, y_bit.get_value().get().unwrap());
-                } else {
-                    assert_eq!(false, y_bit.get_value().get().unwrap());
-                }
-
-                if i == 0 {
-                    println!("number of constraints: {}", cs.num_constraints());
-                }
-
-                // we're not checking this, because we couldn't find a matching point on BLS12-377,
-                // and so we can't generate proper points on the curve
-                /*
-                if !cs.is_satisfied() {
-                    println!("{}", cs.which_is_unsatisfied().unwrap());
-                }
-                assert!(cs.is_satisfied());
-                */
-            }
-        }
-
-        // Check points at the edge - c1 == half + 1.
-        for i in 0..10 {
-            let secret_key = Bls12_377Fr::rand(rng);
-
-            let generator = Bls12_377G2Projective::prime_subgroup_generator();
-            let pub_key = generator.clone().mul(secret_key).into_affine();
-            let half = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-            let mut p_minus_one = half;
-            p_minus_one.mul2();
-            let zero = <Bls12_377Parameters as Bls12Parameters>::Fp::zero();
-            let new_y = Fp2::<<Bls12_377Parameters as Bls12Parameters>::Fp2Params>::new(
-                pub_key.y.c0,
-                p_minus_one.into(),
+    // Check points at the edge - c1 == p-1.
+    #[test]
+    fn test_y_to_bit_g2_c1_is_p_minus_1() {
+        let half =
+            <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two(
             );
-            let pub_key = Bls12_377G2Affine::new(pub_key.x, new_y, false).into_projective();
+        let mut p_minus_one = half;
+        p_minus_one.mul2();
+        test_y_to_bit_g2_edge(p_minus_one);
+    }
 
-            {
-                let mut cs = TestConstraintSystem::<SW6Fr>::new();
-
-                let pk =
-                    G2Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
-                        .unwrap();
-
-                let y_bit =
-                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &pk)
-                        .unwrap();
-
-                if pk.y.c1.get_value().get().unwrap().into_repr() > half
-                    || (pk.y.c1.get_value().get().unwrap().into_repr() == zero.into_repr()
-                        && pk.y.c0.get_value().get().unwrap().into_repr() > half)
-                {
-                    assert_eq!(true, y_bit.get_value().get().unwrap());
-                } else {
-                    assert_eq!(false, y_bit.get_value().get().unwrap());
-                }
-
-                if i == 0 {
-                    println!("number of constraints: {}", cs.num_constraints());
-                }
-
-                // we're not checking this, because we couldn't find a matching point on BLS12-377,
-                // and so we can't generate proper points on the curve
-                /*
-                if !cs.is_satisfied() {
-                    println!("{}", cs.which_is_unsatisfied().unwrap());
-                }
-                assert!(cs.is_satisfied());
-                */
-            }
-        }
+    // Check points at the edge - c1 == half + 1.
+    #[test]
+    fn test_y_to_bit_g2_c1_is_half_plus_one() {
+        let mut half_plus_one =
+            <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two(
+            );
+        let one = <<Bls12_377Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from(1);
+        half_plus_one.add_nocarry(&one);
+        test_y_to_bit_g2_edge(half_plus_one);
     }
 }
