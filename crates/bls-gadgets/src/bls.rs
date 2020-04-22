@@ -142,9 +142,10 @@ where
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
-        let g2_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
-            Ok(E::G2Projective::prime_subgroup_generator())
-        })?;
+        let g2_generator = P::G2Gadget::alloc_constant(
+            cs.ns(|| "G2 generator"),
+            E::G2Projective::prime_subgroup_generator(),
+        )?;
 
         // We initialize the Aggregate Public Key as a generator point, in order to
         // calculate the sum of all keys which have signed according to the bitmap.
@@ -178,9 +179,10 @@ where
         pub_keys: &[P::G2Gadget],
     ) -> Result<P::G2Gadget, SynthesisError> {
         // Allocate the G2 Generator
-        let g2_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
-            Ok(E::G2Projective::prime_subgroup_generator())
-        })?;
+        let g2_generator = P::G2Gadget::alloc_constant(
+            cs.ns(|| "G2 generator"),
+            E::G2Projective::prime_subgroup_generator(),
+        )?;
 
         // We initialize the Aggregate Public Key as a generator point, in order to
         // calculate the sum of all keys.
@@ -233,9 +235,10 @@ where
         let prepared_signature = P::prepare_g1(cs.ns(|| "prepared signature"), signature)?;
 
         // Allocate the generator on G2
-        let g2_generator = P::G2Gadget::alloc(cs.ns(|| "G2 generator"), || {
-            Ok(E::G2Projective::prime_subgroup_generator())
-        })?;
+        let g2_generator = P::G2Gadget::alloc_constant(
+            cs.ns(|| "G2 generator"),
+            E::G2Projective::prime_subgroup_generator(),
+        )?;
         // and negate it for the purpose of verification
         let g2_neg_generator = g2_generator.negate(cs.ns(|| "negate g2 generator"))?;
         let prepared_g2_neg_generator =
@@ -382,7 +385,7 @@ mod verify_one_message {
             0,
         );
         assert!(cs.is_satisfied());
-        assert_eq!(cs.num_constraints(), 21909);
+        assert_eq!(cs.num_constraints(), 21893);
 
         // random sig fails
         let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(

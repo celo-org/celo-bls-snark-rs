@@ -120,10 +120,12 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
         input: &[UInt8],
     ) -> Result<Vec<Boolean>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
-        let crh_params = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc(
-            cs.ns(|| "pedersen parameters"),
-            || CompositeHasher::<CRH>::setup_crh().ok().get(),
-        )?;
+        let crh_params =
+            <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc_constant(
+                cs.ns(|| "pedersen parameters"),
+                CompositeHasher::<CRH>::setup_crh()
+                    .map_err(|_| SynthesisError::AssignmentMissing)?,
+            )?;
 
         let pedersen_hash = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
             &mut cs.ns(|| "pedersen evaluation"),
@@ -322,9 +324,10 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         x_bits.reverse();
 
         // return p * cofactor - [g]_1
-        let generator = G1Gadget::<P>::alloc(cs.ns(|| "generator"), || {
-            Ok(G1Projective::<P>::prime_subgroup_generator())
-        })?;
+        let generator = G1Gadget::<P>::alloc_constant(
+            cs.ns(|| "generator"),
+            G1Projective::<P>::prime_subgroup_generator(),
+        )?;
         let scaled = p
             .mul_bits(cs.ns(|| "scaled"), &generator, x_bits.iter())?
             .sub(cs.ns(|| "scaled finalize"), &generator)?;
