@@ -1,6 +1,12 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 
-//! The goal of the gadgets is to provide the bit according to the value of y, as done in point compression. The idea is that given $half = \frac{p-1}{2}$, we can normalize any elements greater than $half$ (i.e. in the range [half+1, p-1]), by subtracting half (resulting in a number in the [1, half] range). Then we check that the cast element is <= half, which enforces that originally they were > half. For points in G2, we also check the lexicographical ordering.
+//! The goal of the gadgets is to provide the bit according to the value of y,
+//! as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
+//! we can normalize any elements greater than $half$ (i.e. in the range
+//! [half+1, p-1]), by subtracting half (resulting in a number in the [1, half]
+//! range). Then we check that the cast element is <= half, which enforces that
+//! originally they were > half. For points in G2, we also check the
+//! lexicographical ordering.
 
 use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
 use r1cs_core::SynthesisError;
