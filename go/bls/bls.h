@@ -97,11 +97,11 @@ bool deserialize_signature(const uint8_t *in_signature_bytes,
                            int in_signature_bytes_len,
                            Signature **out_signature);
 
-void destroy_private_key(PrivateKey *private_key);
+bool destroy_private_key(PrivateKey *private_key);
 
-void destroy_public_key(PublicKey *public_key);
+bool destroy_public_key(PublicKey *public_key);
 
-void destroy_signature(Signature *signature);
+bool destroy_signature(Signature *signature);
 
 bool encode_epoch_block_to_bytes(unsigned short in_epoch_index,
                                  unsigned int in_maximum_non_signers,
@@ -112,7 +112,7 @@ bool encode_epoch_block_to_bytes(unsigned short in_epoch_index,
                                  int *out_len);
 
 
-void free_vec(uint8_t *bytes, int len);
+bool free_vec(uint8_t *bytes, int len);
 
 bool generate_private_key(PrivateKey **out_private_key);
 

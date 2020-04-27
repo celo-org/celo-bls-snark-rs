@@ -65,7 +65,7 @@ impl Signature {
     pub fn aggregate<S: Borrow<Signature>>(signatures: impl IntoIterator<Item = S>) -> Signature {
         let mut asig = G1Projective::zero();
         for sig in signatures {
-            asig = asig + sig.borrow().as_ref();
+            asig += sig.borrow().as_ref();
         }
 
         asig.into()
@@ -126,7 +126,7 @@ impl Signature {
         if pairing == Fq12::one() {
             Ok(())
         } else {
-            Err(BLSError::VerificationFailed)?
+            Err(BLSError::VerificationFailed)
         }
     }
 }
@@ -243,12 +243,12 @@ mod tests {
         let mut asig = G1Projective::zero();
         let mut pubkeys = Vec::new();
         let mut sigs = Vec::new();
-        for i in 0..num_epochs {
+        for msg in msgs.iter().take(num_epochs) {
             let mut epoch_pubkey = G2Projective::zero();
             let mut epoch_sig = G1Projective::zero();
             for _ in 0..num_validators {
                 let sk = PrivateKey::generate(rng);
-                let s = sk.sign(&msgs[i].0, &msgs[i].1, &try_and_increment).unwrap();
+                let s = sk.sign(msg.0, msg.1, &try_and_increment).unwrap();
 
                 epoch_sig += s.as_ref();
                 epoch_pubkey += sk.to_public().as_ref();
@@ -276,10 +276,7 @@ mod tests {
             });
         }
 
-        let msgs_ffi = messages
-            .iter()
-            .map(|m| MessageFFI::from(m))
-            .collect::<Vec<_>>();
+        let msgs_ffi = messages.iter().map(MessageFFI::from).collect::<Vec<_>>();
 
         let mut verified: bool = false;
 
@@ -343,7 +340,7 @@ mod tests {
                 let num_x_bytes = x_bytes.len();
                 x_bytes[num_x_bytes - 1] |= 0x80;
             }
-            writer.write(&x_bytes)?;
+            writer.write_all(&x_bytes)?;
             Ok(())
         };
 
@@ -354,12 +351,11 @@ mod tests {
             x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
             let x = Fq::read(x_bytes_with_y.as_slice())?;
             let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
-                &((x.square() * &x) + &<Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
+                &((x.square() * x) + <Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
             );
-            let y = x3b.sqrt().ok_or(io::Error::new(
-                io::ErrorKind::NotFound,
-                "couldn't find square root for x",
-            ))?;
+            let y = x3b.sqrt().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
+            })?;
             let negy = -y;
             let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
             Ok((x, chosen_y))

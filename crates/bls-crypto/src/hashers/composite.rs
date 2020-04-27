@@ -187,7 +187,7 @@ mod test {
             0x2d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
             0x06, 0x54,
         ]);
-        let mut msg: Vec<u8> = vec![0; 100_000_0];
+        let mut msg: Vec<u8> = vec![0; 1_000_000];
         for i in msg.iter_mut() {
             *i = rng.gen();
         }

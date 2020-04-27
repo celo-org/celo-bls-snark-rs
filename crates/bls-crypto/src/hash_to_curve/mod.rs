@@ -1,4 +1,3 @@
-pub mod cofactor;
 pub mod try_and_increment;
 
 use crate::BLSError;

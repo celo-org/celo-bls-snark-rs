@@ -47,8 +47,8 @@ impl<'a> From<&'a MessageFFI> for Message<'a> {
 impl From<&Message<'_>> for MessageFFI {
     fn from(src: &Message) -> MessageFFI {
         MessageFFI {
-            data: Buffer::from(src.data.as_ref()),
-            extra: Buffer::from(src.extra.as_ref()),
+            data: Buffer::from(src.data),
+            extra: Buffer::from(src.extra),
             public_key: src.public_key as *const PublicKey,
             sig: src.sig as *const Signature,
         }

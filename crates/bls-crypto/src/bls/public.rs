@@ -1,4 +1,6 @@
-use crate::{BLSError, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN};
+use crate::{
+    BLSError, BlsResult, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN,
+};
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
@@ -6,12 +8,10 @@ use algebra::{
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
     SerializationError, Zero,
 };
-use std::hash::{Hash, Hasher};
-
-use crate::BlsResult;
 
 use std::{
-    io::{self, Read, Result as IoResult, Write},
+    hash::{Hash, Hasher},
+    io::{self, Cursor, Read, Result as IoResult, Write},
     ops::Neg,
 };
 
@@ -41,13 +41,14 @@ impl PublicKey {
     pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
         let mut apk = G2Projective::zero();
         for pk in public_keys.iter() {
-            apk = apk + pk.as_ref();
+            apk += pk.as_ref();
         }
         apk.into()
     }
 
-    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
-        PublicKey::deserialize(&mut &data[..]).map_err(|_| io::ErrorKind::InvalidInput.into())
+    pub fn from_vec(data: &[u8]) -> IoResult<PublicKey> {
+        PublicKey::deserialize(&mut Cursor::new(data))
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -93,7 +94,7 @@ impl PublicKey {
         if pairing == Fq12::one() {
             Ok(())
         } else {
-            Err(BLSError::VerificationFailed)?
+            Err(BLSError::VerificationFailed)
         }
     }
 }
@@ -191,12 +192,10 @@ mod test {
             let half = Fq::modulus_minus_one_div_two();
             affine.x.write(&mut x_bytes)?;
             let num_x_bytes = x_bytes.len();
-            if y_c1_big > half {
-                x_bytes[num_x_bytes - 1] |= 0x80;
-            } else if y_c1_big == half && y_c0_big > half {
+            if y_c1_big > half || (y_c1_big == half && y_c0_big > half) {
                 x_bytes[num_x_bytes - 1] |= 0x80;
             }
-            writer.write(&x_bytes)?;
+            writer.write_all(&x_bytes)?;
 
             Ok(())
         };
@@ -208,12 +207,11 @@ mod test {
             x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
             let x = Fq2::read(x_bytes_with_y.as_slice())?;
             let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
-                &((x.square() * &x) + &<Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
+                &((x.square() * x) + <Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
             );
-            let y = x3b.sqrt().ok_or(io::Error::new(
-                io::ErrorKind::NotFound,
-                "couldn't find square root for x",
-            ))?;
+            let y = x3b.sqrt().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
+            })?;
 
             let y_c0_big = y.c0.into_repr();
             let y_c1_big = y.c1.into_repr();
@@ -222,9 +220,7 @@ mod test {
 
             let (bigger, smaller) = {
                 let half = Fq::modulus_minus_one_div_two();
-                if y_c1_big > half {
-                    (y, negy)
-                } else if y_c1_big == half && y_c0_big > half {
+                if y_c1_big > half || (y_c1_big == half && y_c0_big > half) {
                     (y, negy)
                 } else {
                     (negy, y)

@@ -252,12 +252,12 @@ mod test {
         rng: &mut impl Rng,
         expected_hashes: Vec<Vec<u8>>,
     ) {
-        for i in 0..10 {
+        for expected_hash in expected_hashes.into_iter() {
             let (domain, msg, extra_data) = generate_test_data(rng);
             let g = hasher.hash(&domain, &msg, &extra_data).unwrap();
             let mut bytes = vec![];
             g.into_affine().serialize(&mut bytes).unwrap();
-            assert_eq!(expected_hashes[i], bytes);
+            assert_eq!(expected_hash, bytes);
         }
     }
 }
