@@ -1,4 +1,6 @@
-use crate::{BLSError, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN, BlsResult};
+use crate::{
+    BLSError, BlsResult, HashToCurve, PrivateKey, PublicKeyCache, Signature, POP_DOMAIN, SIG_DOMAIN,
+};
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
@@ -8,8 +10,8 @@ use algebra::{
 };
 
 use std::{
-    io::{self, Read, Result as IoResult, Write, Cursor},
     hash::{Hash, Hasher},
+    io::{self, Cursor, Read, Result as IoResult, Write},
     ops::Neg,
 };
 
@@ -45,7 +47,8 @@ impl PublicKey {
     }
 
     pub fn from_vec(data: &[u8]) -> IoResult<PublicKey> {
-        PublicKey::deserialize(&mut Cursor::new(data)).map_err(|_| io::ErrorKind::InvalidInput.into())
+        PublicKey::deserialize(&mut Cursor::new(data))
+            .map_err(|_| io::ErrorKind::InvalidInput.into())
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -206,10 +209,9 @@ mod test {
             let x3b = <Bls12_377G2Parameters as SWModelParameters>::add_b(
                 &((x.square() * x) + <Bls12_377G2Parameters as SWModelParameters>::mul_by_a(&x)),
             );
-            let y = x3b.sqrt().ok_or_else(|| io::Error::new(
-                io::ErrorKind::NotFound,
-                "couldn't find square root for x",
-            ))?;
+            let y = x3b.sqrt().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
+            })?;
 
             let y_c0_big = y.c0.into_repr();
             let y_c1_big = y.c1.into_repr();

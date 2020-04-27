@@ -21,10 +21,10 @@ use algebra::{
     AffineCurve, FromBytes, ProjectiveCurve, ToBytes,
 };
 use log::error;
+use once_cell::sync::Lazy;
 use rand::thread_rng;
 use std::{error::Error, fmt::Display, os::raw::c_int, slice};
 use thiserror::Error;
-use once_cell::sync::Lazy;
 
 /// Convenience result alias
 pub type BlsResult<T> = std::result::Result<T, BLSError>;
@@ -66,7 +66,7 @@ pub extern "C" fn init() {
     Lazy::force(&DIRECT_HASH_TO_G1);
 }
 
-/// # Safety 
+/// # Safety
 ///
 /// out_private_key must initialized to memory that can contain a pointer.
 #[no_mangle]
@@ -291,7 +291,7 @@ pub extern "C" fn compress_pubkey(
     })
 }
 
-/// # Safety 
+/// # Safety
 ///
 /// This function must only be called on a valid PrivateKey instance pointer.
 #[no_mangle]
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn destroy_private_key(private_key: *mut PrivateKey) -> bo
     true
 }
 
-/// # Safety 
+/// # Safety
 ///
 /// This function must only be called on a valid vector pointer.
 #[no_mangle]
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn free_vec(bytes: *mut u8, len: c_int) -> bool {
     true
 }
 
-/// # Safety 
+/// # Safety
 ///
 /// This function must only be called on a valid PublicKey instance pointer.
 #[no_mangle]
@@ -327,8 +327,7 @@ pub unsafe extern "C" fn destroy_public_key(public_key: *mut PublicKey) -> bool 
     true
 }
 
-
-/// # Safety 
+/// # Safety
 ///
 /// This function must only be called on a valid Signature instance pointer.
 #[no_mangle]
@@ -430,10 +429,7 @@ pub extern "C" fn batch_verify_signature(
         let messages: &[MessageFFI] = unsafe { slice::from_raw_parts(messages_ptr, messages_len) };
 
         // Get the data from the underlying pointers in the right format
-        let messages = messages
-            .iter()
-            .map(Message::from)
-            .collect::<Vec<_>>();
+        let messages = messages.iter().map(Message::from).collect::<Vec<_>>();
 
         let asig = Signature::aggregate(messages.iter().map(|m| m.sig));
 

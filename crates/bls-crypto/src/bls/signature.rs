@@ -276,10 +276,7 @@ mod tests {
             });
         }
 
-        let msgs_ffi = messages
-            .iter()
-            .map(MessageFFI::from)
-            .collect::<Vec<_>>();
+        let msgs_ffi = messages.iter().map(MessageFFI::from).collect::<Vec<_>>();
 
         let mut verified: bool = false;
 
@@ -356,10 +353,9 @@ mod tests {
             let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
                 &((x.square() * x) + <Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
             );
-            let y = x3b.sqrt().ok_or_else(|| io::Error::new(
-                io::ErrorKind::NotFound,
-                "couldn't find square root for x",
-            ))?;
+            let y = x3b.sqrt().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
+            })?;
             let negy = -y;
             let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
             Ok((x, chosen_y))
