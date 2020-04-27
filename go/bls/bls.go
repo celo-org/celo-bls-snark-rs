@@ -114,12 +114,16 @@ func (self *PrivateKey) Serialize() ([]byte, error) {
 	var bytes *C.uchar
 	var size C.int
 	success := C.serialize_private_key(self.ptr, &bytes, &size)
-	defer C.free_vec(bytes, size)
+	if !success {
+		return nil, GeneralError
+	}
+	goBytes := C.GoBytes(unsafe.Pointer(bytes), size)
+	success = C.free_vec(bytes, size)
 	if !success {
 		return nil, GeneralError
 	}
 
-	return C.GoBytes(unsafe.Pointer(bytes), size), nil
+	return goBytes, nil
 }
 
 func (self *PrivateKey) ToPublic() (*PublicKey, error) {
@@ -161,11 +165,14 @@ func HashDirect(message []byte, usePoP bool) ([]byte, error) {
 	var hashPtr *C.uchar
 	var hashLen C.int
 	success := C.hash_direct(messagePtr, messageLen, &hashPtr, &hashLen, C.bool(usePoP))
-	defer C.free_vec(hashPtr, hashLen)
 	if !success {
 		return nil, GeneralError
 	}
 	hash := C.GoBytes(unsafe.Pointer(hashPtr), hashLen)
+	success = C.free_vec(hashPtr, hashLen)
+	if !success {
+		return nil, GeneralError
+	}
 	return hash, nil
 }
 
@@ -206,8 +213,8 @@ func CompressPublickey(pubkey []byte) ([]byte, error) {
 	return compressedPubkey, nil
 }
 
-func (self *PrivateKey) Destroy() {
-	C.destroy_private_key(self.ptr)
+func (self *PrivateKey) Destroy() bool {
+	return bool(C.destroy_private_key(self.ptr))
 }
 
 func DeserializePublicKey(publicKeyBytes []byte) (*PublicKey, error) {
@@ -231,16 +238,20 @@ func (self *PublicKey) Serialize() ([]byte, error) {
 	var bytes *C.uchar
 	var size C.int
 	success := C.serialize_public_key(self.ptr, &bytes, &size)
-	defer C.free_vec(bytes, size)
 	if !success {
 		return nil, GeneralError
 	}
 
-	return C.GoBytes(unsafe.Pointer(bytes), size), nil
+	goBytes := C.GoBytes(unsafe.Pointer(bytes), size)
+	success = C.free_vec(bytes, size)
+	if !success {
+		return nil, GeneralError
+	}
+	return goBytes, nil
 }
 
-func (self *PublicKey) Destroy() {
-	C.destroy_public_key(self.ptr)
+func (self *PublicKey) Destroy() bool {
+	return bool(C.destroy_public_key(self.ptr))
 }
 
 func toBuffer(data []byte) C.Buffer {
@@ -358,16 +369,20 @@ func (self *Signature) Serialize() ([]byte, error) {
 	var bytes *C.uchar
 	var size C.int
 	success := C.serialize_signature(self.ptr, &bytes, &size)
-	defer C.free_vec(bytes, size)
 	if !success {
 		return nil, GeneralError
 	}
 
-	return C.GoBytes(unsafe.Pointer(bytes), size), nil
+	goBytes := C.GoBytes(unsafe.Pointer(bytes), size)
+	success = C.free_vec(bytes, size)
+	if !success {
+		return nil, GeneralError
+	}
+	return goBytes, nil
 }
 
-func (self *Signature) Destroy() {
-	C.destroy_signature(self.ptr)
+func (self *Signature) Destroy() bool {
+	return bool(C.destroy_signature(self.ptr))
 }
 
 func AggregatePublicKeys(publicKeys []*PublicKey) (*PublicKey, error) {
@@ -455,9 +470,13 @@ func encodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublic
 	if !success {
 		return nil, GeneralError
 	}
-	defer C.free_vec(bytes, size)
 
-	return C.GoBytes(unsafe.Pointer(bytes), size), nil
+	goBytes := C.GoBytes(unsafe.Pointer(bytes), size)
+	success = C.free_vec(bytes, size)
+	if !success {
+		return nil, GeneralError
+	}
+	return goBytes, nil
 }
 
 func EncodeEpochToBytes(epochIndex uint16, maximumNonSigners uint32, addedPublicKeys []*PublicKey) ([]byte, error) {
