@@ -1,7 +1,6 @@
 //! # BLS Cryptography
 //!
 //! This crate implements cryptographic operations for BLS signatures
-#![allow(clippy::all)]
 /// BLS signing
 mod bls;
 pub use bls::{ffi, PrivateKey, PublicKey, PublicKeyCache, Signature};
@@ -25,6 +24,7 @@ use log::error;
 use rand::thread_rng;
 use std::{error::Error, fmt::Display, os::raw::c_int, slice};
 use thiserror::Error;
+use once_cell::sync::Lazy;
 
 /// Convenience result alias
 pub type BlsResult<T> = std::result::Result<T, BLSError>;
@@ -62,17 +62,18 @@ pub enum BLSError {
 #[no_mangle]
 /// Initializes the lazily evaluated hashers.
 pub extern "C" fn init() {
-    &*COMPOSITE_HASH_TO_G1;
-    &*DIRECT_HASH_TO_G1;
+    Lazy::force(&COMPOSITE_HASH_TO_G1);
+    Lazy::force(&DIRECT_HASH_TO_G1);
 }
 
+/// # Safety 
+///
+/// out_private_key must initialized to memory that can contain a pointer.
 #[no_mangle]
-pub extern "C" fn generate_private_key(out_private_key: *mut *mut PrivateKey) -> bool {
+pub unsafe extern "C" fn generate_private_key(out_private_key: *mut *mut PrivateKey) -> bool {
     let mut rng = thread_rng();
     let key = PrivateKey::generate(&mut rng);
-    unsafe {
-        *out_private_key = Box::into_raw(Box::new(key));
-    }
+    *out_private_key = Box::into_raw(Box::new(key));
 
     true
 }
@@ -290,30 +291,53 @@ pub extern "C" fn compress_pubkey(
     })
 }
 
+/// # Safety 
+///
+/// This function must only be called on a valid PrivateKey instance pointer.
 #[no_mangle]
-pub extern "C" fn destroy_private_key(private_key: *mut PrivateKey) {
-    drop(unsafe {
-        Box::from_raw(private_key);
-    })
+pub unsafe extern "C" fn destroy_private_key(private_key: *mut PrivateKey) -> bool {
+    if private_key.is_null() {
+        return false;
+    }
+    Box::from_raw(private_key);
+    true
 }
 
+/// # Safety 
+///
+/// This function must only be called on a valid vector pointer.
 #[no_mangle]
-pub extern "C" fn free_vec(bytes: *mut u8, len: c_int) {
-    drop(unsafe { Vec::from_raw_parts(bytes, len as usize, len as usize) });
+pub unsafe extern "C" fn free_vec(bytes: *mut u8, len: c_int) -> bool {
+    if bytes.is_null() {
+        return false;
+    }
+    Vec::from_raw_parts(bytes, len as usize, len as usize);
+    true
 }
 
+/// # Safety 
+///
+/// This function must only be called on a valid PublicKey instance pointer.
 #[no_mangle]
-pub extern "C" fn destroy_public_key(public_key: *mut PublicKey) {
-    drop(unsafe {
-        Box::from_raw(public_key);
-    })
+pub unsafe extern "C" fn destroy_public_key(public_key: *mut PublicKey) -> bool {
+    if public_key.is_null() {
+        return false;
+    }
+    Box::from_raw(public_key);
+    true
 }
 
+
+/// # Safety 
+///
+/// This function must only be called on a valid Signature instance pointer.
 #[no_mangle]
-pub extern "C" fn destroy_signature(signature: *mut Signature) {
-    drop(unsafe {
-        Box::from_raw(signature);
-    })
+pub unsafe extern "C" fn destroy_signature(signature: *mut Signature) -> bool {
+    if signature.is_null() {
+        return false;
+    }
+    Box::from_raw(signature);
+    true
 }
 
 #[no_mangle]
@@ -408,7 +432,7 @@ pub extern "C" fn batch_verify_signature(
         // Get the data from the underlying pointers in the right format
         let messages = messages
             .iter()
-            .map(|m| Message::from(m))
+            .map(Message::from)
             .collect::<Vec<_>>();
 
         let asig = Signature::aggregate(messages.iter().map(|m| m.sig));

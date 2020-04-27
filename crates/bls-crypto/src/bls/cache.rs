@@ -18,7 +18,7 @@ static FROM_VEC_CACHE: Lazy<Mutex<LruCache<Vec<u8>, PublicKey>>> =
 static AGGREGATE_CACHE: Lazy<Mutex<AggregateCacheState>> = Lazy::new(|| {
     Mutex::new(AggregateCacheState {
         keys: HashSet::new(),
-        combined: G2Projective::zero().clone(),
+        combined: G2Projective::zero(),
     })
 });
 
@@ -29,32 +29,35 @@ impl PublicKeyCache {
         FROM_VEC_CACHE.lock().unwrap().clear();
         let mut cache = AGGREGATE_CACHE.lock().unwrap();
         cache.keys = HashSet::new();
-        cache.combined = G2Projective::zero().clone();
+        cache.combined = G2Projective::zero();
     }
 
     pub fn resize(cap: usize) {
         FROM_VEC_CACHE.lock().unwrap().resize(cap);
     }
 
-    pub fn from_vec(data: &Vec<u8>) -> IoResult<PublicKey> {
+    pub fn from_vec(data: &[u8]) -> IoResult<PublicKey> {
         let cached_result = PublicKeyCache::from_vec_cached(data);
-        if cached_result.is_none() {
-            // cache miss
-            let generated_result = PublicKey::from_vec(data)?;
-            FROM_VEC_CACHE
-                .lock()
-                .unwrap()
-                .put(data.to_owned(), generated_result.clone());
-            Ok(generated_result)
-        } else {
-            // cache hit
-            Ok(cached_result.unwrap())
+        match cached_result {
+            None => {
+                // cache miss
+                let generated_result = PublicKey::from_vec(data)?;
+                FROM_VEC_CACHE
+                    .lock()
+                    .unwrap()
+                    .put(data.to_owned(), generated_result.clone());
+                Ok(generated_result)
+            }
+            Some(cached_result) => {
+                // cache hit
+                Ok(cached_result)
+            }
         }
     }
 
-    pub fn from_vec_cached(data: &Vec<u8>) -> Option<PublicKey> {
+    pub fn from_vec_cached(data: &[u8]) -> Option<PublicKey> {
         let mut cache = FROM_VEC_CACHE.lock().unwrap();
-        Some(cache.get(data)?.clone())
+        Some(cache.get(&data.to_vec())?.clone())
     }
 
     pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
@@ -68,11 +71,11 @@ impl PublicKeyCache {
         let mut combined = cache.combined;
 
         for key in cache.keys.difference(&keys) {
-            combined = combined - key.as_ref();
+            combined -= key.as_ref();
         }
 
         for key in keys.difference(&cache.keys) {
-            combined = combined + key.as_ref();
+            combined += key.as_ref();
         }
 
         cache.keys = keys;
