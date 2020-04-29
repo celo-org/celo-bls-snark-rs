@@ -3,6 +3,6 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../../target/mipsel-unknown-linux-gnu/release -lepoch_snark -ldl -lm
+#cgo LDFLAGS: -lepoch_snark -ldl -lm
 */
 import "C"

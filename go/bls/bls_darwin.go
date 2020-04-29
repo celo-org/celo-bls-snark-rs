@@ -3,6 +3,6 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../../target/i686-apple-darwin/release -L../../target/release -lepoch_snark -ldl -lm
+#cgo LDFLAGS: -lepoch_snark -ldl -lm
 */
 import "C"

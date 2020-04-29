@@ -3,7 +3,7 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L../../target/aarch64-unknown-linux-gnu/release -lepoch_snark -ldl -lm
+#cgo LDFLAGS: -lepoch_snark -ldl -lm
 */
 import "C"
 
