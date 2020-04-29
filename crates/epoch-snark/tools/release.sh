@@ -50,16 +50,16 @@ then
     echo "$DIRECTORY exists on your filesystem."
     exit
 fi
+mkdir -p $DIRECTORY
 
 TOOLS_DIR=`dirname $0`
 COMPILE_DIR=${TOOLS_DIR}/../../../target
 for platform in `ls ${COMPILE_DIR}`
 do
-  PLATFORM_DIR=${DIRECTORY}/$platform
-  mkdir -p ${PLATFORM_DIR}
   LIB_PATH=${COMPILE_DIR}/$platform/release/libepoch_snark.a
+  TARGET_PATH=${DIRECTORY}/libepoch_snark_${platform}_${VERSION}.a
   if [[ -f ${LIB_PATH} ]]
   then
-    cp ${COMPILE_DIR}/$platform/release/libepoch_snark.a ${PLATFORM_DIR}
+    cp ${COMPILE_DIR}/$platform/release/libepoch_snark.a ${TARGET_PATH}
   fi
 done

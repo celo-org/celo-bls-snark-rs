@@ -3,7 +3,7 @@
 package bls
 
 /*
-#cgo LDFLAGS: -l0.1.0/x86_64-apple-darwin/libepoch_snark.a -ldl -lm
+#cgo LDFLAGS: -epoch_snark_x86_64-apple-darwin_0.1.0 -ldl -lm
 */
 import "C"
 
