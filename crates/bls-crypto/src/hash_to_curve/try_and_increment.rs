@@ -16,9 +16,8 @@ use algebra::{
     curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
     curves::models::{bls12::Bls12Parameters, SWModelParameters},
     AffineCurve, Zero,
+    ConstantSerializedSize,
 };
-
-use algebra::ConstantSerializedSize;
 
 use once_cell::sync::Lazy;
 
@@ -100,6 +99,22 @@ where
             // produce a hash with sufficient length
             let candidate_hash = self.hasher.hash(domain, msg, hash_bytes)?;
 
+            // handle the Celo deployed bit extraction logic
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "compat")] {
+                    use algebra::serialize::{Flags, SWFlags};
+
+                    let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
+                    let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
+                    if positive_flag {
+                        candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
+                    } else {
+                        candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
+                    }
+                    let candidate_hash = candidate_hash;
+                }
+            }
+
             if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
                     "succeeded hashing \"{}\" to curve in {} tries",
@@ -133,37 +148,13 @@ fn hash_length(n: usize) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use algebra::{bls12_377::Parameters, curves::ProjectiveCurve, CanonicalSerialize};
-    use rand::RngCore;
-    use rand::{Rng, SeedableRng};
-    use rand_xorshift::XorShiftRng;
+    use algebra::{bls12_377::Parameters, ProjectiveCurve, CanonicalSerialize};
+    use rand::{Rng, RngCore};
 
     #[test]
     fn test_hash_length() {
         assert_eq!(hash_length(48), 64);
         assert_eq!(hash_length(96), 96);
-    }
-
-    fn generate_test_data<R: Rng>(rng: &mut R) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-        let msg_size: u8 = rng.gen();
-        let mut msg: Vec<u8> = vec![0; msg_size as usize];
-        for i in msg.iter_mut() {
-            *i = rng.gen();
-        }
-
-        let mut domain = vec![0u8; 8];
-        for i in domain.iter_mut() {
-            *i = rng.gen();
-        }
-
-        let extra_data_size: u8 = rng.gen();
-        let mut extra_data: Vec<u8> = vec![0; extra_data_size as usize];
-        for i in extra_data.iter_mut() {
-            *i = rng.gen();
-        }
-
-        (domain, msg, extra_data)
     }
 
     #[test]
@@ -200,6 +191,172 @@ mod test {
         }
     }
 
+    pub fn generate_test_data<R: Rng>(rng: &mut R) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let msg_size: u8 = rng.gen();
+        let mut msg: Vec<u8> = vec![0; msg_size as usize];
+        for i in msg.iter_mut() {
+            *i = rng.gen();
+        }
+
+        let mut domain = vec![0u8; 8];
+        for i in domain.iter_mut() {
+            *i = rng.gen();
+        }
+
+        let extra_data_size: u8 = rng.gen();
+        let mut extra_data: Vec<u8> = vec![0; extra_data_size as usize];
+        for i in extra_data.iter_mut() {
+            *i = rng.gen();
+        }
+
+        (domain, msg, extra_data)
+    }
+
+    pub fn test_hash_to_group<P: SWModelParameters, H: HashToCurve<Output = GroupProjective<P>>>(
+        hasher: &H,
+        rng: &mut impl Rng,
+        expected_hashes: Vec<Vec<u8>>,
+    ) {
+        for expected_hash in expected_hashes.into_iter() {
+            let (domain, msg, extra_data) = generate_test_data(rng);
+            let g = hasher.hash(&domain, &msg, &extra_data).unwrap();
+            let mut bytes = vec![];
+            g.into_affine().serialize(&mut bytes).unwrap();
+            assert_eq!(expected_hash, bytes);
+        }
+    }
+}
+
+#[cfg(all(test, feature="compat"))]
+mod compat_tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
+    use algebra::{Field, SquareRootField, PrimeField, FpParameters, curves::models::{bls12::{G1Affine, G1Projective}, ModelParameters}, FromBytes, ProjectiveCurve, CanonicalSerialize};
+
+    const RNG_SEED: [u8; 16] = [
+        0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
+        0x06, 0x54,
+    ];
+
+    pub fn get_point_from_x_g1<P: Bls12Parameters>(
+        x: <P::G1Parameters as ModelParameters>::BaseField,
+        greatest: bool,
+    ) -> Option<G1Affine<P>> {
+        // Compute x^3 + ax + b
+        let x3b = <P::G1Parameters as SWModelParameters>::add_b(
+            &((x.square() * &x) + &<P::G1Parameters as SWModelParameters>::mul_by_a(&x)),
+        );
+
+        x3b.sqrt().map(|y| {
+            let negy = -y;
+
+            let y = if (y < negy) ^ greatest { y } else { negy };
+            G1Affine::<P>::new(x, y, false)
+        })
+    }
+
+
+    fn compat_hasher<P: Bls12Parameters>(
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+    ) -> Result<(G1Projective<P>, usize), BLSError> {
+        const NUM_TRIES: usize = 256;
+        const EXPECTED_TOTAL_BITS: usize = 512;
+        const LAST_BYTE_MASK: u8 = 1;
+        const GREATEST_MASK: u8 = 2;
+
+        let hasher = &*COMPOSITE_HASHER;
+
+        let fp_bits =
+            (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64) / 8.0).ceil() as usize) * 8;
+        let num_bits = fp_bits;
+        let num_bytes = num_bits / 8;
+
+        //round up to a multiple of 8
+        let hash_fp_bits =
+            (((<P::Fp as PrimeField>::Params::MODULUS_BITS as f64) / 256.0).ceil() as usize) * 256;
+        let hash_num_bits = hash_fp_bits;
+        assert_eq!(hash_num_bits, EXPECTED_TOTAL_BITS);
+        let hash_num_bytes = hash_num_bits / 8;
+        let mut counter: [u8; 1] = [0; 1];
+        let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
+        for c in 0..NUM_TRIES {
+            (&mut counter[..]).write_u8(c as u8)?;
+            let hash = hasher.hash(
+                domain,
+                &[&counter, extra_data, &message].concat(),
+                hash_num_bytes,
+            )?;
+            let (possible_x, greatest) = {
+                //zero out the last byte except the first bit, to get to a total of 377 bits
+                let mut possible_x_bytes = hash[..num_bytes].to_vec();
+                let possible_x_bytes_len = possible_x_bytes.len();
+                let greatest =
+                    (possible_x_bytes[possible_x_bytes_len - 1] & GREATEST_MASK) == GREATEST_MASK;
+                possible_x_bytes[possible_x_bytes_len - 1] &= LAST_BYTE_MASK;
+                let possible_x = P::Fp::read(possible_x_bytes.as_slice());
+                if possible_x.is_err() {
+                    continue;
+                }
+
+                (possible_x.unwrap(), greatest)
+            };
+            match get_point_from_x_g1::<P>(possible_x, greatest) {
+                None => continue,
+                Some(x) => {
+                    trace!(
+                        "succeeded hashing \"{}\" to G1 in {} tries",
+                        hex::encode(message),
+                        c
+                    );
+                    end_timer!(hash_loop_time);
+                    let scaled = x.scale_by_cofactor();
+                    if scaled.is_zero() {
+                        continue;
+                    }
+                    return Ok((scaled, c));
+                }
+            }
+        }
+        Err(BLSError::HashToCurveError)?
+    }
+
+    fn generate_compat_expected_hashes(num_expected_hashes: usize) -> Vec<Vec<u8>> {
+        let mut rng = XorShiftRng::from_seed(RNG_SEED);
+
+        let mut expected_hashes = vec![];
+        for _ in 0..num_expected_hashes {
+            let (domain, msg, extra_data) = super::test::generate_test_data(&mut rng);
+            let expected_hash_point = compat_hasher::<Parameters>(&domain, &msg, &extra_data).unwrap().0;
+
+            let mut expected_hash = vec![];
+            expected_hash_point.into_affine().serialize(&mut expected_hash).unwrap();
+            expected_hashes.push(expected_hash);
+        }
+        
+        expected_hashes
+    }
+
+    #[test]
+    fn test_hash_to_curve_g1() {
+        let mut rng = XorShiftRng::from_seed(RNG_SEED);
+        let expected_hashes = generate_compat_expected_hashes(10);
+
+        let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&*COMPOSITE_HASHER);
+        super::test::test_hash_to_group(&hasher, &mut rng, expected_hashes)
+    }
+}
+
+#[cfg(all(test, not(feature="compat")))]
+mod non_compat_tests {
+    use super::*;
+    use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
+    use algebra::bls12_377::Parameters;
+
     #[test]
     fn test_hash_to_curve_g1() {
         let mut rng = XorShiftRng::from_seed([
@@ -219,9 +376,10 @@ mod test {
             "b68e1db4b648801676a79ac199eaf003757bf2a96cdbb804bfefe0484afdc0cc299d50d660221d1de374e92c44291200",
         ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
 
-        test_hash_to_group(&*COMPOSITE_HASH_TO_G1, &mut rng, expected_hashes)
+        super::test::test_hash_to_group(&*COMPOSITE_HASH_TO_G1, &mut rng, expected_hashes)
     }
 
+    #[cfg(not(feature ="compat"))]
     #[test]
     fn test_hash_to_curve_g2() {
         let mut rng = XorShiftRng::from_seed([
@@ -244,20 +402,7 @@ mod test {
         let hasher_g2 = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G2Parameters>::new(
             &*COMPOSITE_HASHER,
         );
-        test_hash_to_group(&hasher_g2, &mut rng, expected_hashes)
+        super::test::test_hash_to_group(&hasher_g2, &mut rng, expected_hashes)
     }
 
-    fn test_hash_to_group<P: SWModelParameters, H: HashToCurve<Output = GroupProjective<P>>>(
-        hasher: &H,
-        rng: &mut impl Rng,
-        expected_hashes: Vec<Vec<u8>>,
-    ) {
-        for expected_hash in expected_hashes.into_iter() {
-            let (domain, msg, extra_data) = generate_test_data(rng);
-            let g = hasher.hash(&domain, &msg, &extra_data).unwrap();
-            let mut bytes = vec![];
-            g.into_affine().serialize(&mut bytes).unwrap();
-            assert_eq!(expected_hash, bytes);
-        }
-    }
 }
