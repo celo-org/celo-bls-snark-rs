@@ -42,7 +42,7 @@ jobs:
             - v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Build
-          command: cargo build --release
+          command: cargo build --release --all-features
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -50,7 +50,7 @@ jobs:
           key: v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run tests
-          command: cargo test --release
+          command: cargo test --release --all-features
           no_output_timeout: 30m
       - run:
           name: Run compat tests

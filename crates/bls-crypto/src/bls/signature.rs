@@ -150,7 +150,6 @@ impl FromBytes for Signature {
 mod tests {
     use super::*;
     use crate::{
-        ffi::{Message, MessageFFI},
         hash_to_curve::try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
         hashers::{composite::COMPOSITE_HASHER, DirectHasher, XOF},
         test_helpers::{keygen_batch, sign_batch, sum},
@@ -266,28 +265,32 @@ mod tests {
 
         assert!(res.is_ok());
 
-        let mut messages = Vec::new();
-        for i in 0..num_epochs {
-            messages.push(Message {
-                data: msgs[i].0,
-                extra: msgs[i].1,
-                public_key: &pubkeys[i],
-                sig: &sigs[i],
-            });
+        #[cfg(feature = "ffi")]
+        {
+            use crate::ffi::utils::{Message, MessageFFI};
+            let mut messages = Vec::new();
+            for i in 0..num_epochs {
+                messages.push(Message {
+                    data: msgs[i].0,
+                    extra: msgs[i].1,
+                    public_key: &pubkeys[i],
+                    sig: &sigs[i],
+                });
+            }
+
+            let msgs_ffi = messages.iter().map(MessageFFI::from).collect::<Vec<_>>();
+
+            let mut verified: bool = false;
+
+            let success = crate::ffi::signatures::batch_verify_signature(
+                &msgs_ffi[0] as *const MessageFFI,
+                msgs_ffi.len(),
+                is_composite,
+                &mut verified as *mut bool,
+            );
+            assert!(success);
+            assert!(verified);
         }
-
-        let msgs_ffi = messages.iter().map(MessageFFI::from).collect::<Vec<_>>();
-
-        let mut verified: bool = false;
-
-        let success = crate::batch_verify_signature(
-            &msgs_ffi[0] as *const MessageFFI,
-            msgs_ffi.len(),
-            is_composite,
-            &mut verified as *mut bool,
-        );
-        assert!(success);
-        assert!(verified);
     }
 
     #[test]
