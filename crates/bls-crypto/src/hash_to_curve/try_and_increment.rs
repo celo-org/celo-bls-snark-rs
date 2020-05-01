@@ -342,7 +342,7 @@ mod compat_tests {
     #[test]
     fn test_hash_to_curve_g1() {
         let mut rng = XorShiftRng::from_seed(RNG_SEED);
-        let expected_hashes = generate_compat_expected_hashes(10);
+        let expected_hashes = generate_compat_expected_hashes(1000);
 
         let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&*COMPOSITE_HASHER);
         super::test::test_hash_to_group(&hasher, &mut rng, expected_hashes)
