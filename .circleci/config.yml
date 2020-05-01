@@ -53,6 +53,10 @@ jobs:
           command: cargo test --release
           no_output_timeout: 30m
       - run:
+          name: Run compat tests
+          command: cd crates/bls-crypto && cargo test --release --features compat
+          no_output_timeout: 30m
+      - run:
           name: Check Style
           command: |
             cargo fmt --all -- --check
