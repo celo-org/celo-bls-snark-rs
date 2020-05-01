@@ -15,8 +15,7 @@ use algebra::{
     bls12_377::Parameters,
     curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
     curves::models::{bls12::Bls12Parameters, SWModelParameters},
-    AffineCurve, Zero,
-    ConstantSerializedSize,
+    AffineCurve, ConstantSerializedSize, Zero,
 };
 
 use once_cell::sync::Lazy;
@@ -148,7 +147,7 @@ fn hash_length(n: usize) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use algebra::{bls12_377::Parameters, ProjectiveCurve, CanonicalSerialize};
+    use algebra::{bls12_377::Parameters, CanonicalSerialize, ProjectiveCurve};
     use rand::{Rng, RngCore};
 
     #[test]
@@ -227,16 +226,23 @@ mod test {
     }
 }
 
-#[cfg(all(test, feature="compat"))]
+#[cfg(all(test, feature = "compat"))]
 mod compat_tests {
     use super::*;
+    use algebra::{
+        curves::models::{
+            bls12::{G1Affine, G1Projective},
+            ModelParameters,
+        },
+        CanonicalSerialize, Field, FpParameters, FromBytes, PrimeField, ProjectiveCurve,
+        SquareRootField,
+    };
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
-    use algebra::{Field, SquareRootField, PrimeField, FpParameters, curves::models::{bls12::{G1Affine, G1Projective}, ModelParameters}, FromBytes, ProjectiveCurve, CanonicalSerialize};
 
     const RNG_SEED: [u8; 16] = [
-        0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
-        0x06, 0x54,
+        0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06,
+        0x54,
     ];
 
     pub fn get_point_from_x_g1<P: Bls12Parameters>(
@@ -255,7 +261,6 @@ mod compat_tests {
             G1Affine::<P>::new(x, y, false)
         })
     }
-
 
     fn compat_hasher<P: Bls12Parameters>(
         domain: &[u8],
@@ -329,13 +334,18 @@ mod compat_tests {
         let mut expected_hashes = vec![];
         for _ in 0..num_expected_hashes {
             let (domain, msg, extra_data) = super::test::generate_test_data(&mut rng);
-            let expected_hash_point = compat_hasher::<Parameters>(&domain, &msg, &extra_data).unwrap().0;
+            let expected_hash_point = compat_hasher::<Parameters>(&domain, &msg, &extra_data)
+                .unwrap()
+                .0;
 
             let mut expected_hash = vec![];
-            expected_hash_point.into_affine().serialize(&mut expected_hash).unwrap();
+            expected_hash_point
+                .into_affine()
+                .serialize(&mut expected_hash)
+                .unwrap();
             expected_hashes.push(expected_hash);
         }
-        
+
         expected_hashes
     }
 
@@ -344,18 +354,20 @@ mod compat_tests {
         let mut rng = XorShiftRng::from_seed(RNG_SEED);
         let expected_hashes = generate_compat_expected_hashes(1000);
 
-        let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&*COMPOSITE_HASHER);
+        let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(
+            &*COMPOSITE_HASHER,
+        );
         super::test::test_hash_to_group(&hasher, &mut rng, expected_hashes)
     }
 }
 
-#[cfg(all(test, not(feature="compat")))]
+#[cfg(all(test, not(feature = "compat")))]
 mod non_compat_tests {
     use super::*;
     use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
+    use algebra::bls12_377::Parameters;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
-    use algebra::bls12_377::Parameters;
 
     #[test]
     fn test_hash_to_curve_g1() {
@@ -379,7 +391,7 @@ mod non_compat_tests {
         super::test::test_hash_to_group(&*COMPOSITE_HASH_TO_G1, &mut rng, expected_hashes)
     }
 
-    #[cfg(not(feature ="compat"))]
+    #[cfg(not(feature = "compat"))]
     #[test]
     fn test_hash_to_curve_g2() {
         let mut rng = XorShiftRng::from_seed([
@@ -404,5 +416,4 @@ mod non_compat_tests {
         );
         super::test::test_hash_to_group(&hasher_g2, &mut rng, expected_hashes)
     }
-
 }
