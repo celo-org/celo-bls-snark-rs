@@ -2,14 +2,13 @@ use crate::HashToCurve;
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine},
-    bytes::{FromBytes, ToBytes},
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
     SerializationError, Zero,
 };
 use std::borrow::Borrow;
 
 use std::{
-    io::{self, Read, Result as IoResult, Write},
+    io::{Read, Write},
     ops::Neg,
 };
 
@@ -131,21 +130,6 @@ impl Signature {
     }
 }
 
-impl ToBytes for Signature {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.serialize(&mut writer)
-            .map_err(|_| io::ErrorKind::InvalidInput.into())
-    }
-}
-
-impl FromBytes for Signature {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        Signature::deserialize(&mut reader).map_err(|_| io::ErrorKind::InvalidInput.into())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,14 +141,9 @@ mod tests {
     };
 
     use algebra::{
-        bls12_377::{
-            g1::Parameters as Bls12_377G1Parameters, Bls12_377, Fq, G1Projective, G2Projective,
-            Parameters,
-        },
-        bytes::{FromBytes, ToBytes},
-        curves::{bls12::Bls12Parameters, SWModelParameters},
-        CanonicalDeserialize, CanonicalSerialize, Field, PrimeField, ProjectiveCurve,
-        SquareRootField, UniformRand, Zero,
+        bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters},
+        curves::bls12::Bls12Parameters,
+        CanonicalDeserialize, CanonicalSerialize, UniformRand, Zero,
     };
     use rand::{thread_rng, Rng};
 
@@ -181,7 +160,9 @@ mod tests {
         let sig2 = sk2.sign(&message[..], &[], try_and_increment).unwrap();
         let sigs = &[sig1, sig2];
 
-        let apk = PublicKeyCache::aggregate(&[sk1.to_public(), sk2.to_public()]);
+        let mut cache = PublicKeyCache::new();
+
+        let apk = cache.aggregate(vec![sk1.to_public(), sk2.to_public()]);
         let asig = Signature::aggregate(sigs);
         apk.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
@@ -194,13 +175,13 @@ mod tests {
         apk.verify(&message2[..], &[], &asig, try_and_increment)
             .unwrap_err();
 
-        let apk2 = PublicKeyCache::aggregate(&[sk1.to_public()]);
+        let apk2 = cache.aggregate(vec![sk1.to_public()]);
         apk2.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap_err();
         apk2.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap();
 
-        let apk3 = PublicKeyCache::aggregate(&[sk2.to_public(), sk1.to_public()]);
+        let apk3 = cache.aggregate(vec![sk2.to_public(), sk1.to_public()]);
         apk3.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
         apk3.verify(&message[..], &[], &sigs[0], try_and_increment)
@@ -219,6 +200,7 @@ mod tests {
         test_batch_verify_with_hasher(&*COMPOSITE_HASHER, true);
     }
 
+    #[allow(unused)] // needed when we don't compile with ffi features
     fn test_batch_verify_with_hasher<X: XOF<Error = BLSError>>(hasher: &X, is_composite: bool) {
         let rng = &mut thread_rng();
         let try_and_increment =
@@ -333,63 +315,14 @@ mod tests {
         let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let rng = &mut thread_rng();
 
-        let old_serialization_logic = |sig: Signature, writer: &mut Vec<u8>| -> IoResult<_> {
-            let affine = sig.0.into_affine();
-            let mut x_bytes: Vec<u8> = vec![];
-            let y_big = affine.y.into_repr();
-            let half = Fq::modulus_minus_one_div_two();
-            affine.x.write(&mut x_bytes)?;
-            if y_big > half {
-                let num_x_bytes = x_bytes.len();
-                x_bytes[num_x_bytes - 1] |= 0x80;
-            }
-            writer.write_all(&x_bytes)?;
-            Ok(())
-        };
-
-        let old_deserialization_logic = |data: &[u8]| -> IoResult<_> {
-            let mut x_bytes_with_y: Vec<u8> = data.to_owned();
-            let x_bytes_with_y_len = x_bytes_with_y.len();
-            let y_over_half = (x_bytes_with_y[x_bytes_with_y_len - 1] & 0x80) == 0x80;
-            x_bytes_with_y[x_bytes_with_y_len - 1] &= 0xFF - 0x80;
-            let x = Fq::read(x_bytes_with_y.as_slice())?;
-            let x3b = <Bls12_377G1Parameters as SWModelParameters>::add_b(
-                &((x.square() * x) + <Bls12_377G1Parameters as SWModelParameters>::mul_by_a(&x)),
-            );
-            let y = x3b.sqrt().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::NotFound, "couldn't find square root for x")
-            })?;
-            let negy = -y;
-            let chosen_y = if (y <= negy) ^ y_over_half { y } else { negy };
-            Ok((x, chosen_y))
-        };
-
         for _ in 0..100 {
             let message = b"hello";
             let sk = PrivateKey::generate(rng);
             let sig = sk.sign(&message[..], &[], try_and_increment).unwrap();
-
             let mut sig_bytes = vec![];
-            sig.write(&mut sig_bytes).unwrap();
-
-            let mut sig_bytes2 = vec![];
-            sig.serialize(&mut sig_bytes2).unwrap();
-
-            let mut sig_bytes3 = vec![];
-            old_serialization_logic(sig, &mut sig_bytes3).unwrap();
-
-            // both methods have the same ersult
-            assert_eq!(sig_bytes, sig_bytes2);
-            assert_eq!(sig_bytes, sig_bytes3);
-
-            let de_sig1 = Signature::read(&sig_bytes[..]).unwrap();
-            let de_sig2 = Signature::deserialize(&mut &sig_bytes[..]).unwrap();
-            let (x, y) = old_deserialization_logic(&sig_bytes[..]).unwrap();
-            assert_eq!(x, de_sig1.as_ref().x);
-            assert_eq!(y, de_sig1.as_ref().y);
-
-            // both deserialization methods have the same result
-            assert_eq!(de_sig1, de_sig2);
+            sig.serialize(&mut sig_bytes).unwrap();
+            let de = Signature::deserialize(&mut &sig_bytes[..]).unwrap();
+            assert_eq!(sig, de);
         }
     }
 }

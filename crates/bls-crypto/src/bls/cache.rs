@@ -13,6 +13,10 @@ pub struct PublicKeyCache {
     pub de: LruCache<Vec<u8>, PublicKey>,
 }
 
+impl Default for PublicKeyCache {
+    fn default() -> Self { Self::new() }
+}
+
 impl PublicKeyCache {
     /// Initializes an empty cache
     pub fn new() -> Self {

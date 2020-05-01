@@ -2,11 +2,10 @@ use crate::{BLSError, HashToCurve, PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN}
 
 use algebra::{
     bls12_377::{Fr, G1Projective},
-    bytes::{FromBytes, ToBytes},
     CanonicalDeserialize, CanonicalSerialize, Group, SerializationError, UniformRand,
 };
 use rand::Rng;
-use std::io::{Read, Result as IoResult, Write};
+use std::io::{Read, Write};
 
 /// A Private Key using a pairing friendly curve's Fr point
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -73,21 +72,6 @@ impl PrivateKey {
     }
 }
 
-impl ToBytes for PrivateKey {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for PrivateKey {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let sk = Fr::read(&mut reader)?;
-        Ok(PrivateKey::from(sk))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,7 +128,7 @@ mod tests {
 
         let pk = sk.to_public();
         let mut pk_bytes = vec![];
-        pk.write(&mut pk_bytes).unwrap();
+        pk.serialize(&mut pk_bytes).unwrap();
 
         let sig = sk.sign_pop(&pk_bytes, &try_and_increment).unwrap();
 

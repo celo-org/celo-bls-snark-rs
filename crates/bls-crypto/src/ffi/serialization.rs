@@ -1,12 +1,10 @@
-use crate::BLSError;
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
+use crate::BLSError;
 
 use algebra::{
     bls12_377::{Fq, Fq2, G1Affine, G2Affine},
-    FromBytes, ToBytes,
-    AffineCurve, CanonicalSerialize, CanonicalDeserialize,
+    AffineCurve, CanonicalDeserialize, CanonicalSerialize, FromBytes,
 };
-use std::io::Error as IoError;
 use std::{os::raw::c_int, slice};
 
 // Serialization & deserialization
@@ -69,7 +67,11 @@ pub extern "C" fn serialize_signature(
     serialize(in_signature, out_bytes, out_len)
 }
 
-fn deserialize<T: CanonicalDeserialize>(in_bytes: *const u8, in_bytes_len: c_int, out: *mut *mut T) -> bool {
+fn deserialize<T: CanonicalDeserialize>(
+    in_bytes: *const u8,
+    in_bytes_len: c_int,
+    out: *mut *mut T,
+) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let bytes = unsafe { slice::from_raw_parts(in_bytes, in_bytes_len as usize) };
         let key = T::deserialize(&mut &bytes[..])?;
@@ -81,7 +83,11 @@ fn deserialize<T: CanonicalDeserialize>(in_bytes: *const u8, in_bytes_len: c_int
     })
 }
 
-fn serialize<T: CanonicalSerialize>(in_obj: *const T, out_bytes: *mut *mut u8, out_len: *mut c_int) -> bool {
+fn serialize<T: CanonicalSerialize>(
+    in_obj: *const T,
+    out_bytes: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let obj = unsafe { &*in_obj };
         let mut obj_bytes = vec![];
@@ -106,14 +112,14 @@ pub extern "C" fn compress_signature(
     out_signature: *mut *mut u8,
     out_len: *mut c_int,
 ) -> bool {
-    convert_result_to_bool::<_, IoError, _>(|| {
+    convert_result_to_bool::<_, BLSError, _>(|| {
         let signature = unsafe { slice::from_raw_parts(in_signature, in_signature_len as usize) };
         let x = Fq::read(&signature[0..48]).unwrap();
         let y = Fq::read(&signature[48..96]).unwrap();
         let affine = G1Affine::new(x, y, false);
         let sig = Signature::from(affine.into_projective());
         let mut obj_bytes = vec![];
-        sig.write(&mut obj_bytes)?;
+        sig.serialize(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_signature = obj_bytes.as_mut_ptr();
