@@ -226,6 +226,8 @@ mod test {
 
 #[cfg(all(test, feature = "compat"))]
 mod compat_tests {
+    #![allow(clippy::op_ref)]
+
     use super::*;
     use algebra::{
         curves::models::{
