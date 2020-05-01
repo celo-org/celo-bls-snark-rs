@@ -249,7 +249,7 @@ mod compat_tests {
     ) -> Option<G1Affine<P>> {
         // Compute x^3 + ax + b
         let x3b = <P::G1Parameters as SWModelParameters>::add_b(
-            &((x.square() * x) + <P::G1Parameters as SWModelParameters>::mul_by_a(&x)),
+            &((x.square() * &x) + &<P::G1Parameters as SWModelParameters>::mul_by_a(&x)),
         );
 
         x3b.sqrt().map(|y| {
