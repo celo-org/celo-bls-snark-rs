@@ -1,7 +1,10 @@
+use crate::BLSError;
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
+
 use algebra::{
     bls12_377::{Fq, Fq2, G1Affine, G2Affine},
-    AffineCurve, FromBytes, ToBytes,
+    FromBytes, ToBytes,
+    AffineCurve, CanonicalSerialize, CanonicalDeserialize,
 };
 use std::io::Error as IoError;
 use std::{os::raw::c_int, slice};
@@ -66,10 +69,10 @@ pub extern "C" fn serialize_signature(
     serialize(in_signature, out_bytes, out_len)
 }
 
-fn deserialize<T: FromBytes>(in_bytes: *const u8, in_bytes_len: c_int, out: *mut *mut T) -> bool {
-    convert_result_to_bool::<_, IoError, _>(|| {
+fn deserialize<T: CanonicalDeserialize>(in_bytes: *const u8, in_bytes_len: c_int, out: *mut *mut T) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
         let bytes = unsafe { slice::from_raw_parts(in_bytes, in_bytes_len as usize) };
-        let key = T::read(bytes)?;
+        let key = T::deserialize(&mut &bytes[..])?;
         unsafe {
             *out = Box::into_raw(Box::new(key));
         }
@@ -78,11 +81,11 @@ fn deserialize<T: FromBytes>(in_bytes: *const u8, in_bytes_len: c_int, out: *mut
     })
 }
 
-fn serialize<T: ToBytes>(in_obj: *const T, out_bytes: *mut *mut u8, out_len: *mut c_int) -> bool {
-    convert_result_to_bool::<_, IoError, _>(|| {
+fn serialize<T: CanonicalSerialize>(in_obj: *const T, out_bytes: *mut *mut u8, out_len: *mut c_int) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
         let obj = unsafe { &*in_obj };
         let mut obj_bytes = vec![];
-        obj.write(&mut obj_bytes)?;
+        obj.serialize(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_bytes = obj_bytes.as_mut_ptr();
@@ -128,15 +131,17 @@ pub extern "C" fn compress_pubkey(
     out_pubkey: *mut *mut u8,
     out_len: *mut c_int,
 ) -> bool {
-    convert_result_to_bool::<_, IoError, _>(|| {
+    convert_result_to_bool::<_, BLSError, _>(|| {
         let pubkey = unsafe { slice::from_raw_parts(in_pubkey, in_pubkey_len as usize) };
         let x = Fq2::read(&pubkey[0..96]).unwrap();
         let y = Fq2::read(&pubkey[96..192]).unwrap();
         let affine = G2Affine::new(x, y, false);
         let pk = PublicKey::from(affine.into_projective());
+
         let mut obj_bytes = vec![];
-        pk.write(&mut obj_bytes)?;
+        pk.serialize(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
+
         unsafe {
             *out_pubkey = obj_bytes.as_mut_ptr();
             *out_len = obj_bytes.len() as c_int;

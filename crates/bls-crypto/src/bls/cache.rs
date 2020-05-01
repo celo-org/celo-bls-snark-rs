@@ -1,85 +1,72 @@
-use lru::LruCache;
-use once_cell::sync::Lazy;
-use std::io::Result as IoResult;
-
-use std::{collections::HashSet, sync::Mutex};
-
-use algebra::{bls12_377::G2Projective, Zero};
-
 use super::PublicKey;
+use algebra::{bls12_377::G2Projective, CanonicalDeserialize, SerializationError, Zero};
 
-struct AggregateCacheState {
-    keys: HashSet<PublicKey>,
-    combined: G2Projective,
+use lru::LruCache;
+use std::collections::HashSet;
+
+pub struct PublicKeyCache {
+    /// The current keys in the validator set
+    pub keys: HashSet<PublicKey>,
+    /// The aggregated public key of all validators
+    pub combined: PublicKey,
+    /// A mapping from
+    pub de: LruCache<Vec<u8>, PublicKey>,
 }
 
-static FROM_VEC_CACHE: Lazy<Mutex<LruCache<Vec<u8>, PublicKey>>> =
-    Lazy::new(|| Mutex::new(LruCache::new(128)));
-static AGGREGATE_CACHE: Lazy<Mutex<AggregateCacheState>> = Lazy::new(|| {
-    Mutex::new(AggregateCacheState {
-        keys: HashSet::new(),
-        combined: G2Projective::zero(),
-    })
-});
-
-pub struct PublicKeyCache;
-
 impl PublicKeyCache {
-    pub fn clear_cache() {
-        FROM_VEC_CACHE.lock().unwrap().clear();
-        let mut cache = AGGREGATE_CACHE.lock().unwrap();
-        cache.keys = HashSet::new();
-        cache.combined = G2Projective::zero();
+    /// Initializes an empty cache
+    pub fn new() -> Self {
+        Self {
+            keys: HashSet::new(),
+            combined: PublicKey(G2Projective::zero()),
+            de: LruCache::new(128),
+        }
     }
 
-    pub fn resize(cap: usize) {
-        FROM_VEC_CACHE.lock().unwrap().resize(cap);
+    /// Clears the deserialization cache's keys
+    pub fn clear_cache(&mut self) {
+        self.keys = HashSet::new();
+        self.combined = PublicKey(G2Projective::zero());
+        self.de.clear();
     }
 
-    pub fn from_vec(data: &[u8]) -> IoResult<PublicKey> {
-        let cached_result = PublicKeyCache::from_vec_cached(data);
+    /// Returns the PublicKey corresponding to the serialized data from the cache, or deserializes
+    /// the element, saves it to the cache for later use and returns it
+    pub fn deserialize(&mut self, data: Vec<u8>) -> Result<PublicKey, SerializationError> {
+        let cached_result = self.de.get(&data);
         match cached_result {
+            // cache hit
+            Some(cached_result) => Ok(cached_result.clone()),
+            // cache miss
             None => {
-                // cache miss
-                let generated_result = PublicKey::from_vec(data)?;
-                FROM_VEC_CACHE
-                    .lock()
-                    .unwrap()
-                    .put(data.to_owned(), generated_result.clone());
+                let generated_result = PublicKey::deserialize(&mut &data[..])?;
+                self.de.put(data, generated_result.clone());
                 Ok(generated_result)
             }
-            Some(cached_result) => {
-                // cache hit
-                Ok(cached_result)
-            }
         }
     }
 
-    pub fn from_vec_cached(data: &[u8]) -> Option<PublicKey> {
-        let mut cache = FROM_VEC_CACHE.lock().unwrap();
-        Some(cache.get(&data.to_vec())?.clone())
-    }
-
-    pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
-        // The set of validators changes slowly, so for speed we will compute the
-        // difference from the last call and do an incremental update
+    /// The set of public keys changes slowly, so for speed this method computes the
+    /// difference from the last call and does an incremental update of the combined key
+    pub fn aggregate(&mut self, public_keys: Vec<PublicKey>) -> PublicKey {
         let mut keys: HashSet<PublicKey> = HashSet::with_capacity(public_keys.len());
         for key in public_keys {
-            keys.insert(key.clone());
+            keys.insert(key);
         }
-        let mut cache = AGGREGATE_CACHE.lock().unwrap();
-        let mut combined = cache.combined;
 
-        for key in cache.keys.difference(&keys) {
+        let mut combined = self.combined.0;
+
+        for key in self.keys.difference(&keys) {
             combined -= key.as_ref();
         }
 
-        for key in keys.difference(&cache.keys) {
+        for key in keys.difference(&self.keys) {
             combined += key.as_ref();
         }
 
-        cache.keys = keys;
-        cache.combined = combined;
-        PublicKey::from(combined)
+        self.keys = keys;
+        self.combined = PublicKey(combined);
+
+        self.combined.clone()
     }
 }
