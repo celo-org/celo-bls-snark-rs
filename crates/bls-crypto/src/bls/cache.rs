@@ -14,7 +14,9 @@ pub struct PublicKeyCache {
 }
 
 impl Default for PublicKeyCache {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PublicKeyCache {
