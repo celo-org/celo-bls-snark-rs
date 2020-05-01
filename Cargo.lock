@@ -138,7 +138,6 @@ dependencies = [
  "bench-utils",
  "blake2s_simd",
  "byteorder",
- "cfg-if",
  "clap",
  "criterion",
  "crypto-primitives",

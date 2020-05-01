@@ -99,20 +99,19 @@ where
             let candidate_hash = self.hasher.hash(domain, msg, hash_bytes)?;
 
             // handle the Celo deployed bit extraction logic
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "compat")] {
-                    use algebra::serialize::{Flags, SWFlags};
+            #[cfg(feature = "compat")]
+            let candidate_hash = {
+                use algebra::serialize::{Flags, SWFlags};
 
-                    let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
-                    let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
-                    if positive_flag {
-                        candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
-                    } else {
-                        candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
-                    }
-                    let candidate_hash = candidate_hash;
+                let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
+                let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
+                if positive_flag {
+                    candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
+                } else {
+                    candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
                 }
-            }
+                candidate_hash
+            };
 
             if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
@@ -391,7 +390,6 @@ mod non_compat_tests {
         super::test::test_hash_to_group(&*COMPOSITE_HASH_TO_G1, &mut rng, expected_hashes)
     }
 
-    #[cfg(not(feature = "compat"))]
     #[test]
     fn test_hash_to_curve_g2() {
         let mut rng = XorShiftRng::from_seed([
