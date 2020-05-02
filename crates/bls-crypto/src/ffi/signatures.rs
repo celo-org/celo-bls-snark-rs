@@ -7,6 +7,12 @@ use crate::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use algebra::{ProjectiveCurve, ToBytes};
 use std::{os::raw::c_int, slice};
 
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+static PUBLIC_KEY_CACHE: Lazy<Mutex<PublicKeyCache>> =
+    Lazy::new(|| Mutex::new(PublicKeyCache::new()));
+
 /// # Safety
 ///
 /// out_private_key must initialized to memory that can contain a pointer.
@@ -244,7 +250,10 @@ pub extern "C" fn aggregate_public_keys(
             .into_iter()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
-        let aggregated_public_key = PublicKeyCache::aggregate(&public_keys[..]);
+
+        let mut cache = PUBLIC_KEY_CACHE.lock().expect("mutex poisoned");
+        let aggregated_public_key = cache.aggregate(public_keys);
+
         unsafe {
             *out_public_key = Box::into_raw(Box::new(aggregated_public_key));
         }
@@ -269,10 +278,13 @@ pub extern "C" fn aggregate_public_keys_subtract(
             .into_iter()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
-        let aggregated_public_key_to_subtract = PublicKeyCache::aggregate(&public_keys[..]);
+
+        let mut cache = PUBLIC_KEY_CACHE.lock().expect("mutex poisoned");
+        let aggregated_public_key_to_subtract = cache.aggregate(public_keys);
         let prepared_aggregated_public_key = PublicKey::from(
             *aggregated_public_key.as_ref() - *aggregated_public_key_to_subtract.as_ref(),
         );
+
         unsafe {
             *out_public_key = Box::into_raw(Box::new(prepared_aggregated_public_key));
         }

@@ -1,6 +1,6 @@
 use crate::{hashers::DirectHasher, BLSError, XOF};
 
-use algebra::{bytes::ToBytes, edwards_sw6::EdwardsProjective as Edwards, ProjectiveCurve};
+use algebra::{edwards_sw6::EdwardsProjective as Edwards, CanonicalSerialize, ProjectiveCurve};
 
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
@@ -71,7 +71,7 @@ impl<H: FixedLengthCRH<Output = Edwards>> XOF for CompositeHasher<H> {
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Self::Error> {
         let h = H::evaluate(&self.parameters, message)?.into_affine();
         let mut res = vec![];
-        h.x.write(&mut res)?;
+        h.x.serialize(&mut res)?;
 
         Ok(res)
     }
