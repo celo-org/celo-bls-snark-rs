@@ -44,3 +44,4 @@ crate-type = ["lib", "staticlib"]
 
 [features]
 test-helpers = []
+compat = []
