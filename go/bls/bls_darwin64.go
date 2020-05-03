@@ -3,7 +3,7 @@
 package bls
 
 /*
-#cgo LDFLAGS: -lepoch_snark_x86_64-apple-darwin_0.1.0 -ldl -lm
+#cgo LDFLAGS: -L${SRCDIR}/../libs/x86_64-apple-darwin -lepoch_snark -ldl -lm
 */
 import "C"
 
