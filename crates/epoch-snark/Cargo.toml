@@ -5,7 +5,7 @@ authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org
 edition = "2018"
 
 [dependencies]
-bls-crypto = { path = "../bls-crypto", default-features = false }
+bls-crypto = { path = "../bls-crypto", default-features = false, features = ["ffi"] }
 bls-gadgets = { path = "../bls-gadgets", default-features = false }
 
 algebra = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "sw6", "edwards_sw6", "edwards_bls12", "parallel"] }
