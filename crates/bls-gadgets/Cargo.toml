@@ -5,7 +5,7 @@ authors = ["Georgios Konstantopoulos <me@gakonst.com>", "Kobi Gurkan <kobigurk@g
 edition = "2018"
 
 [dependencies]
-bls-crypto = { path = "../bls-crypto" }
+bls-crypto = { path = "../bls-crypto", default-features = false }
 
 algebra = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "sw6", "edwards_sw6", "edwards_bls12", "parallel"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe", default-features = false }
@@ -21,7 +21,9 @@ tracing = "0.1.13"
 rand_xorshift = { version = "0.2" }
 rand = { version = "0.7" }
 groth16 = { git = "https://github.com/scipr-lab/zexe" }
-bls-crypto = { path = "../bls-crypto", features = ["test-helpers"] }
+bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
 
 [features]
+default = ["compat"]
 test-helpers = ["rand", "rand_xorshift"]
+compat = ["bls-crypto/compat"]

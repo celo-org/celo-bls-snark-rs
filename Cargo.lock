@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "epoch-snark"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "algebra",
  "bench-utils",

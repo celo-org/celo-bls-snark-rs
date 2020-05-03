@@ -230,6 +230,10 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
+
+        #[cfg(feature = "compat")]
+        let xof_bits = [&xof_bits[..377], &[xof_bits[377]]].concat();
+        #[cfg(not(feature = "compat"))]
         let xof_bits = [&xof_bits[..377], &[xof_bits[383]]].concat();
 
         trace!("getting G1 point from bits");
