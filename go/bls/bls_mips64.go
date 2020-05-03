@@ -3,7 +3,7 @@
 package bls
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../libs/mips64-unknown-linux-gnu -lepoch_snark -ldl -lm
+#cgo LDFLAGS: -L${SRCDIR}/../libs/mips64-unknown-linux-gnuabi64 -lepoch_snark -ldl -lm
 */
 import "C"
 
