@@ -1,4 +1,4 @@
-use algebra::bytes::ToBytes;
+use algebra::CanonicalSerialize;
 use bls_crypto::{hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1, PrivateKey};
 
 use clap::{App, Arg};
@@ -35,13 +35,13 @@ fn main() {
         let pk = sk.to_public();
         let address_bytes = hex::decode("60515f8c59451e04ab4b22b3fc9a196b2ad354e6").unwrap();
         let mut pk_bytes = vec![];
-        pk.write(&mut pk_bytes).unwrap();
+        pk.serialize(&mut pk_bytes).unwrap();
         let pop = sk.sign_pop(&address_bytes, try_and_increment).unwrap();
         let mut pop_bytes = vec![];
-        pop.write(&mut pop_bytes).unwrap();
+        pop.serialize(&mut pop_bytes).unwrap();
 
         let mut sk_bytes = vec![];
-        sk.write(&mut sk_bytes).unwrap();
+        sk.serialize(&mut sk_bytes).unwrap();
 
         pk.verify_pop(&address_bytes, &pop, try_and_increment)
             .unwrap();

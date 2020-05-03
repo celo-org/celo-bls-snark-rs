@@ -42,7 +42,7 @@ jobs:
             - v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Build
-          command: cargo build --release
+          command: cargo build --release --all-features
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -51,6 +51,10 @@ jobs:
       - run:
           name: Run tests
           command: cargo test --release
+          no_output_timeout: 30m
+      - run:
+          name: Run FFI tests
+          command: cd crates/bls-crypto && cargo test --release --features ffi
           no_output_timeout: 30m
       - run:
           name: Run compat tests
