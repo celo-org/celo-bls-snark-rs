@@ -43,7 +43,7 @@ rustup target add armv7-apple-ios i386-apple-ios
 cargo build --target=i686-apple-darwin --release
 cargo lipo --release --targets=aarch64-apple-ios,armv7-apple-ios,x86_64-apple-ios,i386-apple-ios
 
-DIRECTORY=libs
+DIRECTORY=./go/libs
 if [[ -d "$DIRECTORY" ]]
 then
     echo "$DIRECTORY exists on your filesystem."
