@@ -3,7 +3,7 @@
 package bls
 
 /*
-#cgo LDFLAGS: -lepoch_snark_aarch64-linux-android_0.1.0 -lepoch_snark_armv7-linux-androideabi_0.1.0 -lepoch_snark_i686-linux-android_0.1.0 -lepoch_snark_x86_64-linux-android_0.1.0 -ldl -lm
+#cgo LDFLAGS: -L${SRCDIR}/libs/aarch64-linux-android -L${SRCDIR}/libs/armv7-linux-androideabi -L${SRCDIR}/libs/i686-linux-android -L${SRCDIR}/libs/x86_64-linux-android -lepoch_snark -ldl -lm
 */
 import "C"
 
