@@ -3,10 +3,11 @@ use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN,
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
-    SerializationError, Zero,
+    SerializationError,
 };
 
 use std::{
+    borrow::Borrow,
     io::{Read, Write},
     ops::Neg,
 };
@@ -35,12 +36,12 @@ impl AsRef<G2Projective> for PublicKey {
 
 impl PublicKey {
     /// Sums the provided public keys to produce the aggregate public key.
-    pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
-        let mut apk = G2Projective::zero();
-        for pk in public_keys.iter() {
-            apk += pk.as_ref();
-        }
-        apk.into()
+    pub fn aggregate<P: Borrow<PublicKey>>(public_keys: impl IntoIterator<Item = P>) -> PublicKey {
+        public_keys
+            .into_iter()
+            .map(|s| s.borrow().0)
+            .sum::<G2Projective>()
+            .into()
     }
 
     /// Verifies the provided signature against the message-extra_data pair using the
