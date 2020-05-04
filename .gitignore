@@ -2,3 +2,4 @@
 *.swp
 go/cmd/example/example
 target/
+.idea

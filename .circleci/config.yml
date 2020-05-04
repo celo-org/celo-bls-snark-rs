@@ -53,12 +53,16 @@ jobs:
           command: cargo test --release
           no_output_timeout: 30m
       - run:
-          name: Run FFI tests
-          command: cd crates/bls-crypto && cargo test --release --features ffi
+          name: Run non-compat tests in bls-crypto
+          command: cd crates/bls-crypto && cargo test --release --no-default-features
           no_output_timeout: 30m
       - run:
-          name: Run compat tests
-          command: cd crates/bls-crypto && cargo test --release --features compat
+          name: Run non-compat tests in bls-gadgets
+          command: cd crates/bls-gadgets && cargo test --release --no-default-features
+          no_output_timeout: 30m
+      - run:
+          name: Run non-compat tests in epoch-snark
+          command: cd crates/epoch-snark && cargo test --release --no-default-features
           no_output_timeout: 30m
       - run:
           name: Check Style
@@ -72,30 +76,6 @@ jobs:
           root: .
           paths: target/release
 
-  go-tests:
-    <<: *go_defaults
-    working_directory: ~/app
-    docker:
-      - image: circleci/golang:latest
-    steps:
-      - attach_workspace:
-          at: ~/app
-      - run: 
-          name: Run Tests
-          command: |
-            cd ~/app/go
-            go test ./bls ./snark
-      - run:
-          name: Build and run example
-          command: |
-            cd ~/app/
-            LIB_DIR=`pwd`/target/release
-            cd ./go/cmd
-            CGO_LDFLAGS="-L$LIB_DIR -lepoch_snark -ldl -lm" go build -ldflags "-w" bls_example.go
-            ./bls_example
- 
-
-
 workflows:
   version: 2
   run-tests:
@@ -104,7 +84,3 @@ workflows:
       - bls-tests:
           requires:
             - checkout-repo
-      - go-tests:
-          requires:
-            - checkout-repo
-            - bls-tests
