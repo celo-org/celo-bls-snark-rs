@@ -7,13 +7,12 @@ use algebra::{
 };
 
 use std::{
-    hash::{Hash, Hasher},
     io::{Read, Write},
     ops::Neg,
 };
 
 /// A BLS public key on G2
-#[derive(Clone, Eq, Debug)]
+#[derive(Clone, Eq, Debug, PartialEq, Hash)]
 pub struct PublicKey(pub(super) G2Projective);
 
 impl From<G2Projective> for PublicKey {
@@ -88,27 +87,6 @@ impl PublicKey {
         } else {
             Err(BLSError::VerificationFailed)
         }
-    }
-}
-
-impl PartialEq for PublicKey {
-    fn eq(&self, other: &Self) -> bool {
-        // This byte-level equality operator differs from the (much slower) semantic
-        // equality operator in G2Projective.  We require byte-level equality here
-        // for HashSet to work correctly.  HashSet requires that item equality
-        // implies hash equality.
-        let a = self.as_ref();
-        let b = other.as_ref();
-        a.x == b.x && a.y == b.y && a.z == b.z
-    }
-}
-
-impl Hash for PublicKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Only hash based on `y` for slight speed improvement
-        self.0.y.hash(state);
-        // self.pk.x.hash(state);
-        // self.pk.z.hash(state);
     }
 }
 
