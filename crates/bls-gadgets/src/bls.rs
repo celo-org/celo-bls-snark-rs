@@ -268,7 +268,7 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use crate::test_helpers::alloc_vec;
+    use crate::utils::test_helpers::alloc_vec;
     use bls_crypto::test_helpers::*;
 
     use algebra::{

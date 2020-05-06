@@ -89,7 +89,7 @@ mod tests {
     use crate::gadgets::pack;
     use algebra::{sw6::FrParameters as SW6FrParameters, Bls12_377};
     use bls_crypto::hashers::{DirectHasher, Hasher};
-    use bls_gadgets::{bits_to_bytes, bytes_to_bits};
+    use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };

@@ -3,7 +3,7 @@ use algebra::{
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
 use bls_crypto::PublicKey;
-use bls_gadgets::bytes_to_bits;
+use bls_gadgets::utils::bytes_to_bits;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
 
@@ -71,7 +71,7 @@ pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
 mod test {
     use super::*;
     use algebra::{bls12_377::FqParameters, FpParameters};
-    use bls_gadgets::bits_to_bytes;
+    use bls_gadgets::utils::bits_to_bytes;
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;

@@ -3,7 +3,7 @@ use algebra::{
     sw6::Fr,
     One, PairingEngine,
 };
-use bls_gadgets::{is_setup, HashToGroupGadget};
+use bls_gadgets::{utils::is_setup, HashToGroupGadget};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget},

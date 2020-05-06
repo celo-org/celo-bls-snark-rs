@@ -132,7 +132,7 @@ mod tests {
     use super::*;
     use crate::gadgets::to_fr;
     use algebra::UniformRand;
-    use bls_gadgets::test_helpers::alloc_vec;
+    use bls_gadgets::utils::test_helpers::alloc_vec;
     use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
