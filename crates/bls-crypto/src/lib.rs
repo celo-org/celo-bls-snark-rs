@@ -5,7 +5,7 @@
 pub(crate) mod bls;
 pub use bls::{PrivateKey, PublicKey, PublicKeyCache, Signature};
 
-/// Hashing to curve utilities
+/// Traits and implementations for hashing arbitrary data to an elliptic curve's group element
 pub mod hash_to_curve;
 pub use hash_to_curve::HashToCurve;
 
@@ -40,17 +40,24 @@ pub enum BLSError {
     /// Error
     #[error("signature verification failed")]
     VerificationFailed,
+
     /// An IO error
     #[error("io error {0}")]
     IoError(#[from] std::io::Error),
+
     /// Error while hashing
     #[error("error in hasher {0}")]
     HashingError(#[from] Box<dyn std::error::Error>),
+
     /// Personalization string cannot be larger than 8 bytes
     #[error("domain length is too large: {0}")]
     DomainTooLarge(usize),
+
+    /// Hashing to curve failed
     #[error("Could not hash to curve")]
     HashToCurveError,
-    #[error("{0}")]
+
+    /// Serialization error in Zexe
+    #[error(transparent)]
     SerializationError(#[from] algebra::SerializationError),
 }

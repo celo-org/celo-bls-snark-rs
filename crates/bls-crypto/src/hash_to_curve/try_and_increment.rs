@@ -21,11 +21,12 @@ use once_cell::sync::Lazy;
 
 const NUM_TRIES: u8 = 255;
 
-/// Composite Try-and-Increment hasher for BLS 12-377.
+/// Composite (Pedersen CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
 pub static COMPOSITE_HASH_TO_G1: Lazy<
     TryAndIncrement<CompositeHasher<CRH>, <Parameters as Bls12Parameters>::G1Parameters>,
 > = Lazy::new(|| TryAndIncrement::new(&*COMPOSITE_HASHER));
 
+/// Direct (Blake2s CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
 pub static DIRECT_HASH_TO_G1: Lazy<
     TryAndIncrement<DirectHasher, <Parameters as Bls12Parameters>::G1Parameters>,
 > = Lazy::new(|| TryAndIncrement::new(&DirectHasher));
