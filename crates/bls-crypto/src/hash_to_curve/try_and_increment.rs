@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use super::HashToCurve;
 use crate::hashers::{
     composite::{CompositeHasher, COMPOSITE_HASHER, CRH},
-    DirectHasher, XOF,
+    DirectHasher, Hasher,
 };
 use crate::BLSError;
 
@@ -21,11 +21,13 @@ use once_cell::sync::Lazy;
 
 const NUM_TRIES: u8 = 255;
 
-/// Composite Try-and-Increment hasher for BLS 12-377.
+/// Composite (Bowe-Hopwood CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
 pub static COMPOSITE_HASH_TO_G1: Lazy<
     TryAndIncrement<CompositeHasher<CRH>, <Parameters as Bls12Parameters>::G1Parameters>,
 > = Lazy::new(|| TryAndIncrement::new(&*COMPOSITE_HASHER));
 
+/// Direct (Blake2s CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
+/// Equivalent to Blake2xs.
 pub static DIRECT_HASH_TO_G1: Lazy<
     TryAndIncrement<DirectHasher, <Parameters as Bls12Parameters>::G1Parameters>,
 > = Lazy::new(|| TryAndIncrement::new(&DirectHasher));
@@ -40,7 +42,7 @@ pub struct TryAndIncrement<'a, H, P> {
 
 impl<'a, H, P> TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     /// Instantiates a new Try-and-increment hasher with the provided hashing method
@@ -55,7 +57,7 @@ where
 
 impl<'a, H, P> HashToCurve for TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     type Output = GroupProjective<P>;
@@ -73,7 +75,7 @@ where
 
 impl<'a, H, P> TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     /// Hash with attempt takes the input, appends a counter
@@ -178,7 +180,7 @@ mod test {
         hash_to_curve_test::<<Parameters as Bls12Parameters>::G2Parameters, _>(h)
     }
 
-    fn hash_to_curve_test<P: SWModelParameters, X: XOF<Error = BLSError>>(h: X) {
+    fn hash_to_curve_test<P: SWModelParameters, X: Hasher<Error = BLSError>>(h: X) {
         let hasher = TryAndIncrement::<X, P>::new(&h);
         let mut rng = rand::thread_rng();
         for length in &[10, 25, 50, 100, 200, 300] {

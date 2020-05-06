@@ -27,15 +27,15 @@ pub fn keygen_mul<E: PairingEngine>(num: usize) -> (Vec<E::Fr>, Vec<E::G2Project
     (secret_keys, public_keys)
 }
 
-/// generate N * sets of keypair vectors, each of size 3-7
+/// generate `num_batches` sets of keypair vectors, each `num_per_batch` size
 #[allow(clippy::type_complexity)]
 pub fn keygen_batch<E: PairingEngine>(
-    batch_size: usize,
+    num_batches: usize,
     num_per_batch: usize,
 ) -> (Vec<Vec<E::Fr>>, Vec<Vec<E::G2Projective>>) {
     let mut secret_keys = Vec::new();
     let mut public_keys = Vec::new();
-    (0..batch_size).for_each(|_| {
+    (0..num_batches).for_each(|_| {
         let (secret_keys_i, public_keys_i) = keygen_mul::<E>(num_per_batch);
         secret_keys.push(secret_keys_i);
         public_keys.push(public_keys_i);

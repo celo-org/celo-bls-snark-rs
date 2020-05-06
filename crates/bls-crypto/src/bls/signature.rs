@@ -135,7 +135,7 @@ mod tests {
     use super::*;
     use crate::{
         hash_to_curve::try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
-        hashers::{composite::COMPOSITE_HASHER, DirectHasher, XOF},
+        hashers::{composite::COMPOSITE_HASHER, DirectHasher, Hasher},
         test_helpers::{keygen_batch, sign_batch, sum},
         PrivateKey, PublicKeyCache, SIG_DOMAIN,
     };
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[allow(unused)] // needed when we don't compile with ffi features
-    fn test_batch_verify_with_hasher<X: XOF<Error = BLSError>>(hasher: &X, is_composite: bool) {
+    fn test_batch_verify_with_hasher<X: Hasher<Error = BLSError>>(hasher: &X, is_composite: bool) {
         let rng = &mut thread_rng();
         let try_and_increment =
             TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(hasher);

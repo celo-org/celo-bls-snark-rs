@@ -79,7 +79,7 @@ mod tests {
         hash_to_curve::try_and_increment::TryAndIncrement,
         hashers::{
             composite::{CompositeHasher, CRH},
-            DirectHasher, XOF,
+            DirectHasher, Hasher,
         },
     };
     use algebra::{bls12_377::Parameters, curves::models::bls12::Bls12Parameters};
@@ -93,7 +93,7 @@ mod tests {
         test_simple_sig_with_hasher(composite_hasher);
     }
 
-    fn test_simple_sig_with_hasher<X: XOF<Error = BLSError>>(hasher: X) {
+    fn test_simple_sig_with_hasher<X: Hasher<Error = BLSError>>(hasher: X) {
         let rng = &mut thread_rng();
         let try_and_increment =
             TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&hasher);

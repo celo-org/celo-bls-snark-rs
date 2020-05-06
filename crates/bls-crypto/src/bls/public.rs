@@ -34,6 +34,7 @@ impl AsRef<G2Projective> for PublicKey {
 }
 
 impl PublicKey {
+    /// Sums the provided public keys to produce the aggregate public key.
     pub fn aggregate(public_keys: &[PublicKey]) -> PublicKey {
         let mut apk = G2Projective::zero();
         for pk in public_keys.iter() {
@@ -42,6 +43,10 @@ impl PublicKey {
         apk.into()
     }
 
+    /// Verifies the provided signature against the message-extra_data pair using the
+    /// `hash_to_g1` hasher.
+    ///
+    /// Uses the `SIG_DOMAIN` under the hood.
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
@@ -52,6 +57,10 @@ impl PublicKey {
         self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g1)
     }
 
+    /// Verifies the provided proof of possession signature against the message using the
+    /// `hash_to_g1` hasher.
+    ///
+    /// Uses the `POP_DOMAIN` under the hood.
     pub fn verify_pop<H: HashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],

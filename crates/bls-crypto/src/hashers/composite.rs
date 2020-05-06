@@ -1,36 +1,43 @@
-use crate::{hashers::DirectHasher, BLSError, XOF};
+//! Utilities for hashing using a fixed-length CRH. Consider using the re-exported
+//! COMPOSITE_HASHER which is already instantiated with the Bowe Hopwood Pedersen CRH and
+//! Blake2x as the XOF
+use crate::{hashers::DirectHasher, BLSError, Hasher};
 
 use algebra::{edwards_sw6::EdwardsProjective as Edwards, CanonicalSerialize, ProjectiveCurve};
 
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
-    bowe_hopwood::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenParameters},
-    pedersen::PedersenWindow,
-    FixedLengthCRH,
+    bowe_hopwood::BoweHopwoodPedersenCRH, pedersen::PedersenWindow, FixedLengthCRH,
 };
 use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-/// The window which will be used with the Fixed Length CRH
-#[derive(Clone)]
-pub struct Window;
+// Fix to get around leaking a private type in a public interface
+mod window {
+    use super::PedersenWindow;
 
-impl PedersenWindow for Window {
-    const WINDOW_SIZE: usize = 93;
-    const NUM_WINDOWS: usize = 560;
+    /// The window which will be used with the Fixed Length CRH
+    #[derive(Clone)]
+    pub struct Window;
+
+    impl PedersenWindow for Window {
+        const WINDOW_SIZE: usize = 93;
+        const NUM_WINDOWS: usize = 560;
+    }
 }
 
-pub type CRH = BoweHopwoodPedersenCRH<Edwards, Window>;
-pub type CRHParameters = BoweHopwoodPedersenParameters<Edwards>;
+/// Bowe Hopwood Pedersen CRH instantiated over Edwards SW6 with `WINDOW_SIZE = 93` and
+/// `NUM_WINDOWS = 560`
+pub type CRH = BoweHopwoodPedersenCRH<Edwards, window::Window>;
 
 /// Lazily evaluated composite hasher instantiated over the
 /// Bowe-Hopwood-Pedersen CRH.
 pub static COMPOSITE_HASHER: Lazy<CompositeHasher<CRH>> =
     Lazy::new(|| CompositeHasher::<CRH>::new().unwrap());
 
-/// A composite hasher which uses the provided CRH independently of domain/message length
-/// provided
+/// Uses the Bowe-Hopwood-Pedersen hash (instantiated with a prng) as a CRH and Blake2x as the XOF.
+/// The CRH does _not_ use the domain or the output bytes.
 #[derive(Clone, Debug)]
 pub struct CompositeHasher<H: FixedLengthCRH> {
     parameters: H::Parameters,
@@ -65,9 +72,11 @@ impl<H: FixedLengthCRH> CompositeHasher<H> {
     }
 }
 
-impl<H: FixedLengthCRH<Output = Edwards>> XOF for CompositeHasher<H> {
+impl<H: FixedLengthCRH<Output = Edwards>> Hasher for CompositeHasher<H> {
     type Error = BLSError;
 
+    // TODO: Should we improve the trait design somehow? Seems like there's a bad abstraction
+    // here if we do not use the 2 params
     fn crh(&self, _: &[u8], message: &[u8], _: usize) -> Result<Vec<u8>, Self::Error> {
         let h = H::evaluate(&self.parameters, message)?.into_affine();
         let mut res = vec![];
@@ -89,7 +98,7 @@ impl<H: FixedLengthCRH<Output = Edwards>> XOF for CompositeHasher<H> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::hashers::XOF;
+    use crate::hashers::Hasher;
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 

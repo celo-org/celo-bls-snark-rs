@@ -2,7 +2,7 @@ use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget
 use bls_crypto::{
     hashers::{
         composite::{CompositeHasher, CRH},
-        DirectHasher, XOF,
+        DirectHasher, Hasher,
     },
     SIG_DOMAIN,
 };
