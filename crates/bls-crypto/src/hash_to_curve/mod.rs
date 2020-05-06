@@ -8,7 +8,7 @@
 ///
 /// # Examples
 ///
-/// Hashing the data requires instantiating a hasher, importing the `HashToCurve` trait 
+/// Hashing the data requires instantiating a hasher, importing the `HashToCurve` trait
 /// and calling the `hash` function
 ///
 /// ```rust

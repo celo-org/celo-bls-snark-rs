@@ -43,7 +43,7 @@ impl PublicKey {
         apk.into()
     }
 
-    /// Verifies the provided signature against the message-extra_data pair using the 
+    /// Verifies the provided signature against the message-extra_data pair using the
     /// `hash_to_g1` hasher.
     ///
     /// Uses the `SIG_DOMAIN` under the hood.
@@ -57,7 +57,7 @@ impl PublicKey {
         self.verify_sig(SIG_DOMAIN, message, extra_data, signature, hash_to_g1)
     }
 
-    /// Verifies the provided proof of possession signature against the message using the 
+    /// Verifies the provided proof of possession signature against the message using the
     /// `hash_to_g1` hasher.
     ///
     /// Uses the `POP_DOMAIN` under the hood.
