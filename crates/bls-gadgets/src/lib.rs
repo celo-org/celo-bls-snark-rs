@@ -15,8 +15,5 @@ pub use y_to_bit::YToBitGadget;
 mod hash_to_group;
 pub use hash_to_group::{hash_to_bits, HashToGroupGadget};
 
-mod smaller_than;
-pub use smaller_than::SmallerThanGadget;
-
 /// Utility functions which do not involve generating constraints
 pub mod utils;
