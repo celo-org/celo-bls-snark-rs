@@ -1,7 +1,7 @@
 //! # BLS Cryptography
 //!
 //! This crate implements cryptographic operations for BLS signatures
-/// BLS signing
+
 pub(crate) mod bls;
 pub use bls::{PrivateKey, PublicKey, PublicKeyCache, Signature};
 
@@ -9,9 +9,9 @@ pub use bls::{PrivateKey, PublicKey, PublicKeyCache, Signature};
 pub mod hash_to_curve;
 pub use hash_to_curve::HashToCurve;
 
-/// Useful hash functions
+/// Hash function implementations using a CRH followed by a XOF.
 pub mod hashers;
-pub use hashers::XOF;
+pub use hashers::Hasher;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;

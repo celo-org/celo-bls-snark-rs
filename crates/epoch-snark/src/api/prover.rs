@@ -9,7 +9,7 @@ use crate::{
 };
 use bls_crypto::{
     hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1,
-    hashers::{COMPOSITE_HASHER, XOF},
+    hashers::{Hasher, COMPOSITE_HASHER},
     Signature, SIG_DOMAIN,
 };
 use bls_gadgets::bytes_to_bits;

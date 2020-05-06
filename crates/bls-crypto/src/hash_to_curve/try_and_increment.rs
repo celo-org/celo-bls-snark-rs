@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use super::HashToCurve;
 use crate::hashers::{
     composite::{CompositeHasher, COMPOSITE_HASHER, CRH},
-    DirectHasher, XOF,
+    DirectHasher, Hasher,
 };
 use crate::BLSError;
 
@@ -40,7 +40,7 @@ pub struct TryAndIncrement<'a, H, P> {
 
 impl<'a, H, P> TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     /// Instantiates a new Try-and-increment hasher with the provided hashing method
@@ -55,7 +55,7 @@ where
 
 impl<'a, H, P> HashToCurve for TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     type Output = GroupProjective<P>;
@@ -73,7 +73,7 @@ where
 
 impl<'a, H, P> TryAndIncrement<'a, H, P>
 where
-    H: XOF<Error = BLSError>,
+    H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     /// Hash with attempt takes the input, appends a counter
@@ -178,7 +178,7 @@ mod test {
         hash_to_curve_test::<<Parameters as Bls12Parameters>::G2Parameters, _>(h)
     }
 
-    fn hash_to_curve_test<P: SWModelParameters, X: XOF<Error = BLSError>>(h: X) {
+    fn hash_to_curve_test<P: SWModelParameters, X: Hasher<Error = BLSError>>(h: X) {
         let hasher = TryAndIncrement::<X, P>::new(&h);
         let mut rng = rand::thread_rng();
         for length in &[10, 25, 50, 100, 200, 300] {

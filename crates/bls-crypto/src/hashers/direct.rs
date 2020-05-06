@@ -1,7 +1,8 @@
-use crate::{hashers::XOF, BLSError};
+use crate::{hashers::Hasher, BLSError};
 use blake2s_simd::Params;
 use byteorder::{LittleEndian, WriteBytesExt};
 
+/// Uses Blake2s as a CRH and Blake2x as the XOF.
 pub struct DirectHasher;
 
 fn xof_digest_length_to_node_offset(
@@ -16,7 +17,7 @@ fn xof_digest_length_to_node_offset(
     Ok(offset)
 }
 
-impl XOF for DirectHasher {
+impl Hasher for DirectHasher {
     type Error = BLSError;
 
     fn crh(
