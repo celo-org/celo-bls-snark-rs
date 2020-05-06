@@ -268,7 +268,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
                 }
 
                 let x_bits = &xof_bits[..X_BITS];
-                let greatest = xof_bits[SIGN_BIT_POSITION];
+                let greatest = xof_bits[X_BITS];
 
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
