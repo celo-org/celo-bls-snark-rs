@@ -41,6 +41,16 @@ use tracing::{debug, span, trace, Level};
 /// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
 type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
 
+// The deployed Celo version's hash-to-curve takes the sign bit from position 377.
+#[cfg(feature = "compat")]
+const SIGN_BIT_POSITION: usize = 377;
+// Zexe's upstream logic takes the sign bit from position 383.
+#[cfg(not(feature = "compat"))]
+const SIGN_BIT_POSITION: usize = 383;
+
+// The bits from the hash which will be interpreted as the x coordinate of a group element
+const X_BITS: usize = 377;
+
 /// Parameters for Blake2x as specified in: https://blake2.net/blake2x.pdf
 /// • “Key length” is set to 0 (even if the root hash was keyed)
 /// • “Fanout” is set to 0 (unlimited)
@@ -247,10 +257,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
-        #[cfg(feature = "compat")]
-        let xof_bits = [&xof_bits[..377], &[xof_bits[377]]].concat();
-        #[cfg(not(feature = "compat"))]
-        let xof_bits = [&xof_bits[..377], &[xof_bits[383]]].concat();
+        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
 
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
@@ -260,8 +267,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
                     return Err(SynthesisError::AssignmentMissing);
                 }
 
-                let x_bits = &xof_bits[..377];
-                let greatest = xof_bits[377];
+                let x_bits = &xof_bits[..X_BITS];
+                let greatest = xof_bits[X_BITS];
 
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
