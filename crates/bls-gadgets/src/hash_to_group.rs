@@ -1,4 +1,7 @@
-use crate::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup, YToBitGadget};
+use crate::{
+    utils::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup},
+    YToBitGadget,
+};
 use bls_crypto::{
     hashers::{
         composite::{CompositeHasher, CRH},
@@ -66,7 +69,13 @@ fn blake2xs_params(
     }
 }
 
-/// Gadget for checking that hashes to group are computed correctly
+/// Gadget which enforces correct calculation of hashing to group of arbitrary data, implementing
+/// the "try and increment" method. For more information on the method, refer to the [non-gadget
+/// implementation][hash_to_group].
+///
+/// Currently this gadget only exposes hashing to BLS12-377's G1.
+///
+/// [hash_to_group]: ../bls_crypto/hash_to_curve/try_and_increment/index.html
 pub struct HashToGroupGadget<P> {
     parameters_type: PhantomData<P>,
 }
@@ -76,9 +85,15 @@ pub struct HashToGroupGadget<P> {
 // and then hashing it to bits and to group
 impl HashToGroupGadget<Bls12_377_Parameters> {
     /// Returns the G1 constrained hash of the message with the provided counter.
-    /// We do not generate constraints for the CRH -> XOF conversion in this case,
-    /// because it is expensive to do inside SW6. We provide auxiliary date which can be
-    /// used to generate an outer proof that ensures this calculation is done correctly
+    ///
+    /// If `generate_constraints_for_hash` is set to `false`, then constraints will not
+    /// be generated for the CRH -> XOF conversion. You may want to set this to `false` if
+    /// calculations inside SW6 are considered too expensive. In that case, you MUST verify
+    /// that they were calculated properly.
+    ///
+    /// For that reason, this function also returns the CRH bits and the XOF bits,
+    /// so that they can be used to verify the correct calculation of the XOF from
+    /// the CRH in a separate proof.
     #[allow(clippy::type_complexity)]
     pub fn enforce_hash_to_group<CS: ConstraintSystem<Bls12_377_Fq>>(
         cs: &mut CS,
@@ -150,6 +165,8 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
 /// This uses Blake2s under the hood and is expensive for large messages.
 /// Consider reducing the input size by passing it through a Collision Resistant Hash function
 /// such as Pedersen.
+///
+/// If `generate_constraints_for_hash = false`, then no constraints will be generated.
 ///
 /// # Panics
 ///

@@ -1,5 +1,5 @@
 use algebra::{BigInteger, FpParameters, PrimeField};
-use bls_gadgets::is_setup;
+use bls_gadgets::utils::is_setup;
 use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
 use tracing::{span, trace, Level};

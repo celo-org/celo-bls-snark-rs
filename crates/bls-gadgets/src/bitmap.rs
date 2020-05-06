@@ -1,4 +1,4 @@
-use crate::{is_setup, smaller_than::SmallerThanGadget};
+use crate::{smaller_than::SmallerThanGadget, utils::is_setup};
 use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use r1cs_std::{

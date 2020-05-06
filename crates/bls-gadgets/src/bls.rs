@@ -8,7 +8,7 @@ use r1cs_std::{
 use std::marker::PhantomData;
 use tracing::{debug, span, trace, Level};
 
-/// BLS Signature Verification Pairing Gadget.
+/// BLS Signature Verification Gadget.
 ///
 /// Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
 /// in a Pairing-based SNARK.
@@ -268,7 +268,7 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use crate::test_helpers::alloc_vec;
+    use crate::utils::test_helpers::alloc_vec;
     use bls_crypto::test_helpers::*;
 
     use algebra::{

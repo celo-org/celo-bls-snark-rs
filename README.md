@@ -8,10 +8,6 @@ Implements SNARK-friendly BLS signatures over BLS12-377 and SW6.
 
 All Rust crates live under the `crates/` directory. You can import them in your code via git paths, until they get published on `crates.io`.
 
-### Go and FFI
-
-A Go package consuming the library exists in the `go` directory, using `cgo`.
-
 ## Quick start
 
 The following commands assume your current directory is the root of this repository.

@@ -5,7 +5,7 @@ use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
-use bls_gadgets::{bits_to_bytes, bytes_to_bits};
+use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated

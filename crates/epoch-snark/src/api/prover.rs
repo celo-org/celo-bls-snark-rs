@@ -12,7 +12,7 @@ use bls_crypto::{
     hashers::{Hasher, COMPOSITE_HASHER},
     Signature, SIG_DOMAIN,
 };
-use bls_gadgets::bytes_to_bits;
+use bls_gadgets::utils::bytes_to_bits;
 
 use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
 use r1cs_core::SynthesisError;
