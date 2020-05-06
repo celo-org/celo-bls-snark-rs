@@ -1,4 +1,7 @@
-//! # Gadgets
+//! # BLS Gadgets
+//!
+//! This module provides gadgets for constructing R1CS involving BLS Signatures
+//! over the BLS12-377 curve.
 
 mod bls;
 pub use bls::BlsVerifyGadget;

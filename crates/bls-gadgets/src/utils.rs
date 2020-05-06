@@ -30,7 +30,7 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
-/// If bytes is a little endian representation of a number, this returns the bits 
+/// If bytes is a little endian representation of a number, this returns the bits
 /// of the number in descending order
 pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
     let mut bits = vec![];
@@ -60,7 +60,6 @@ pub(crate) fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
         .map(|(j, b)| Boolean::alloc(cs.ns(|| format!("{}", j)), || Ok(b)))
         .collect::<Result<Vec<_>, _>>()
 }
-
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
