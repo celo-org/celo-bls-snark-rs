@@ -40,7 +40,7 @@ impl PrivateKey {
         self.sign_message(SIG_DOMAIN, message, extra_data, hash_to_g1)
     }
 
-    /// Hashes the message/extra_data tuple with the provided `hash_to_g1` function
+    /// Hashes the message with the provided `hash_to_g1` function
     /// and then signs it in the POP_DOMAIN
     pub fn sign_pop<H: HashToCurve<Output = G1Projective>>(
         &self,

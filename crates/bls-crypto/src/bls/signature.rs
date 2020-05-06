@@ -1,19 +1,17 @@
-use crate::HashToCurve;
+use super::PublicKey;
+use crate::{BLSError, HashToCurve};
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine},
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
-    SerializationError, Zero,
+    SerializationError,
 };
-use std::borrow::Borrow;
 
 use std::{
+    borrow::Borrow,
     io::{Read, Write},
     ops::Neg,
 };
-
-use super::PublicKey;
-use crate::BLSError;
 
 /// A BLS signature on G1.
 #[derive(Clone, Debug, PartialEq)]
@@ -62,12 +60,11 @@ impl CanonicalDeserialize for Signature {
 impl Signature {
     /// Sums the provided signatures to produce the aggregate signature.
     pub fn aggregate<S: Borrow<Signature>>(signatures: impl IntoIterator<Item = S>) -> Signature {
-        let mut asig = G1Projective::zero();
-        for sig in signatures {
-            asig += sig.borrow().as_ref();
-        }
-
-        asig.into()
+        signatures
+            .into_iter()
+            .map(|s| s.borrow().0)
+            .sum::<G1Projective>()
+            .into()
     }
 
     /// Verifies the signature against a vector of pubkey & message tuples, for the provided
