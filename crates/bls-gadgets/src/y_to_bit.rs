@@ -114,14 +114,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             let c1 = pk.y.c1.get_value().get()?;
             let c0 = pk.y.c0.get_value().get()?;
 
-            let bit = if c1 > half {
-                true
-            } else if c1 == P::Fp::zero() && c0 > half {
-                true
-            } else {
-                false
-            };
-
+            let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
             Ok(bit)
         })?;
 
