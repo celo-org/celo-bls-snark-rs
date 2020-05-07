@@ -1,15 +1,6 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
-
-//! The goal of the gadgets is to provide the bit according to the value of y,
-//! as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
-//! we can normalize any elements greater than $half$ (i.e. in the range
-//! [half+1, p-1]), by subtracting half (resulting in a number in the [1, half]
-//! range). Then we check that the cast element is <= half, which enforces that
-//! originally they were > half. For points in G2, we also check the
-//! lexicographical ordering.
-
 use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
-use r1cs_core::SynthesisError;
+use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     alloc::AllocGadget,
     bits::ToBitsGadget,
@@ -21,54 +12,60 @@ use r1cs_std::{
 use std::{marker::PhantomData, ops::Neg};
 
 /// Enforces point compression on the provided element
+///
+/// The goal of the gadgets is to provide the bit according to the value of y,
+/// as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
+/// we can normalize any elements greater than $half$ (i.e. in the range
+/// [half+1, p-1]), by subtracting half (resulting in a number in the [1, half]
+/// range). Then we check that the cast element is <= half, which enforces that
+/// originally they were > half. For points in G2, we also check the
+/// lexicographical ordering.
 pub struct YToBitGadget<P: Bls12Parameters> {
     parameters_type: PhantomData<P>,
 }
 
 impl<P: Bls12Parameters> YToBitGadget<P> {
-    pub fn y_to_bit_g1<CS: r1cs_core::ConstraintSystem<P::Fp>>(
+    pub fn y_to_bit_g1<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         pk: &G1Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
-        let half_neg = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).neg();
+        let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
+
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
-            if pk.y.get_value().is_some() {
-                let half = P::Fp::modulus_minus_one_div_two();
-                Ok(pk.y.get_value().get()?.into_repr() > half)
-            } else {
-                Err(SynthesisError::AssignmentMissing)
-            }
+            Ok(pk.y.get_value().get()? > half)
         })?;
+
         let y_adjusted = FpGadget::alloc(cs.ns(|| "alloc y"), || {
-            if pk.y.get_value().is_some() {
-                let half = P::Fp::modulus_minus_one_div_two();
-                let y_value = pk.y.get_value().get()?;
-                if y_value.into_repr() > half {
-                    Ok(y_value - &P::Fp::from_repr(half))
-                } else {
-                    Ok(y_value)
-                }
+            let y_value = pk.y.get_value().get()?; 
+
+            let adjusted = if y_value > half {
+                y_value - &half
             } else {
-                Err(SynthesisError::AssignmentMissing)
-            }
+                y_value
+            };
+
+            Ok(adjusted)
         })?;
-        let y_bit_lc = y_bit.lc(CS::one(), half_neg);
+
+        let y_bit_lc = y_bit.lc(CS::one(), half.neg());
         cs.enforce(
             || "check y bit",
             |lc| lc + (P::Fp::one(), CS::one()),
             |lc| pk.y.get_variable() + y_bit_lc + lc,
             |lc| y_adjusted.get_variable() + lc,
         );
-        let y_adjusted_bits = &y_adjusted.to_bits(cs.ns(|| "y adjusted to bits"))?;
+
+        let y_adjusted_bits = y_adjusted.to_bits(cs.ns(|| "y adjusted to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
             cs.ns(|| "enforce smaller than or equal to modulus minus one div two"),
-            y_adjusted_bits,
+            &y_adjusted_bits,
             P::Fp::modulus_minus_one_div_two(),
         )?;
+
         Ok(y_bit)
     }
 
-    pub fn y_to_bit_g2<CS: r1cs_core::ConstraintSystem<P::Fp>>(
+    pub fn y_to_bit_g2<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         pk: &G2Gadget<P>,
     ) -> Result<Boolean, SynthesisError> {
@@ -220,6 +217,8 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
@@ -234,7 +233,6 @@ mod test {
         sw6::Fr as SW6Fr,
         AffineCurve, BigInteger, PrimeField, ProjectiveCurve, UniformRand, Zero,
     };
-    use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocGadget,
         fields::FieldGadget,
