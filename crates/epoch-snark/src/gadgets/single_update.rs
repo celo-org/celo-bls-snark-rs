@@ -156,7 +156,7 @@ mod tests {
         single_update_enforce(&mut cs, 5, 5, 4, 5, 1, &[true, true, false, true, false]);
         assert!(!cs.is_satisfied());
         let not_satisfied = cs.which_is_unsatisfied();
-        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than strict/enforce smaller than");
+        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than/enforce smaller than/enforce smaller than");
     }
 
     #[test]

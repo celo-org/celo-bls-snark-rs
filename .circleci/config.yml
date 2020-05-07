@@ -7,11 +7,7 @@ rust_defaults: &rust_defaults
   <<: *defaults
   docker:
     - image: circleci/rust:latest
-
-go_defaults: &go_defaults
-  <<: *defaults
-  docker:
-    - image: circleci/go:latest
+  resource_class: medium+
 
 jobs:
   checkout-repo:

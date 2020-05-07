@@ -1,4 +1,4 @@
-use crate::{smaller_than::SmallerThanGadget, utils::is_setup};
+use crate::utils::is_setup;
 use algebra::PrimeField;
 use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use r1cs_std::{
@@ -45,15 +45,18 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
             occurrences += (got_value == value) as u8;
         }
     }
+
     // Rebind `occurrences` to a constraint
     let occurrences = FpGadget::alloc(&mut cs.ns(|| "num occurrences"), || {
         Ok(F::from(occurrences))
     })?;
 
-    SmallerThanGadget::<F>::enforce_smaller_than_or_equal_to_strict(
+    // Enforce `occurences <= max_occurences`
+    occurrences.enforce_cmp(
         &mut cs.ns(|| "enforce maximum number of occurrences"),
-        &occurrences,
         &max_occurrences,
+        std::cmp::Ordering::Less,
+        true,
     )?;
 
     // Enforce that we have correctly counted the number of occurrences
