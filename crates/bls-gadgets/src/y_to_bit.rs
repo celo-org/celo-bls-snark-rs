@@ -11,9 +11,7 @@ use r1cs_std::{
 };
 use std::{marker::PhantomData, ops::Neg};
 
-/// Enforces that the y bit is graeter than half
-///
-/// The goal of the gadgets is to provide the bit according to the value of y,
+/// The goal of the gadget is to provide the bit according to the value of y,
 /// as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
 /// we can normalize any elements greater than $half$ (i.e. in the range
 /// [half+1, p-1]), by subtracting half (resulting in a number in the [1, half]
@@ -25,6 +23,94 @@ pub struct YToBitGadget<P: Bls12Parameters> {
 }
 
 impl<P: Bls12Parameters> YToBitGadget<P> {
+    pub fn y_to_bit_g1<CS: ConstraintSystem<P::Fp>>(
+        mut cs: CS,
+        pk: &G1Gadget<P>,
+    ) -> Result<Boolean, SynthesisError> {
+        let y_bit = Self::normalize(&mut cs.ns(|| "g1 normalize"), &pk.y)?;
+        Ok(y_bit)
+    }
+
+    pub fn y_to_bit_g2<CS: ConstraintSystem<P::Fp>>(
+        mut cs: CS,
+        pk: &G2Gadget<P>,
+    ) -> Result<Boolean, SynthesisError> {
+        // Apply the point compression logic for getting the y bit's value.
+        let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
+            let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
+            let c1 = pk.y.c1.get_value().get()?;
+            let c0 = pk.y.c0.get_value().get()?;
+
+            let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
+            Ok(bit)
+        })?;
+
+        // Get the y_c1 and y_c0 bits
+        let y_c0_bit = Self::normalize(&mut cs.ns(|| "normalize c0"), &pk.y.c0)?;
+        let y_c1_bit = Self::normalize(&mut cs.ns(|| "normalize c1"), &pk.y.c1)?;
+
+        // (1-a)*(b*c) == o - a
+        // a is c1
+        // b is y_eq
+        // c is c0
+        // (1-c1)*(y_eq*c0) == o - c1
+        //
+        // previously we constrained y_eq to be 1 <==> c1 == 0
+        // either c1 is 1, and then o is 1
+        // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
+        // else c1 is 0 and c0 is 0 (then y_eq is 1), and then o is 0
+        let y_eq_bit = Self::is_eq_zero(&mut cs.ns(|| "c1 == 0"), &pk.y.c1)?;
+        let bc = Boolean::and(cs.ns(|| "and bc"), &y_eq_bit, &y_c0_bit)?;
+
+        cs.enforce(
+            || "enforce y bit derived correctly",
+            |lc| lc + (P::Fp::one(), CS::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg()),
+            |_| bc.lc(CS::one(), P::Fp::one()),
+            |lc| {
+                lc + y_bit.lc(CS::one(), P::Fp::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg())
+            },
+        );
+
+        Ok(y_bit)
+    }
+
+    fn is_eq_zero<CS: ConstraintSystem<P::Fp>>(
+        cs: &mut CS,
+        el: &FpGadget<P::Fp>,
+    ) -> Result<Boolean, SynthesisError> {
+        let bit = Boolean::alloc(cs.ns(|| "alloc bit"), || {
+            Ok(el.get_value().get()? == P::Fp::zero())
+        })?;
+
+        // This enforces bit = 1 <=> el != 0.
+        // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
+        // forces result to be 1. If el is non-zero, then a constraint of the form
+        // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
+        // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
+        // witness calculation to pass.
+        let inv = FpGadget::alloc(cs.ns(|| "alloc inv"), || {
+            Ok(el.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
+        })?;
+
+        // (el * inv == 1 - bit)
+        cs.enforce(
+            || "enforce y_eq_bit",
+            |lc| el.get_variable() + lc,
+            |lc| inv.get_variable() + lc,
+            |lc| lc + (P::Fp::one(), CS::one()) + bit.lc(CS::one(), P::Fp::one().neg()),
+        );
+
+        // (lhs * bit == 0)
+        cs.enforce(
+            || "enforce y_eq_bit 2",
+            |lc| el.get_variable() + lc,
+            |_| bit.lc(CS::one(), P::Fp::one()),
+            |lc| lc,
+        );
+
+        Ok(bit)
+    }
+
     // Returns 1 if el > half, else 0.
     fn normalize<CS: ConstraintSystem<P::Fp>>(
         cs: &mut CS,
@@ -51,7 +137,6 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         );
 
         // Enforce `adjusted <= half`
-        // TODO: Switch to `FpGadget<P>::enforce_smaller_or_equal_than_mod_minus_one_div_two`
         let adjusted_bits = &adjusted.to_bits(cs.ns(|| "adjusted to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
             cs.ns(|| "enforce smaller than or equal to modulus minus one div two"),
@@ -60,90 +145,6 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         )?;
 
         Ok(bit)
-    }
-
-    pub fn y_to_bit_g1<CS: ConstraintSystem<P::Fp>>(
-        mut cs: CS,
-        pk: &G1Gadget<P>,
-    ) -> Result<Boolean, SynthesisError> {
-        let y_bit = Self::normalize(&mut cs.ns(|| "g1 normalize"), &pk.y)?;
-        Ok(y_bit)
-    }
-
-    pub fn y_to_bit_g2<CS: ConstraintSystem<P::Fp>>(
-        mut cs: CS,
-        pk: &G2Gadget<P>,
-    ) -> Result<Boolean, SynthesisError> {
-        // Is y.c1 == 0?
-        let y_eq_bit = Boolean::alloc(cs.ns(|| "alloc y eq bit"), || {
-            Ok(pk.y.c1.get_value().get()? == P::Fp::zero())
-        })?;
-
-        // This enforces y_eq_bit = 1 <=> c_1 != 0.
-        // The idea is that if lhs is 0, then a constraint of the form lhs*lhs_inv == 1 -
-        // result forces result to be 1. If lhs is non-zero, then a constraint of the form
-        // lhs*result == 0 forces result to be 0. lhs_inv is set to be 0 in case lhs is 0 because
-        // the value of lhs_inv is not significant in that case (lhs is 0 anyway) and we need the
-        // witness calculation to pass.
-        {
-            let lhs = &pk.y.c1;
-            let inv = FpGadget::alloc(cs.ns(|| "alloc c1 inv"), || {
-                Ok(lhs.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
-            })?;
-
-            // (lhs * lhs_inv == 1 - y_eq_bit)
-            cs.enforce(
-                || "enforce y_eq_bit",
-                |lc| lhs.get_variable() + lc,
-                |lc| inv.get_variable() + lc,
-                |lc| lc + (P::Fp::one(), CS::one()) + y_eq_bit.lc(CS::one(), P::Fp::one().neg()),
-            );
-
-            // (lhs*y_eq_bit == 0)
-            cs.enforce(
-                || "enforce y_eq_bit 2",
-                |lc| lhs.get_variable() + lc,
-                |_| y_eq_bit.lc(CS::one(), P::Fp::one()),
-                |lc| lc,
-            );
-        }
-
-        // Apply the point compression logic for getting the y bit's value.
-        let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
-            let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
-            let c1 = pk.y.c1.get_value().get()?;
-            let c0 = pk.y.c0.get_value().get()?;
-
-            let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
-            Ok(bit)
-        })?;
-
-        // Get the y_c1 and y_c0 bits
-        let y_c0_bit = Self::normalize(&mut cs.ns(|| "normalize c0"), &pk.y.c0)?;
-        let y_c1_bit = Self::normalize(&mut cs.ns(|| "normalize c1"), &pk.y.c1)?;
-
-        // (1-a)*(b*c) == o - a
-        // a is c1
-        // b is y_eq
-        // c is c0
-        // (1-c1)*(y_eq*c0) == o - c1
-        //
-        // previously we constrained y_eq to be 1 <==> c1 == 0
-        // either c1 is 1, and then o is 1
-        // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
-        // else c1 is 0 and c0 is 0 (then y_eq is 1), and then o is 0
-        let bc = Boolean::and(cs.ns(|| "and bc"), &y_eq_bit, &y_c0_bit)?;
-
-        cs.enforce(
-            || "enforce y bit derived correctly",
-            |lc| lc + (P::Fp::one(), CS::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg()),
-            |_| bc.lc(CS::one(), P::Fp::one()),
-            |lc| {
-                lc + y_bit.lc(CS::one(), P::Fp::one()) + y_c1_bit.lc(CS::one(), P::Fp::one().neg())
-            },
-        );
-
-        Ok(y_bit)
     }
 }
 
