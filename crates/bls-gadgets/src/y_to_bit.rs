@@ -245,41 +245,33 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g1() {
-        let rng = &mut XorShiftRng::from_seed([
-            0x5d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc,
-            0x06, 0x54,
-        ]);
+        type Fp = <Bls12_377Parameters as Bls12Parameters>::Fp;
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+
         for i in 0..10 {
-            let secret_key = Bls12_377Fr::rand(rng);
+            let element = Bls12_377G1Projective::rand(&mut rand::thread_rng());
 
-            let generator = Bls12_377G1Projective::prime_subgroup_generator();
-            let pub_key = generator.clone().mul(secret_key);
+            let mut cs = TestConstraintSystem::<SW6Fr>::new();
 
-            let half = <Bls12_377Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two();
+            let allocated =
+                G1Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element))
+                    .unwrap();
 
-            {
-                let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let y_bit =
+                YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(cs.ns(|| "y to bit"), &allocated)
+                    .unwrap();
 
-                let pk =
-                    G1Gadget::<Bls12_377Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(pub_key))
-                        .unwrap();
+            assert_eq!(
+                allocated.y.get_value().get().unwrap() > half,
+                y_bit.get_value().get().unwrap()
+            );
 
-                let y_bit =
-                    YToBitGadget::<Bls12_377Parameters>::y_to_bit_g1(cs.ns(|| "y to bit"), &pk)
-                        .unwrap();
-
-                assert_eq!(
-                    pk.y.get_value().get().unwrap().into_repr() > half,
-                    y_bit.get_value().get().unwrap()
-                );
-
-                if i == 0 {
-                    println!("number of constraints: {}", cs.num_constraints());
-                }
-                assert_eq!(cs.num_constraints(), 1621);
-
-                assert!(cs.is_satisfied());
+            if i == 0 {
+                println!("number of constraints: {}", cs.num_constraints());
             }
+            assert_eq!(cs.num_constraints(), 1621);
+
+            assert!(cs.is_satisfied());
         }
     }
 
