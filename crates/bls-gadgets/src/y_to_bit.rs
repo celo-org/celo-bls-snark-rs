@@ -25,43 +25,50 @@ pub struct YToBitGadget<P: Bls12Parameters> {
 }
 
 impl<P: Bls12Parameters> YToBitGadget<P> {
-    pub fn y_to_bit_g1<CS: ConstraintSystem<P::Fp>>(
-        mut cs: CS,
-        pk: &G1Gadget<P>,
+    // Returns 1 if el > half, else 0.
+    fn normalize<CS: ConstraintSystem<P::Fp>>(
+        cs: &mut CS,
+        el: &FpGadget<P::Fp>, 
     ) -> Result<Boolean, SynthesisError> {
         let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
 
-        let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
-            Ok(pk.y.get_value().get()? > half)
+        let bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
+            Ok(el.get_value().get()? > half)
         })?;
 
-        let y_adjusted = FpGadget::alloc(cs.ns(|| "alloc y"), || {
-            let y_value = pk.y.get_value().get()?; 
+        let adjusted = FpGadget::alloc(cs.ns(|| "alloc y"), || {
+            let el = el.get_value().get()?;
 
-            let adjusted = if y_value > half {
-                y_value - &half
-            } else {
-                y_value
-            };
+            let adjusted = if el > half { el - &half } else { el };
 
             Ok(adjusted)
         })?;
 
-        let y_bit_lc = y_bit.lc(CS::one(), half.neg());
+        let bit_lc = bit.lc(CS::one(), half.neg());
         cs.enforce(
-            || "check y bit",
+            || "check bit",
             |lc| lc + (P::Fp::one(), CS::one()),
-            |lc| pk.y.get_variable() + y_bit_lc + lc,
-            |lc| y_adjusted.get_variable() + lc,
+            |lc| el.get_variable() + bit_lc + lc,
+            |lc| adjusted.get_variable() + lc,
         );
 
-        let y_adjusted_bits = y_adjusted.to_bits(cs.ns(|| "y adjusted to bits"))?;
+        // Enforce `adjusted <= half`
+        // TODO: Switch to `FpGadget<P>::enforce_smaller_or_equal_than_mod_minus_one_div_two`
+        let adjusted_bits = &adjusted.to_bits(cs.ns(|| "adjusted to bits"))?;
         Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
             cs.ns(|| "enforce smaller than or equal to modulus minus one div two"),
-            &y_adjusted_bits,
+            adjusted_bits,
             P::Fp::modulus_minus_one_div_two(),
         )?;
 
+        Ok(bit)
+    }
+
+    pub fn y_to_bit_g1<CS: ConstraintSystem<P::Fp>>(
+        mut cs: CS,
+        pk: &G1Gadget<P>,
+    ) -> Result<Boolean, SynthesisError> {
+        let y_bit = Self::normalize(&mut cs.ns(|| "g1 normalize"), &pk.y)?;
         Ok(y_bit)
     }
 
