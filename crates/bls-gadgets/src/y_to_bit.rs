@@ -3,7 +3,6 @@ use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     alloc::AllocGadget,
-    bits::ToBitsGadget,
     boolean::Boolean,
     fields::{fp::FpGadget, FieldGadget},
     groups::curves::short_weierstrass::bls12::{G1Gadget, G2Gadget},
@@ -137,11 +136,9 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         );
 
         // Enforce `adjusted <= half`
-        let adjusted_bits = &adjusted.to_bits(cs.ns(|| "adjusted to bits"))?;
-        Boolean::enforce_smaller_or_equal_than::<_, _, P::Fp, _>(
+        FpGadget::enforce_smaller_or_equal_than_mod_minus_one_div_two(
             cs.ns(|| "enforce smaller than or equal to modulus minus one div two"),
-            adjusted_bits,
-            P::Fp::modulus_minus_one_div_two(),
+            &adjusted,
         )?;
 
         Ok(bit)
@@ -174,7 +171,7 @@ mod test {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
         let rng = &mut rand::thread_rng();
 
-        for i in 0..10 {
+        for _ in 0..10 {
             let element = G1Projective::rand(rng);
 
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
@@ -190,11 +187,10 @@ mod test {
                 y_bit.get_value().get().unwrap()
             );
 
-            if i == 0 {
-                println!("number of constraints: {}", cs.num_constraints());
-            }
             assert_eq!(cs.num_constraints(), 1621);
-
+            if !cs.is_satisfied() {
+                println!("{}", cs.which_is_unsatisfied().unwrap());
+            }
             assert!(cs.is_satisfied());
         }
     }
@@ -206,7 +202,7 @@ mod test {
         let rng = &mut rand::thread_rng();
 
         // Check random points.
-        for i in 0..10 {
+        for _ in 0..10 {
             let element = G2Projective::rand(rng);
 
             let mut cs = TestConstraintSystem::<SW6Fr>::new();
@@ -226,11 +222,7 @@ mod test {
                 assert_eq!(false, y_bit.get_value().unwrap());
             }
 
-            if i == 0 {
-                println!("number of constraints: {}", cs.num_constraints());
-            }
             assert_eq!(cs.num_constraints(), 3248);
-
             if !cs.is_satisfied() {
                 println!("{}", cs.which_is_unsatisfied().unwrap());
             }
@@ -243,7 +235,7 @@ mod test {
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
 
-        for i in 0..10 {
+        for _ in 0..10 {
             let element = G2Projective::rand(rng);
             // we edit the key with a specific vaue for y.c1
             let new_y =
@@ -267,11 +259,7 @@ mod test {
                 assert_eq!(false, y_bit.get_value().unwrap());
             }
 
-            if i == 0 {
-                println!("number of constraints: {}", cs.num_constraints());
-            }
             assert_eq!(cs.num_constraints(), 3248);
-
             // we're not checking this, because we couldn't find a matching point on BLS12-377,
             // and so we can't generate proper points on the curve
             /*
