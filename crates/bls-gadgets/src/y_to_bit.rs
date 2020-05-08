@@ -278,6 +278,7 @@ mod test {
                 if i == 0 {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
+                assert_eq!(cs.num_constraints(), 1621);
 
                 assert!(cs.is_satisfied());
             }
@@ -325,6 +326,7 @@ mod test {
                 if i == 0 {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
+                assert_eq!(cs.num_constraints(), 3248);
 
                 if !cs.is_satisfied() {
                     println!("{}", cs.which_is_unsatisfied().unwrap());
@@ -379,6 +381,7 @@ mod test {
                 if i == 0 {
                     println!("number of constraints: {}", cs.num_constraints());
                 }
+                assert_eq!(cs.num_constraints(), 3248);
 
                 // we're not checking this, because we couldn't find a matching point on BLS12-377,
                 // and so we can't generate proper points on the curve
