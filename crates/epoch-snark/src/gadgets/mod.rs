@@ -4,7 +4,8 @@ pub use epoch_data::EpochData;
 mod hash_to_bits;
 pub use hash_to_bits::HashToBits;
 
-pub mod single_update;
+mod single_update;
+pub use single_update::{ConstrainedEpoch, SingleUpdate};
 
 mod pack;
 pub use pack::MultipackGadget;
@@ -12,8 +13,8 @@ pub use pack::MultipackGadget;
 mod proof_of_compression;
 pub use proof_of_compression::ProofOfCompression;
 
-pub mod epochs;
-pub use epochs::ValidatorSetUpdate;
+mod epochs;
+pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
 use algebra::{bls12_377::Parameters, sw6::Fr, BigInteger, Field, FpParameters, PrimeField};
@@ -56,7 +57,7 @@ pub mod test_helpers {
     }
 }
 
-pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
+pub(super) fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
     values
         .chunks(P::CAPACITY as usize)
         .map(|c| {
@@ -66,14 +67,14 @@ pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Vec<F> {
         .collect::<Vec<_>>()
 }
 
-pub fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
+fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     num: Option<T>,
 ) -> Result<FrGadget, SynthesisError> {
     FrGadget::alloc(cs, || Ok(Fr::from(num.get()?.into())))
 }
 
-pub fn fr_to_bits<CS: ConstraintSystem<Fr>>(
+fn fr_to_bits<CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     input: &FrGadget,
     length: usize,
@@ -83,7 +84,7 @@ pub fn fr_to_bits<CS: ConstraintSystem<Fr>>(
     Ok(input[0..length].to_vec())
 }
 
-pub fn g2_to_bits<CS: ConstraintSystem<Fr>>(
+fn g2_to_bits<CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     input: &G2Gadget,
 ) -> Result<Vec<Boolean>, SynthesisError> {
@@ -98,7 +99,7 @@ pub fn g2_to_bits<CS: ConstraintSystem<Fr>>(
     Ok(output)
 }
 
-pub fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
+fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
     cs: &mut CS,
     input: &[Option<bool>],
 ) -> Result<Vec<Boolean>, SynthesisError> {

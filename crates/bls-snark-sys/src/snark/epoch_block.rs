@@ -3,7 +3,7 @@ use algebra::{
     bls12_377::G2Affine, AffineCurve, CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve,
 };
 use bls_crypto::PublicKey;
-use epoch_snark::{encoding::EncodingError, epoch_block::EpochBlock};
+use epoch_snark::{EncodingError, EpochBlock};
 use std::{
     convert::TryFrom,
     os::raw::{c_int, c_uint, c_ushort},

@@ -1,11 +1,7 @@
 use super::{BLSCurve, CPCurve, Parameters};
 use crate::{
     epoch_block::{EpochBlock, EpochTransition},
-    gadgets::{
-        epochs::{HashToBitsHelper, ValidatorSetUpdate},
-        single_update::SingleUpdate,
-        EpochData, HashToBits,
-    },
+    gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
 };
 use bls_crypto::{
     hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1,
@@ -20,7 +16,7 @@ use r1cs_core::SynthesisError;
 use tracing::{info, span, Level};
 
 pub fn prove(
-    parameters: &Parameters,
+    parameters: &Parameters<CPCurve, BLSCurve>,
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
@@ -65,7 +61,7 @@ pub fn prove(
 }
 
 /// Helper which creates the hashproof inside BLS12-377
-pub fn generate_hash_helper(
+fn generate_hash_helper(
     params: &Groth16Parameters<BLSCurve>,
     transitions: &[EpochTransition],
 ) -> Result<HashToBitsHelper<BLSCurve>, SynthesisError> {
@@ -107,7 +103,7 @@ pub fn generate_hash_helper(
     })
 }
 
-pub fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
+fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
         maximum_non_signers: block.maximum_non_signers,
@@ -119,7 +115,7 @@ pub fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     }
 }
 
-pub fn to_update(transition: &EpochTransition) -> SingleUpdate<BLSCurve> {
+fn to_update(transition: &EpochTransition) -> SingleUpdate<BLSCurve> {
     SingleUpdate {
         epoch_data: to_epoch_data(&transition.block),
         signed_bitmap: transition

@@ -23,8 +23,7 @@ use crypto_primitives::{
 use r1cs_std::fields::fp::FpGadget;
 type FrGadget = FpGadget<Fr>;
 
-use super::epochs::HashToBitsHelper;
-use crate::gadgets::{HashToBits, MultipackGadget};
+use crate::gadgets::{HashToBits, HashToBitsHelper, MultipackGadget};
 use bls_crypto::OUT_DOMAIN;
 
 /// Parameters for compressing the public inputs of the R1CS system

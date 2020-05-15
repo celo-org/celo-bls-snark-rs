@@ -32,9 +32,9 @@ impl<E: PairingEngine> SingleUpdate<E> {
 }
 
 pub struct ConstrainedEpoch {
-    // The new validators for this epoch
+    /// The new validators for this epoch
     pub new_pubkeys: Vec<G2Gadget>,
-    // The new threshold needed for signatures
+    /// The new threshold needed for signatures
     pub new_max_non_signers: FrGadget,
     /// The epoch's G1 Hash
     pub message_hash: G1PreparedGadget,

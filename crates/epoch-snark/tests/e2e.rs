@@ -1,4 +1,4 @@
-use epoch_snark::api::{prover, setup, verifier};
+use epoch_snark::api::{prove, trusted_setup, verify};
 
 mod fixtures;
 use fixtures::generate_test_data;
@@ -14,7 +14,7 @@ fn prover_verifier_groth16() {
     let hashes_in_bls12_377 = true;
 
     // Trusted setup
-    let params = setup::trusted_setup(
+    let params = trusted_setup(
         num_validators,
         num_transitions,
         faults,
@@ -29,9 +29,9 @@ fn prover_verifier_groth16() {
         generate_test_data(num_validators, faults, num_transitions);
 
     // Prover generates the proof given the params
-    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    let proof = prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
 
     // Verifier checks the proof
-    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
+    let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
 }

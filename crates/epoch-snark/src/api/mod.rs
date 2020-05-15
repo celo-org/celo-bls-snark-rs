@@ -1,19 +1,15 @@
-pub mod prover;
-/// API for setting up, generating and verifying proofs for the
-/// SNARK instantiated over BLS12-377 / SW6 which proves language
-/// ...
-pub mod setup;
-pub mod verifier;
+mod prover;
+pub use prover::prove;
 
-use algebra::{bls12_377, sw6};
+mod setup;
+pub use setup::{trusted_setup, Parameters};
+
+mod verifier;
+pub use verifier::{verify, VerificationError};
 
 // Instantiate certain types to avoid confusion
-pub type Parameters = setup::Parameters<CPCurve, BLSCurve>;
-
-pub type BLSField = bls12_377::Fr;
-pub type BLSCurve = bls12_377::Bls12_377;
-pub type BLSFrParams = bls12_377::FrParameters;
-
-pub type CPField = sw6::Fr;
-pub type CPCurve = sw6::SW6;
-pub type CPFrParams = sw6::FrParameters;
+use algebra::{bls12_377, sw6};
+type BLSCurve = bls12_377::Bls12_377;
+type CPField = sw6::Fr;
+type CPCurve = sw6::SW6;
+type CPFrParams = sw6::FrParameters;
