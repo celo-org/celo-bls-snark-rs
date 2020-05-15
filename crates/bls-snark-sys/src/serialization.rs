@@ -1,10 +1,9 @@
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
-use crate::BLSError;
-
 use algebra::{
     bls12_377::{Fq, Fq2, G1Affine, G2Affine},
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, FromBytes,
 };
+use bls_crypto::BLSError;
 use std::{os::raw::c_int, slice};
 
 // Serialization & deserialization

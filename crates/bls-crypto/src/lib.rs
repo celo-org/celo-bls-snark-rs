@@ -51,7 +51,7 @@
 //! In a future iteration, this will be abstracted to support any curve which implements
 //! algebra's `PairingEngine` trait. We will also support public keys on G1 and signatures on G2.
 
-pub(crate) mod bls;
+pub mod bls;
 pub use bls::{PrivateKey, PublicKey, PublicKeyCache, Signature};
 
 /// Traits and implementations for hashing arbitrary data to an elliptic curve's group element
@@ -61,9 +61,6 @@ pub use hash_to_curve::HashToCurve;
 /// Hash function implementations using a CRH followed by a XOF.
 pub mod hashers;
 pub use hashers::Hasher;
-
-#[cfg(feature = "ffi")]
-pub mod ffi;
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers;

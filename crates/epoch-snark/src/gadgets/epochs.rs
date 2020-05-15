@@ -10,7 +10,7 @@ use r1cs_std::{
     fields::fp::FpGadget,
     Assignment,
 };
-use tracing::{debug, span, Level};
+use tracing::{debug, info, span, Level};
 
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 

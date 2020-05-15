@@ -1,4 +1,5 @@
-/// Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
+//! Implements BLS signatures as specified in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html.
+
 mod secret;
 pub use secret::PrivateKey;
 
