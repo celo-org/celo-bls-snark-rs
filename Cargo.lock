@@ -492,7 +492,6 @@ dependencies = [
  "byteorder",
  "crypto-primitives",
  "groth16",
- "log",
  "r1cs-core",
  "r1cs-std",
  "rand",
