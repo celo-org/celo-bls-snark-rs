@@ -17,7 +17,7 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 use algebra::PairingEngine;
 use groth16::{Proof, VerifyingKey};
 
-use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochData, ProofOfCompression};
+use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 
 use bls_gadgets::BlsVerifyGadget;
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
@@ -84,9 +84,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
         info!("generating constraints");
-        let proof_of_compression = self.enforce(&mut cs.ns(|| "check signature"))?;
-        proof_of_compression
-            .compress_public_inputs(&mut cs.ns(|| "compress public inputs"), self.hash_helper)?;
+        let epoch_bits = self.enforce(&mut cs.ns(|| "check signature"))?;
+        epoch_bits.verify(&mut cs.ns(|| "compress public inputs"), self.hash_helper)?;
 
         info!("constraints generated");
 
@@ -95,10 +94,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
-    fn enforce<CS: ConstraintSystem<Fr>>(
-        &self,
-        cs: &mut CS,
-    ) -> Result<ProofOfCompression, SynthesisError> {
+    fn enforce<CS: ConstraintSystem<Fr>>(&self, cs: &mut CS) -> Result<EpochBits, SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
@@ -131,7 +127,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             &prepared_message_hashes,
         )?;
 
-        Ok(ProofOfCompression {
+        Ok(EpochBits {
             first_epoch_bits,
             last_epoch_bits,
             crh_bits,

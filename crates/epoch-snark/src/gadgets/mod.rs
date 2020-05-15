@@ -10,8 +10,8 @@ pub use single_update::{ConstrainedEpoch, SingleUpdate};
 mod pack;
 pub use pack::MultipackGadget;
 
-mod proof_of_compression;
-pub use proof_of_compression::ProofOfCompression;
+mod epoch_bits;
+pub use epoch_bits::EpochBits;
 
 mod epochs;
 pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
