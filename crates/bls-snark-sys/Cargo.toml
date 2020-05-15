@@ -13,6 +13,9 @@ once_cell = "1.4.0"
 rand = "0.7.3"
 log = "0.4.8"
 
+[lib]
+crate-type = ["lib", "staticlib"]
+
 [dev-dependencies]
 groth16 = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe" }
