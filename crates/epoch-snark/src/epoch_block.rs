@@ -11,7 +11,7 @@ use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
 /// It contains information about the new epoch, as well as an aggregated
 /// signature and bitmap from the validators from the previous block that
 /// signed on it
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpochTransition {
     /// The new epoch block which is being processed
     pub block: EpochBlock,
@@ -22,14 +22,19 @@ pub struct EpochTransition {
     pub bitmap: Vec<bool>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// Metadata about the next epoch
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpochBlock {
+    /// The block number
     pub index: u16,
+    /// The maximum allowed number of signers that may be absent
     pub maximum_non_signers: u32,
+    /// The public keys of the new validators
     pub new_public_keys: Vec<PublicKey>,
 }
 
 impl EpochBlock {
+    /// Creates a new epoch block
     pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
@@ -38,6 +43,8 @@ impl EpochBlock {
         }
     }
 
+    /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
+    /// group using `SIG_DOMAIN` as a domain separator
     pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
         let input = self.encode_to_bytes()?;
         let expected_hash: G1Projective =
@@ -45,16 +52,17 @@ impl EpochBlock {
         Ok(expected_hash)
     }
 
+    /// Encodes the block to bytes and then hashes it with Blake2
     pub fn blake2(&self) -> Result<Vec<bool>, EncodingError> {
         Ok(hash_to_bits(&self.encode_to_bytes()?))
     }
 
+    /// Encodes the block appended with the aggregate signature to bytes and then hashes it with Blake2
     pub fn blake2_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
         Ok(hash_to_bits(&self.encode_to_bytes_with_aggregated_pk()?))
     }
 
-    /// The goal of the validator diff encoding is to be a constant-size encoding so it would be
-    /// more easily processable in SNARKs
+    /// Encodes the block to LE bits
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
@@ -65,6 +73,7 @@ impl EpochBlock {
         Ok(epoch_bits)
     }
 
+    /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bits
     pub fn encode_to_bits_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = self.encode_to_bits()?;
         let aggregated_pk = PublicKey::aggregate(&self.new_public_keys);
@@ -72,10 +81,12 @@ impl EpochBlock {
         Ok(epoch_bits)
     }
 
+    /// Encodes the block to LE bytes
     pub fn encode_to_bytes(&self) -> Result<Vec<u8>, EncodingError> {
         Ok(bits_to_bytes(&self.encode_to_bits()?))
     }
 
+    /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
     pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
         Ok(bits_to_bytes(&self.encode_to_bits_with_aggregated_pk()?))
     }

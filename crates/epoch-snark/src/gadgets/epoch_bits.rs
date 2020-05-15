@@ -23,22 +23,25 @@ use crypto_primitives::{
 use r1cs_std::fields::fp::FpGadget;
 type FrGadget = FpGadget<Fr>;
 
-use super::epochs::HashToBitsHelper;
-use crate::gadgets::{HashToBits, MultipackGadget};
+use crate::gadgets::{HashToBits, HashToBitsHelper, MultipackGadget};
 use bls_crypto::OUT_DOMAIN;
 
-/// Parameters for compressing the public inputs of the R1CS system
-pub struct ProofOfCompression {
+/// Contains the first and last epoch's bits, along with auxiliary CRH and XOF bits
+/// which are used for verifying the CRH -> XOF hash calculation
+pub struct EpochBits {
+    /// The first epoch's bits
     pub first_epoch_bits: Vec<Boolean>,
+    /// The last epoch's bits
     pub last_epoch_bits: Vec<Boolean>,
+    /// The CRH bits for all intermediate state transitions
     pub crh_bits: Vec<Boolean>,
+    /// The XOF bits for all intermediate state transitions
     pub xof_bits: Vec<Boolean>,
 }
 
-impl ProofOfCompression {
-    /// Compress the public inputs by verifying that the intermediate proofs are computed correctly
-    /// and that the edges are also consistent
-    pub fn compress_public_inputs<CS: ConstraintSystem<Fr>>(
+impl EpochBits {
+    /// Verify that the intermediate proofs are computed correctly and that the edges are correctly calculated
+    pub fn verify<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
         helper: Option<HashToBitsHelper<Bls12_377>>,
@@ -184,7 +187,7 @@ mod tests {
         // encode each epoch's bytes to LE and pas them to the constraint system
         let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
         let last_epoch_bits = bytes_to_bits(&last_bytes, 256);
-        let poc = ProofOfCompression {
+        let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],
             first_epoch_bits: to_bool(&first_epoch_bits),
@@ -192,7 +195,7 @@ mod tests {
         };
 
         let mut cs = TestConstraintSystem::<Fr>::new();
-        let packed = poc.verify_edges(&mut cs).unwrap();
+        let packed = bits.verify_edges(&mut cs).unwrap();
         assert!(cs.is_satisfied());
 
         // get the inner packed value

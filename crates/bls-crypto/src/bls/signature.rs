@@ -14,7 +14,7 @@ use std::{
 };
 
 /// A BLS signature on G1.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Signature(G1Projective);
 
 impl From<G1Projective> for Signature {

@@ -67,7 +67,7 @@ jobs:
             cargo clippy --release --all-targets --all-features -- -D warnings
       - run:
           name: Audit Dependencies
-          command: cargo audit --ignore RUSTSEC-2019-0019 # remove once https://github.com/scipr-lab/zexe/issues/135 is fixed
+          command: cargo audit
       - persist_to_workspace:
           root: .
           paths: target/release

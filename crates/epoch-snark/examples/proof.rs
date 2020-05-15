@@ -1,4 +1,4 @@
-use epoch_snark::api::{prover, setup, verifier};
+use epoch_snark::{prove, trusted_setup, verify};
 use std::env;
 
 #[path = "../tests/fixtures.rs"]
@@ -41,7 +41,7 @@ fn main() {
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
     let params =
-        setup::trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
+        trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
     end_timer!(time);
 
     // Create the state to be proven (first - last and in between)
@@ -51,12 +51,12 @@ fn main() {
 
     // Prover generates the proof given the params
     let time = start_timer!(|| "Generate proof");
-    let proof = prover::prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    let proof = prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
     end_timer!(time);
 
     // Verifier checks the proof
     let time = start_timer!(|| "Verify proof");
-    let res = verifier::verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
+    let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     end_timer!(time);
     assert!(res.is_ok());
 }

@@ -5,7 +5,7 @@ use algebra::{
 
 use bls_crypto::test_helpers::{keygen_batch, keygen_mul};
 use bls_crypto::{PublicKey, Signature};
-use epoch_snark::epoch_block::{EpochBlock, EpochTransition};
+use epoch_snark::{EpochBlock, EpochTransition};
 
 // Returns the initial epoch and a list of signed `num_epochs` state transitions
 pub fn generate_test_data(

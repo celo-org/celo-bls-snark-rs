@@ -14,6 +14,7 @@ use tracing::{info, span, Level};
 
 type Result<T> = std::result::Result<T, SynthesisError>;
 
+/// Public parameters for the BLS and for the CRH->XOF SNARKs
 pub struct Parameters<CP: PairingEngine, BLS: PairingEngine> {
     pub epochs: Groth16Parameters<CP>,
     pub hash_to_bits: Option<Groth16Parameters<BLS>>,

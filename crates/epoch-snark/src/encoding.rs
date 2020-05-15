@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use algebra::serialize::SerializationError;
 #[derive(Debug, Error)]
+/// Union type for data serialization errors
 pub enum EncodingError {
     #[error("Zexe Error: {0}")]
     ZexeSerialization(#[from] SerializationError),
