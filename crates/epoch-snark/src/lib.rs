@@ -16,7 +16,7 @@ use std::{
     slice,
 };
 
-fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
+pub fn convert_result_to_bool<T, E: Display, F: Fn() -> Result<T, E>>(f: F) -> bool {
     match f() {
         Err(e) => {
             error!("SNARK library error: {}", e);

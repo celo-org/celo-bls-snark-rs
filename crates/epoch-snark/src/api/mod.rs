@@ -5,8 +5,6 @@ pub mod prover;
 pub mod setup;
 pub mod verifier;
 
-pub mod ffi;
-
 use algebra::{bls12_377, sw6};
 
 // Instantiate certain types to avoid confusion

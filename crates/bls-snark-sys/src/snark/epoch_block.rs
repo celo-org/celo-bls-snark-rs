@@ -1,9 +1,8 @@
-use crate::epoch_block::EpochBlock;
-use crate::EncodingError;
 use algebra::{
     bls12_377::G2Affine, AffineCurve, CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve,
 };
 use bls_crypto::PublicKey;
+use epoch_snark::{encoding::EncodingError, epoch_block::EpochBlock};
 use std::convert::TryFrom;
 use std::slice;
 
@@ -90,7 +89,7 @@ unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, Enc
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::ffi::test_helpers::TestCircuit;
+    use crate::snark::test_helpers::TestCircuit;
     use algebra::{
         bls12_377::{Fr, G2Projective},
         serialize::CanonicalSerialize,
