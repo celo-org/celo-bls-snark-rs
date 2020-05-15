@@ -1,4 +1,4 @@
-# BLS-ZEXE
+# celo-bls-snark-rs
 
 Implements SNARK-friendly BLS signatures over BLS12-377 and SW6.
 
@@ -47,11 +47,11 @@ We perform cofactor muliplication in *G1* directly.
 
 ## License
 
-BLS-ZEXE is licensed under either of the following licenses, at your discretion.
+celo-bls-snark-rs is licensed under either of the following licenses, at your discretion.
 
 Apache License Version 2.0 (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
 MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
-Unless you explicitly state otherwise, any contribution submitted for inclusion in BLS-ZEXE by you shall be dual licensed as above (as defined in the Apache v2 License), without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution submitted for inclusion in celo-bls-snark-rs by you shall be dual licensed as above (as defined in the Apache v2 License), without any additional terms or conditions.
 
 ## References
 
