@@ -11,18 +11,21 @@ use bls_gadgets::BlsVerifyGadget;
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
-
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
 type FrGadget = FpGadget<Fr>;
 
 #[derive(Clone, Debug)]
-/// An epoch block transition
+/// An epoch block transition which includes the new epoch block's metadata, as well as
+/// the bitmap of the validators which signed on the new epoch block.
 pub struct SingleUpdate<E: PairingEngine> {
+    /// The new epoch block's metadata
     pub epoch_data: EpochData<E>,
+    /// Bitmap of the validators who signed on the next epoch block
     pub signed_bitmap: Vec<Option<bool>>,
 }
 
 impl<E: PairingEngine> SingleUpdate<E> {
+    /// Returns an empty update. This function is used when running the trusted setup.
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         Self {
             epoch_data: EpochData::<E>::empty(num_validators, maximum_non_signers),
@@ -31,6 +34,10 @@ impl<E: PairingEngine> SingleUpdate<E> {
     }
 }
 
+/// A [`SingleUpdate`] is constrained to a `ConstrainedEpoch` via [`SingleUpdate.constrain`]
+///
+/// [`SingleUpdate`]: struct.SingleUpdate.html
+/// [`SingleUpdate.constrain`]: struct.SingleUpdate.html#method.constrain
 pub struct ConstrainedEpoch {
     /// The new validators for this epoch
     pub new_pubkeys: Vec<G2Gadget>,
@@ -54,6 +61,10 @@ pub struct ConstrainedEpoch {
 impl SingleUpdate<Bls12_377> {
     /// Ensures that enough validators are present on the bitmap and generates
     /// the epoch's G1 Hash and Aggregated Public Key
+    ///
+    /// # Panics
+    ///
+    /// - If `num_validators != self.epoch_data.public_keys.len()`
     pub fn constrain<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,

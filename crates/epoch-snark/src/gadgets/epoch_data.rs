@@ -19,7 +19,10 @@ use tracing::{span, trace, Level};
 
 type FrGadget = FpGadget<Fr>;
 
-/// An epoch (either the first one or any in between)
+/// An epoch block using optional types so that it can be used to instantiate the
+/// trusted setup. Its non-gadget compatible equivalent is [`EpochBlock`]
+///
+/// [`EpochBlock`]: struct.EpochBlock.html
 #[derive(Clone, Debug, Default)]
 pub struct EpochData<E: PairingEngine> {
     /// The allowed non-signers for the epoch + 1
@@ -31,12 +34,12 @@ pub struct EpochData<E: PairingEngine> {
 }
 
 pub struct ConstrainedEpochData {
-    /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
-    pub bits: Vec<Boolean>,
     pub index: FrGadget,
     pub maximum_non_signers: FrGadget,
     pub message_hash: G1Gadget,
     pub pubkeys: Vec<G2Gadget>,
+    /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
+    pub bits: Vec<Boolean>,
     pub crh_bits: Vec<Boolean>,
     pub xof_bits: Vec<Boolean>,
 }
