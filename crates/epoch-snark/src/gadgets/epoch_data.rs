@@ -33,19 +33,29 @@ pub struct EpochData<E: PairingEngine> {
     pub public_keys: Vec<Option<E::G2Projective>>,
 }
 
+/// [`EpochData`] is constrained to a `ConstrainedEpochData` via [`EpochData.constrain`]
+///
+/// [`EpochData`]: struct.EpochData.html
+/// [`EpochData.constrain`]: struct.EpochData.html#method.constrain
 pub struct ConstrainedEpochData {
+    /// The epoch's index
     pub index: FrGadget,
+    /// The new threshold needed for signatures
     pub maximum_non_signers: FrGadget,
+    /// The epoch's G1 Hash
     pub message_hash: G1Gadget,
+    /// The new validators for this epoch
     pub pubkeys: Vec<G2Gadget>,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
+    /// Aux data for proving the CRH->XOF hash outside of SW6
     pub crh_bits: Vec<Boolean>,
+    /// Aux data for proving the CRH->XOF hash outside of SW6
     pub xof_bits: Vec<Boolean>,
 }
 
 impl<E: PairingEngine> EpochData<E> {
-    // Initializes an empty epoch, to be used for the setup
+    /// Initializes an empty epoch, to be used for the setup
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         EpochData::<E> {
             index: None,
@@ -56,6 +66,9 @@ impl<E: PairingEngine> EpochData<E> {
 }
 
 impl EpochData<Bls12_377> {
+    /// Ensures that the epoch's index is equal to `previous_index + 1`. Enforces that
+    /// the epoch's G1 hash is correctly calculated, and also provides auxiliary data for
+    /// verifying the CRH->XOF hash outside of SW6.
     pub fn constrain<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,

@@ -11,10 +11,8 @@ use bls_gadgets::hash_to_bits;
 use super::{constrain_bool, MultipackGadget};
 
 #[derive(Clone)]
-/// Gadget which
-/// 1. Converts its inputs to Boolean constraints
-/// 1. Applies blake2x to them
-/// 1. Packs both the boolean constraints and the blake2x constraints in Fr elements
+/// Gadget which converts its inputs to Boolean constraints, applies blake2x to them
+/// and then packs both the boolean constraints and the blake2x constraints in Fr elements
 ///
 /// Utilizes the `hash_to_bits` call under the hood
 ///
@@ -25,7 +23,7 @@ pub struct HashToBits {
 }
 
 impl HashToBits {
-    /// To be used when generating the trusted setup parameters
+    /// Initializes an empty vector of bits. This is called when running the trusted setup
     pub fn empty<P: FpParameters>(num_epochs: usize) -> Self {
         let modulus_bit_rounded = (((P::MODULUS_BITS + 7) / 8) * 8) as usize;
         HashToBits {

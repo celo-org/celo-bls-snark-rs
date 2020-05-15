@@ -2,7 +2,7 @@ mod prover;
 pub use prover::prove;
 
 mod setup;
-pub use setup::{trusted_setup, Parameters};
+pub use setup::trusted_setup;
 
 mod verifier;
 pub use verifier::{verify, VerificationError};

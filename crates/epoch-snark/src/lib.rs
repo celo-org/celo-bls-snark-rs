@@ -21,7 +21,8 @@
 
 /// High level methods for generating public parameters & producing and verifying SNARK proofs for
 /// a headerchain of blocks
-pub mod api;
+mod api;
+pub use api::*;
 
 mod encoding;
 pub use encoding::EncodingError;
@@ -30,4 +31,4 @@ mod epoch_block;
 pub use epoch_block::{EpochBlock, EpochTransition};
 
 mod gadgets;
-pub use gadgets::*;
+pub use gadgets::ValidatorSetUpdate;

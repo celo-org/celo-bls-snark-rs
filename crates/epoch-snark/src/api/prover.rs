@@ -1,4 +1,4 @@
-use super::{BLSCurve, CPCurve, Parameters};
+use super::{setup::Parameters, BLSCurve, CPCurve};
 use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
@@ -15,6 +15,10 @@ use r1cs_core::SynthesisError;
 
 use tracing::{info, span, Level};
 
+/// Given the SNARK's Public Parameters, the initial epoch, and a list of state transitions,
+/// generates a SNARK which proves that the final epoch is correctly calculated from the first
+/// epoch. The proof can then be verified only with constant amount of data (the first and last
+/// epochs)
 pub fn prove(
     parameters: &Parameters<CPCurve, BLSCurve>,
     num_validators: u32,

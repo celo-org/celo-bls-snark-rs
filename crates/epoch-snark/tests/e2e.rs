@@ -1,4 +1,4 @@
-use epoch_snark::api::{prove, trusted_setup, verify};
+use epoch_snark::{prove, trusted_setup, verify};
 
 mod fixtures;
 use fixtures::generate_test_data;

@@ -8,6 +8,7 @@ use thiserror::Error;
 use tracing::info;
 
 #[derive(Debug, Error)]
+/// Error raised while verifying the SNARK proof
 pub enum VerificationError {
     #[error("Verification failed")]
     VerificationFailed,
@@ -17,7 +18,8 @@ pub enum VerificationError {
     EpochEncodingError(#[from] EncodingError),
 }
 
-/// The verifier only needs to check that the edges were calculated correctly
+/// Given the Verifying Key for the circuit and the SNARK proof and _only the first and last epoch_,
+/// this function ensures that the state transition between epochs has been calculated correctly.
 pub fn verify(
     vk: &VerifyingKey<CPCurve>,
     first_epoch: &EpochBlock,

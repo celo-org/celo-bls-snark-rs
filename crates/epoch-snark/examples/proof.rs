@@ -1,4 +1,4 @@
-use epoch_snark::api::{prove, trusted_setup, verify};
+use epoch_snark::{prove, trusted_setup, verify};
 use std::env;
 
 #[path = "../tests/fixtures.rs"]

@@ -40,7 +40,7 @@ pub unsafe extern "C" fn verify(
         let vk = read_slice(vk, vk_len as usize)?;
         let proof = read_slice(proof, proof_len as usize)?;
 
-        epoch_snark::api::verify(&vk, &first_epoch, &last_epoch, &proof)
+        epoch_snark::verify(&vk, &first_epoch, &last_epoch, &proof)
     })
 }
 

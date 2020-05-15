@@ -4,19 +4,23 @@ use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
 use tracing::{span, trace, Level};
 
+/// Gadget which packs and unpacks boolean constraints in field elements for efficiency
 pub struct MultipackGadget;
 
 impl MultipackGadget {
+    /// Packs the provided boolean constraints to a vector of field element gadgets of
+    /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
+    /// will be made as public inputs.
     pub fn pack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
         mut cs: CS,
         bits: &[Boolean],
-        target_capacity: usize,
+        element_size: usize,
         should_alloc_input: bool,
     ) -> Result<Vec<FpGadget<F>>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
-        let fp_chunks = bits.chunks(target_capacity);
+        let fp_chunks = bits.chunks(element_size);
         for (i, chunk) in fp_chunks.enumerate() {
             trace!(iteration = i);
             let alloc = if should_alloc_input {
@@ -48,6 +52,8 @@ impl MultipackGadget {
         Ok(packed)
     }
 
+    /// Unpacks the provided field element gadget to a vector of boolean constraints
+    #[allow(unused)]
     pub fn unpack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
         mut cs: CS,
         packed: &[FpGadget<F>],

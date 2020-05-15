@@ -50,11 +50,11 @@ pub struct ConstrainedEpoch {
     pub aggregate_pk: G2PreparedGadget,
     /// The epoch's index
     pub index: FrGadget,
-    /// Aux data for compressing the public inputs for the SNARK proof
+    /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
-    /// Aux data for compressing the public inputs for the SNARK proof
+    /// Aux data for proving the CRH->XOF hash outside of SW6
     pub xof_bits: Vec<Boolean>,
-    /// Aux data for compressing the public inputs for the SNARK proof
+    /// Aux data for proving the CRH->XOF hash outside of SW6
     pub crh_bits: Vec<Boolean>,
 }
 

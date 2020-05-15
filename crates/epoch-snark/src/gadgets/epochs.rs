@@ -24,7 +24,9 @@ type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
 type FrGadget = FpGadget<Fr>;
 
 #[derive(Clone)]
-/// Multiple epoch block transitions
+/// Contains the initial epoch block, followed by a list of epoch block transitions. The
+/// aggregated signature is calculated over all epoch blokc changes. Providing the hash helper
+/// will not constrain the CRH->XOF calculation.
 pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub initial_epoch: EpochData<E>,
     /// The number of validators over all the epochs
@@ -40,14 +42,16 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
 }
 
 #[derive(Clone)]
+/// The proof and verifying key which will be used to verify the CRH->XOF conversion
 pub struct HashToBitsHelper<E: PairingEngine> {
-    /// The Groth16 proof satisfying the statement
+    /// The Groth16 proof satisfying the CRH->XOF conversion
     pub proof: Proof<E>,
     /// The VK produced by the trusted setup
     pub verifying_key: VerifyingKey<E>,
 }
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
+    /// Initializes an empty validator set update. This is used when running the trusted setup.
     pub fn empty(
         num_validators: usize,
         num_epochs: usize,
