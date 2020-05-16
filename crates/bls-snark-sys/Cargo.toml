@@ -1,6 +1,6 @@
 [package]
 name = "bls-snark-sys"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Georgios Konstantopoulos <me@gakonst.com>"]
 edition = "2018"
 
