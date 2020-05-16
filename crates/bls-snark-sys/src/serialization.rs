@@ -1,4 +1,5 @@
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
+use crate::cache::PUBLIC_KEY_CACHE;
 use algebra::{
     bls12_377::{Fq, Fq2, G1Affine, G2Affine},
     AffineCurve, CanonicalDeserialize, CanonicalSerialize, FromBytes,
@@ -37,6 +38,25 @@ pub extern "C" fn deserialize_public_key(
     out_public_key: *mut *mut PublicKey,
 ) -> bool {
     deserialize(in_public_key_bytes, in_public_key_bytes_len, out_public_key)
+}
+
+#[no_mangle]
+pub extern "C" fn deserialize_public_key_cached(
+    in_public_key_bytes: *const u8,
+    in_public_key_bytes_len: c_int,
+    out_public_key: *mut *mut PublicKey,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let mut cache = PUBLIC_KEY_CACHE.lock().expect("mutex poisoned");
+        let bytes =
+            unsafe { slice::from_raw_parts(in_public_key_bytes, in_public_key_bytes_len as usize) };
+        let key = cache.deserialize(bytes.to_vec())?;
+        unsafe {
+            *out_public_key = Box::into_raw(Box::new(key));
+        }
+
+        Ok(())
+    })
 }
 
 #[no_mangle]

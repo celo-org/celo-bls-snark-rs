@@ -11,6 +11,7 @@ use bls_crypto::hash_to_curve::try_and_increment::{COMPOSITE_HASH_TO_G1, DIRECT_
 use core::fmt::Display;
 use once_cell::sync::Lazy;
 
+pub(crate) mod cache;
 pub mod serialization;
 pub mod signatures;
 pub mod snark;
