@@ -31,7 +31,7 @@ impl PublicKeyCache {
         Self {
             keys: HashSet::new(),
             combined: PublicKey(G2Projective::zero()),
-            de: LruCache::new(128),
+            de: LruCache::new(512),
         }
     }
 

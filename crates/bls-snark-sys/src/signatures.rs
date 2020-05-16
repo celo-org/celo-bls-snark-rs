@@ -1,17 +1,12 @@
 use crate::{
+    cache::PUBLIC_KEY_CACHE,
     convert_result_to_bool,
     utils::{Message, MessageFFI},
-    PrivateKey, PublicKey, PublicKeyCache, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
+    PrivateKey, PublicKey, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
 };
 use algebra::{ProjectiveCurve, ToBytes};
 use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use std::{os::raw::c_int, slice};
-
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-
-static PUBLIC_KEY_CACHE: Lazy<Mutex<PublicKeyCache>> =
-    Lazy::new(|| Mutex::new(PublicKeyCache::new()));
 
 /// # Safety
 ///
