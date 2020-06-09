@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 use algebra::{
@@ -7,7 +7,7 @@ use algebra::{
 };
 
 use bls_crypto::{
-    hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1, PrivateKey, PublicKey, Signature,
+    hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PrivateKey, PublicKey, Signature,
     SIG_DOMAIN,
 };
 
@@ -15,10 +15,10 @@ fn batch_bls_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("bls");
     group.sample_size(10);
     // Generate aggregate signatures on 100-validators across 1000 blocks
-    const NUM_BLOCKS: usize = 30;
+    const NUM_BLOCKS: usize = 300;
     const NUM_VALIDATORS: usize = 20;
     let rng = &mut rand::thread_rng();
-    let try_and_increment = &*DIRECT_HASH_TO_G1;
+    let try_and_increment = &*COMPOSITE_HASH_TO_G1;
 
     // generate some msgs and extra data
     let mut msgs = Vec::new();
@@ -57,10 +57,14 @@ fn batch_bls_comparison(c: &mut Criterion) {
     // verify the sigs individually in a loop
     group.bench_function("individual verification", |b| {
         b.iter(|| {
-            pubkeys.iter().zip(&sigs).zip(&msgs).for_each(|((pk, sig), msg)| {
-                pk.verify(&msg.0[..], &msg.1[..], &sig, try_and_increment).unwrap()
-
-            })
+            pubkeys
+                .iter()
+                .zip(&sigs)
+                .zip(&msgs)
+                .for_each(|((pk, sig), msg)| {
+                    pk.verify(&msg.0[..], &msg.1[..], &sig, try_and_increment)
+                        .unwrap()
+                })
         })
     });
 
