@@ -1,4 +1,4 @@
-use algebra::{bls12_377::Bls12_377, cp6_782::Fr, PairingEngine};
+use algebra::{bls12_377::Bls12_377, bw6_761::Fr, PairingEngine};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1PreparedGadget, G2Gadget, G2PreparedGadget, PairingGadget},
@@ -52,9 +52,9 @@ pub struct ConstrainedEpoch {
     pub index: FrGadget,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
-    /// Aux data for proving the CRH->XOF hash outside of CP6_782
+    /// Aux data for proving the CRH->XOF hash outside of BW6_761
     pub xof_bits: Vec<Boolean>,
-    /// Aux data for proving the CRH->XOF hash outside of CP6_782
+    /// Aux data for proving the CRH->XOF hash outside of BW6_761
     pub crh_bits: Vec<Boolean>,
 }
 

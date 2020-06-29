@@ -3,7 +3,7 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use algebra::{ed_on_cp6_782::EdwardsProjective as Edwards, CanonicalSerialize, ProjectiveCurve};
+use algebra::{ed_on_bw6_761::EdwardsProjective as Edwards, CanonicalSerialize, ProjectiveCurve};
 
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
@@ -27,7 +27,7 @@ mod window {
     }
 }
 
-/// Bowe Hopwood Pedersen CRH instantiated over Edwards CP6_782 with `WINDOW_SIZE = 93` and
+/// Bowe Hopwood Pedersen CRH instantiated over Edwards BW6_761 with `WINDOW_SIZE = 93` and
 /// `NUM_WINDOWS = 560`
 pub type CRH = BoweHopwoodPedersenCRH<Edwards, window::Window>;
 

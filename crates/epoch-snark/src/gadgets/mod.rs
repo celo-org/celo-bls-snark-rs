@@ -17,7 +17,7 @@ mod epochs;
 pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
-use algebra::{bls12_377::Parameters, cp6_782::Fr, BigInteger, Field, FpParameters, PrimeField};
+use algebra::{bls12_377::Parameters, bw6_761::Fr, BigInteger, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
 use r1cs_std::{bls12_377::G2Gadget, fields::fp::FpGadget, Assignment};
 

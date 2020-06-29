@@ -151,7 +151,7 @@ mod test {
 
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
-        cp6_782::Fr as CP6_782Fr,
+        bw6_761::Fr as BW6_761Fr,
         curves::bls12::Bls12Parameters,
         fields::Fp2,
         AffineCurve, BigInteger, PrimeField, UniformRand, Zero,
@@ -174,7 +174,7 @@ mod test {
         for _ in 0..10 {
             let element = G1Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<CP6_782Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G1Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
@@ -205,7 +205,7 @@ mod test {
         for _ in 0..10 {
             let element = G2Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<CP6_782Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
@@ -242,7 +242,7 @@ mod test {
                 Fp2::<<Parameters as Bls12Parameters>::Fp2Params>::new(element.y.c0, edge.into());
             let element = G2Affine::new(element.x, new_y, false).into_projective();
 
-            let mut cs = TestConstraintSystem::<CP6_782Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();

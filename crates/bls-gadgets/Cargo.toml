@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 bls-crypto = { path = "../bls-crypto", default-features = false }
 
-algebra = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "cp6_782", "ed_on_cp6_782", "ed_on_bls12_377", "parallel"] }
+algebra = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe", default-features = false }
 r1cs-std = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }
 crypto-primitives = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["parallel"] }

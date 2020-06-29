@@ -21,12 +21,12 @@ pub struct Parameters<CP: PairingEngine, BLS: PairingEngine> {
 }
 
 /// Initializes the Hash To Bits and Validator Set Update circuits with random parameters
-/// seeded by the provided RNG over BLS12-377 and CP6_782.
+/// seeded by the provided RNG over BLS12-377 and BW6_761.
 ///
 /// `hashes_in_bls_12377` should be set to `true` if you're using the 2-SNARK technique,
 /// which will perform 2 setups, one for the CRH->XOF hashes in BLS12-377 and the rest
-/// of the circuit in CP6_782. If set to `false, only 1 setup will be done (at the expense
-/// of having a longer proving time due to CRH->XOF hashes being done in CP6_782)
+/// of the circuit in BW6_761. If set to `false, only 1 setup will be done (at the expense
+/// of having a longer proving time due to CRH->XOF hashes being done in BW6_761)
 pub fn trusted_setup<R: Rng>(
     num_validators: usize,
     num_epochs: usize,

@@ -85,7 +85,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 mod tests {
     use super::*;
     use crate::gadgets::pack;
-    use algebra::{cp6_782::FrParameters as CP6_782FrParameters, Bls12_377};
+    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use bls_crypto::hashers::{DirectHasher, Hasher};
     use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
     use groth16::{
@@ -109,9 +109,9 @@ mod tests {
         let rng = &mut rand::thread_rng();
         // generate an empty circuit for 3 epochs
         let num_epochs = 3;
-        // Trusted Setup -- USES THE CP6_782FrParameters!
+        // Trusted Setup -- USES THE BW6_761FrParameters!
         let params = {
-            let empty = HashToBits::empty::<CP6_782FrParameters>(num_epochs);
+            let empty = HashToBits::empty::<BW6_761FrParameters>(num_epochs);
             generate_random_parameters::<Bls12_377, _, _>(empty, rng).unwrap()
         };
 

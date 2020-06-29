@@ -1,6 +1,6 @@
 use algebra::{
     bls12_377::{Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters},
-    cp6_782::{Fr, FrParameters},
+    bw6_761::{Fr, FrParameters},
     FpParameters,
 };
 use r1cs_std::bls12_377::PairingGadget;
@@ -97,7 +97,7 @@ impl EpochBits {
         }
 
         // Make the edges public inputs
-        // packed over CP6_782 Fr.
+        // packed over BW6_761 Fr.
         let packed = MultipackGadget::pack(
             cs.ns(|| "pack output hash"),
             &xof_bits,
