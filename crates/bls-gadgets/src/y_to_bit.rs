@@ -151,9 +151,9 @@ mod test {
 
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
+        cp6_782::Fr as CP6_782Fr,
         curves::bls12::Bls12Parameters,
         fields::Fp2,
-        cp6_782::Fr as CP6_782Fr,
         AffineCurve, BigInteger, PrimeField, UniformRand, Zero,
     };
     use r1cs_std::{
@@ -168,7 +168,7 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g1() {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let rng = &mut rand::thread_rng();
 
         for _ in 0..10 {
@@ -197,7 +197,7 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g2() {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
 
@@ -231,7 +231,7 @@ mod test {
     }
 
     fn test_y_to_bit_g2_edge(edge: <<Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt) {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
 

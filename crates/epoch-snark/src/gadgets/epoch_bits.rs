@@ -204,7 +204,7 @@ mod tests {
             .map(|i| i.get_value().unwrap())
             .collect::<Vec<_>>();
         // pack our bits to Fr as well, and see if they match
-        let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits);
+        let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits).unwrap();
         assert_eq!(inner, public_inputs);
     }
 }

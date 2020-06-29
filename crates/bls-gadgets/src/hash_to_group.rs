@@ -152,11 +152,12 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
 
-        let pedersen_hash = <BHHashCP6_782 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "pedersen evaluation"),
-            &crh_params,
-            &input,
-        )?;
+        let pedersen_hash =
+            <BHHashCP6_782 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
+                &mut cs.ns(|| "pedersen evaluation"),
+                &crh_params,
+                &input,
+            )?;
 
         let mut crh_bits = pedersen_hash.x.to_bits(cs.ns(|| "crh bits")).unwrap();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding

@@ -151,8 +151,8 @@ mod tests {
             }
             // The public inputs are the CRH and XOF bits split in `Fr::CAPACITY` chunks
             // encoded in LE
-            let packed_crh_bits = pack::<Fr, FrParameters>(&message_bits);
-            let packed_xof_bits = pack::<Fr, FrParameters>(&xof_bits);
+            let packed_crh_bits = pack::<Fr, FrParameters>(&message_bits).unwrap();
+            let packed_xof_bits = pack::<Fr, FrParameters>(&xof_bits).unwrap();
             [packed_crh_bits, packed_xof_bits].concat()
         };
 
