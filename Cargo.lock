@@ -478,6 +478,7 @@ dependencies = [
  "byteorder",
  "crypto-primitives",
  "groth16",
+ "hex 0.4.2",
  "r1cs-core",
  "r1cs-std",
  "rand",

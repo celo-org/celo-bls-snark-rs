@@ -26,6 +26,7 @@ rand_xorshift = { version = "0.2" }
 bench-utils = { git = "https://github.com/scipr-lab/zexe" }
 bls-gadgets = { path = "../bls-gadgets", default-features = false, features = ["test-helpers"] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
+hex = "0.4.2"
 
 [features]
 default = ["compat"]
