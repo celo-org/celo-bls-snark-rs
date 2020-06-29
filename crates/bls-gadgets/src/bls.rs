@@ -273,7 +273,7 @@ mod verify_one_message {
 
     use algebra::{
         bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
-        sw6::Fr as SW6Fr,
+        cp6_782::Fr as CP6_782Fr,
         ProjectiveCurve, UniformRand, Zero,
     };
     use r1cs_core::ConstraintSystem;
@@ -351,13 +351,13 @@ mod verify_one_message {
         let asig = sum(&asigs);
 
         // allocate the constraints
-        let mut cs = TestConstraintSystem::<SW6Fr>::new();
+        let mut cs = TestConstraintSystem::<CP6_782Fr>::new();
         let messages = alloc_vec(&mut cs.ns(|| "messages"), &messages);
         let aggregate_pubkeys = alloc_vec(&mut cs.ns(|| "aggregate pubkeys"), &aggregate_pubkeys);
         let asig = G1Gadget::alloc(&mut cs.ns(|| "asig"), || Ok(asig)).unwrap();
 
         // check that verification is correct
-        BlsVerifyGadget::<Bls12_377, SW6Fr, Bls12_377PairingGadget>::batch_verify(
+        BlsVerifyGadget::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>::batch_verify(
             &mut cs,
             &aggregate_pubkeys,
             &messages,
@@ -377,7 +377,7 @@ mod verify_one_message {
         let fake_signature = G1Projective::rand(rng);
 
         // good sig passes
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pub_key],
             signature,
@@ -388,7 +388,7 @@ mod verify_one_message {
         assert_eq!(cs.num_constraints(), 21893);
 
         // random sig fails
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pub_key],
             fake_signature,
@@ -407,7 +407,7 @@ mod verify_one_message {
         let (sigs, asig) = sign::<Bls12_377>(message_hash, &[sk, sk2]);
 
         // good aggregate sig passes
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
             asig,
@@ -418,7 +418,7 @@ mod verify_one_message {
 
         // using the single sig if second guy is OK as long as
         // we tolerate 1 non-signers
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
             sigs[0],
@@ -429,7 +429,7 @@ mod verify_one_message {
 
         // bitmap set to false on the second one fails since we don't tolerate
         // >0 failures
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
             asig,
@@ -437,7 +437,7 @@ mod verify_one_message {
             0,
         );
         assert!(!cs.is_satisfied());
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
             sigs[0],
@@ -461,7 +461,7 @@ mod verify_one_message {
 
         let (sigs, _) = sign::<Bls12_377>(message_hash, &[sk, sk2]);
 
-        let cs = cs_verify::<Bls12_377, SW6Fr, Bls12_377PairingGadget>(
+        let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
             sigs[1],

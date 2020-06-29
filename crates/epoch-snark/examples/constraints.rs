@@ -24,7 +24,7 @@ fn main() {
     circuit.generate_constraints(&mut cs).unwrap();
 
     println!(
-        "Number of constraints for {} epochs ({} validators, {} faults, hashes in SW6): {}",
+        "Number of constraints for {} epochs ({} validators, {} faults, hashes in CP6_782): {}",
         num_epochs,
         num_validators,
         faults,

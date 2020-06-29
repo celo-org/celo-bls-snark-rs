@@ -8,8 +8,8 @@ mod verifier;
 pub use verifier::{verify, VerificationError};
 
 // Instantiate certain types to avoid confusion
-use algebra::{bls12_377, sw6};
+use algebra::{bls12_377, cp6_782};
 type BLSCurve = bls12_377::Bls12_377;
-type CPField = sw6::Fr;
-type CPCurve = sw6::SW6;
-type CPFrParams = sw6::FrParameters;
+type CPField = cp6_782::Fr;
+type CPCurve = cp6_782::CP6_782;
+type CPFrParams = cp6_782::FrParameters;

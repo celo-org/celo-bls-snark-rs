@@ -1,6 +1,6 @@
 use algebra::{
     bls12_377::{Bls12_377, Parameters},
-    sw6::Fr,
+    cp6_782::Fr,
     One, PairingEngine,
 };
 use bls_gadgets::{utils::is_setup, HashToGroupGadget};
@@ -48,9 +48,9 @@ pub struct ConstrainedEpochData {
     pub pubkeys: Vec<G2Gadget>,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Boolean>,
-    /// Aux data for proving the CRH->XOF hash outside of SW6
+    /// Aux data for proving the CRH->XOF hash outside of CP6_782
     pub crh_bits: Vec<Boolean>,
-    /// Aux data for proving the CRH->XOF hash outside of SW6
+    /// Aux data for proving the CRH->XOF hash outside of CP6_782
     pub xof_bits: Vec<Boolean>,
 }
 
@@ -68,7 +68,7 @@ impl<E: PairingEngine> EpochData<E> {
 impl EpochData<Bls12_377> {
     /// Ensures that the epoch's index is equal to `previous_index + 1`. Enforces that
     /// the epoch's G1 hash is correctly calculated, and also provides auxiliary data for
-    /// verifying the CRH->XOF hash outside of SW6.
+    /// verifying the CRH->XOF hash outside of CP6_782.
     pub fn constrain<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,

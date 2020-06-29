@@ -38,7 +38,7 @@ impl MultipackGadget {
                         .map(|x| x.get_value().get())
                         .collect::<Result<Vec<bool>, _>>()?,
                 );
-                Ok(F::from_repr(fp_val))
+                Ok(F::from_repr(fp_val).get()?)
             })?;
             let fp_bits = fp.to_bits(cs.ns(|| format!("chunk bits {}", i)))?;
             let chunk_len = chunk.len();
