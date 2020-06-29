@@ -385,7 +385,7 @@ mod verify_one_message {
             0,
         );
         assert!(cs.is_satisfied());
-        assert_eq!(cs.num_constraints(), 21893);
+        assert_eq!(cs.num_constraints(), 21184);
 
         // random sig fails
         let cs = cs_verify::<Bls12_377, CP6_782Fr, Bls12_377PairingGadget>(
