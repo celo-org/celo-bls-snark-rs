@@ -36,7 +36,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
     ) -> Result<Boolean, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
         let y_bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || {
-            let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
+            let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
             let c1 = pk.y.c1.get_value().get()?;
             let c0 = pk.y.c0.get_value().get()?;
 
@@ -115,7 +115,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         cs: &mut CS,
         el: &FpGadget<P::Fp>,
     ) -> Result<Boolean, SynthesisError> {
-        let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two());
+        let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
 
         let bit = Boolean::alloc(cs.ns(|| "alloc y bit"), || Ok(el.get_value().get()? > half))?;
 
@@ -151,9 +151,9 @@ mod test {
 
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
+        bw6_761::Fr as BW6_761Fr,
         curves::bls12::Bls12Parameters,
         fields::Fp2,
-        sw6::Fr as SW6Fr,
         AffineCurve, BigInteger, PrimeField, UniformRand, Zero,
     };
     use r1cs_std::{
@@ -168,13 +168,13 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g1() {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let rng = &mut rand::thread_rng();
 
         for _ in 0..10 {
             let element = G1Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G1Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
@@ -197,7 +197,7 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g2() {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
 
@@ -205,7 +205,7 @@ mod test {
         for _ in 0..10 {
             let element = G2Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
@@ -231,7 +231,7 @@ mod test {
     }
 
     fn test_y_to_bit_g2_edge(edge: <<Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt) {
-        let half = Fp::from_repr(Fp::modulus_minus_one_div_two());
+        let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
 
@@ -242,7 +242,7 @@ mod test {
                 Fp2::<<Parameters as Bls12Parameters>::Fp2Params>::new(element.y.c0, edge.into());
             let element = G2Affine::new(element.x, new_y, false).into_projective();
 
-            let mut cs = TestConstraintSystem::<SW6Fr>::new();
+            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
 
             let allocated =
                 G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();

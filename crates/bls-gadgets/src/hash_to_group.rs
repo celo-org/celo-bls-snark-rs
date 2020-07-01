@@ -13,7 +13,7 @@ use bls_crypto::{
 // Imported for the BLS12-377 API
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-    edwards_sw6::EdwardsProjective,
+    ed_on_bw6_761::EdwardsProjective,
 };
 use algebra::{
     curves::{
@@ -32,14 +32,14 @@ use crypto_primitives::{
 };
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    alloc::AllocGadget, bits::ToBitsGadget, boolean::Boolean, edwards_sw6::EdwardsSWGadget,
+    alloc::AllocGadget, bits::ToBitsGadget, boolean::Boolean, ed_on_cp6_782::EdwardsGadget,
     groups::bls12::G1Gadget, groups::GroupGadget, uint8::UInt8, Assignment,
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
 
-/// Pedersen Gadget instantiated over the Edwards SW6 curve over BLS12-377 Fq (384 bits)
-type BHHashSW6 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsSWGadget>;
+/// Pedersen Gadget instantiated over the Edwards BW6_761 curve over BLS12-377 Fq (384 bits)
+type BHHashBW6_761 = BHHash<EdwardsProjective, Bls12_377_Fq, EdwardsGadget>;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]
@@ -91,14 +91,14 @@ pub struct HashToGroupGadget<P> {
 }
 
 // If we're on Bls12-377, we can have a nice public API for the whole hash to group operation
-// by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards SW6
+// by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards BW6_761
 // and then hashing it to bits and to group
 impl HashToGroupGadget<Bls12_377_Parameters> {
     /// Returns the G1 constrained hash of the message with the provided counter.
     ///
     /// If `generate_constraints_for_hash` is set to `false`, then constraints will not
     /// be generated for the CRH -> XOF conversion. You may want to set this to `false` if
-    /// calculations inside SW6 are considered too expensive. In that case, you MUST verify
+    /// calculations inside BW6_761 are considered too expensive. In that case, you MUST verify
     /// that they were calculated properly.
     ///
     /// For that reason, this function also returns the CRH bits and the XOF bits,
@@ -146,17 +146,18 @@ impl HashToGroupGadget<Bls12_377_Parameters> {
     ) -> Result<Vec<Boolean>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
-            <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc_constant(
+            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::ParametersGadget::alloc_constant(
                 cs.ns(|| "pedersen parameters"),
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
 
-        let pedersen_hash = <BHHashSW6 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "pedersen evaluation"),
-            &crh_params,
-            &input,
-        )?;
+        let pedersen_hash =
+            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::check_evaluation_gadget(
+                &mut cs.ns(|| "pedersen evaluation"),
+                &crh_params,
+                &input,
+            )?;
 
         let mut crh_bits = pedersen_hash.x.to_bits(cs.ns(|| "crh bits")).unwrap();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
@@ -281,7 +282,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P> {
                 // reverse them since they are read in LE
                 bits.reverse();
                 let big = <P::Fp as PrimeField>::BigInt::from_bits(&bits);
-                let x = P::Fp::from_repr(big);
+                let x = P::Fp::from_repr(big).get()?;
                 let greatest = greatest.get_value().get()?;
 
                 // Converts the point read from the xof bits to a G1 element

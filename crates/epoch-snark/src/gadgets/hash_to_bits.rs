@@ -85,7 +85,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 mod tests {
     use super::*;
     use crate::gadgets::pack;
-    use algebra::{sw6::FrParameters as SW6FrParameters, Bls12_377};
+    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use bls_crypto::hashers::{DirectHasher, Hasher};
     use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
     use groth16::{
@@ -109,9 +109,9 @@ mod tests {
         let rng = &mut rand::thread_rng();
         // generate an empty circuit for 3 epochs
         let num_epochs = 3;
-        // Trusted Setup -- USES THE SW6FrParameters!
+        // Trusted Setup -- USES THE BW6_761FrParameters!
         let params = {
-            let empty = HashToBits::empty::<SW6FrParameters>(num_epochs);
+            let empty = HashToBits::empty::<BW6_761FrParameters>(num_epochs);
             generate_random_parameters::<Bls12_377, _, _>(empty, rng).unwrap()
         };
 
@@ -151,8 +151,8 @@ mod tests {
             }
             // The public inputs are the CRH and XOF bits split in `Fr::CAPACITY` chunks
             // encoded in LE
-            let packed_crh_bits = pack::<Fr, FrParameters>(&message_bits);
-            let packed_xof_bits = pack::<Fr, FrParameters>(&xof_bits);
+            let packed_crh_bits = pack::<Fr, FrParameters>(&message_bits).unwrap();
+            let packed_xof_bits = pack::<Fr, FrParameters>(&xof_bits).unwrap();
             [packed_crh_bits, packed_xof_bits].concat()
         };
 

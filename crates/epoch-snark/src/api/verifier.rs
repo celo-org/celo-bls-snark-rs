@@ -30,7 +30,7 @@ pub fn verify(
     // Hash the first-last block together
     let hash = hash_first_last_epoch_block(first_epoch, last_epoch)?;
     // packs them
-    let public_inputs = pack::<CPField, CPFrParams>(&hash);
+    let public_inputs = pack::<CPField, CPFrParams>(&hash)?;
     // verifies the BLS proof by using the First/Last epoch as public inputs over CP
     if verify_proof(&prepare_verifying_key(vk), proof, &public_inputs)? {
         Ok(())

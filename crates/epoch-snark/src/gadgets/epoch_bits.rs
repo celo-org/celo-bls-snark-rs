@@ -1,6 +1,6 @@
 use algebra::{
     bls12_377::{Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters},
-    sw6::{Fr, FrParameters},
+    bw6_761::{Fr, FrParameters},
     FpParameters,
 };
 use r1cs_std::bls12_377::PairingGadget;
@@ -97,7 +97,7 @@ impl EpochBits {
         }
 
         // Make the edges public inputs
-        // packed over SW6 Fr.
+        // packed over BW6_761 Fr.
         let packed = MultipackGadget::pack(
             cs.ns(|| "pack output hash"),
             &xof_bits,
@@ -204,7 +204,7 @@ mod tests {
             .map(|i| i.get_value().unwrap())
             .collect::<Vec<_>>();
         // pack our bits to Fr as well, and see if they match
-        let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits);
+        let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits).unwrap();
         assert_eq!(inner, public_inputs);
     }
 }

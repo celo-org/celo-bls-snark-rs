@@ -5,7 +5,7 @@ authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org
 edition = "2018"
 
 [dependencies]
-algebra = { git = "https://github.com/scipr-lab/zexe", features = ["derive", "bls12_377", "edwards_sw6", "parallel"] }
+algebra = { git = "https://github.com/scipr-lab/zexe", features = ["derive", "bls12_377", "ed_on_bw6_761", "parallel"] }
 crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
 bench-utils = { git = "https://github.com/scipr-lab/zexe" }
 

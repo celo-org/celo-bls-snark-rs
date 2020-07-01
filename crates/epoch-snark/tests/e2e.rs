@@ -1,3 +1,4 @@
+use algebra::serialize::CanonicalSerialize;
 use epoch_snark::{prove, trusted_setup, verify};
 
 mod fixtures;
@@ -34,4 +35,25 @@ fn prover_verifier_groth16() {
     // Verifier checks the proof
     let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     assert!(res.is_ok());
+
+    // Serialize the proof / vk
+    let mut serialized_vk = vec![];
+    params.epochs.vk.serialize(&mut serialized_vk).unwrap();
+    let mut serialized_proof = vec![];
+    proof.serialize(&mut serialized_proof).unwrap();
+    dbg!(hex::encode(&serialized_vk));
+    dbg!(hex::encode(&serialized_proof));
+
+    let mut first_pubkeys = vec![];
+    first_epoch
+        .new_public_keys
+        .serialize(&mut first_pubkeys)
+        .unwrap();
+    let mut last_pubkeys = vec![];
+    last_epoch
+        .new_public_keys
+        .serialize(&mut last_pubkeys)
+        .unwrap();
+    dbg!(hex::encode(&first_pubkeys));
+    dbg!(hex::encode(&last_pubkeys));
 }

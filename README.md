@@ -1,6 +1,6 @@
 # celo-bls-snark-rs
 
-Implements SNARK-friendly BLS signatures over BLS12-377 and SW6.
+Implements SNARK-friendly BLS signatures over BLS12-377 and BW6-761.
 
 ## Using the code
 

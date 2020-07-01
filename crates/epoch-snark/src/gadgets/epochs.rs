@@ -2,7 +2,7 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
-use algebra::{bls12_377::Bls12_377, sw6::Fr};
+use algebra::{bls12_377::Bls12_377, bw6_761::Fr};
 use r1cs_std::prelude::*;
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget, PairingGadget},
@@ -36,7 +36,7 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     /// The aggregated signature of all the validators over all the epoch changes
     pub aggregated_signature: Option<E::G1Projective>,
     /// The optional hash to bits proof data. If provided, the circuit **will not**
-    /// constrain the inner CRH->XOF hashes in SW6 and instead it will be verified
+    /// constrain the inner CRH->XOF hashes in BW6_761 and instead it will be verified
     /// via the helper's proof which is in BLS12-377.
     pub hash_helper: Option<HashToBitsHelper<E>>,
 }
@@ -175,7 +175,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_epoch_index,
                 &previous_max_non_signers,
                 self.num_validators,
-                self.hash_helper.is_none(), // generate constraints in SW6 if no helper was provided
+                self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
             )?;
 
             // Update the pubkeys for the next iteration
