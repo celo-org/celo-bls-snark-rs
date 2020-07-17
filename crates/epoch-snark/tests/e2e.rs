@@ -1,8 +1,10 @@
 use algebra::serialize::CanonicalSerialize;
-use epoch_snark::{prove, trusted_setup, verify};
+use epoch_snark::{prove, trusted_setup, verify, ValidatorSetUpdate};
+use tracing::{info, span, Level};
 
 mod fixtures;
 use fixtures::generate_test_data;
+
 
 #[test]
 #[ignore] // This test makes CI run out of memory and takes too long. It works though!
@@ -45,6 +47,81 @@ fn prover_verifier_groth16() {
     dbg!(hex::encode(&serialized_proof));
 
     let mut first_pubkeys = vec![];
+    first_epoch
+        .new_public_keys
+        .serialize(&mut first_pubkeys)
+        .unwrap();
+    let mut last_pubkeys = vec![];
+    last_epoch
+        .new_public_keys
+        .serialize(&mut last_pubkeys)
+        .unwrap();
+    dbg!(hex::encode(&first_pubkeys));
+    dbg!(hex::encode(&last_pubkeys));
+}
+
+use algebra::{UniformRand, One};
+use algebra::{bw6_761::Fr, BW6_761};
+use blake2::Blake2s;
+use core::ops::MulAssign;
+use poly_commit::marlin_pc::MarlinKZG10;
+
+use marlin::Marlin;
+use groth16::KeypairAssembly;
+use r1cs_core::{ConstraintSystem, ConstraintSynthesizer};
+
+type MultiPC = MarlinKZG10<BW6_761>;
+type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
+
+#[test]
+fn prover_verifier_marlin() {
+    let rng = &mut rand::thread_rng();
+    let num_transitions = 2;
+    let faults = 1;
+    let num_validators = 3 * faults + 1;
+
+    let hashes_in_bls12_377 = false;
+
+    type MultiPC = MarlinKZG10<BW6_761>;
+    type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
+    let universal_srs = MarlinInst::universal_setup(100, 25, 100, rng).unwrap();
+
+
+    info!(
+        "Generating parameters for {} validators and {} epochs",
+        num_validators, num_transitions
+    );
+
+    let span = span!(Level::TRACE, "setup");
+    let _enter = span.enter();
+
+    info!("BLS");
+    let empty_epochs =
+        ValidatorSetUpdate::empty(num_validators, num_transitions, faults, None);
+
+    let mut assembly = KeypairAssembly::<BW6_761> {
+        num_inputs: 0,
+        num_aux: 0,
+        num_constraints: 0,
+        at: vec![],
+        bt: vec![],
+        ct: vec![],
+    };
+
+    // Allocate the "one" input variable
+    assembly.alloc_input(|| "", || Ok(Fr::one())).unwrap();
+
+    empty_epochs.clone().generate_constraints(&mut assembly).unwrap();
+    println!("constraints: {}", assembly.num_constraints());
+
+    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, empty_epochs).unwrap();
+
+    // Create the state to be proven (first epoch + `num_transitions` transitions.
+    // Note: This is all data which should be fetched via the Celo blockchain
+    let (first_epoch, transitions, last_epoch) =
+        generate_test_data(num_validators, faults, num_transitions);
+
+   let mut first_pubkeys = vec![];
     first_epoch
         .new_public_keys
         .serialize(&mut first_pubkeys)

@@ -472,13 +472,17 @@ version = "0.1.4"
 dependencies = [
  "algebra",
  "bench-utils",
+ "blake2",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
  "byteorder",
  "crypto-primitives",
+ "digest",
  "groth16",
  "hex 0.4.2",
+ "marlin",
+ "poly-commit",
  "r1cs-core",
  "r1cs-std",
  "rand",
@@ -648,6 +652,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "marlin"
+version = "0.1.0"
+dependencies = [
+ "algebra-core",
+ "bench-utils",
+ "derivative",
+ "digest",
+ "ff-fft",
+ "poly-commit",
+ "r1cs-core",
+ "rand_chacha",
+ "rand_core",
+ "rayon",
+]
+
+[[package]]
 name = "matchers"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -743,6 +763,20 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "poly-commit"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/poly-commit#c2a7a14a68703f1541b6b6e250c78956b715a53d"
+dependencies = [
+ "algebra-core",
+ "bench-utils",
+ "derivative",
+ "digest",
+ "ff-fft",
+ "rand_core",
+ "rayon",
 ]
 
 [[package]]

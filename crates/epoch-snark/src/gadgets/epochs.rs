@@ -2,7 +2,7 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
-use algebra::{bls12_377::Bls12_377, bw6_761::Fr};
+use algebra::{bls12_377::Bls12_377, bw6_761::Fr, One};
 use r1cs_std::prelude::*;
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget, PairingGadget},
@@ -87,6 +87,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let epoch_bits = self.enforce(&mut cs.ns(|| "check signature"))?;
         epoch_bits.verify(&mut cs.ns(|| "compress public inputs"), self.hash_helper)?;
 
+        cs.alloc_input(|| "dummy", || Ok(Fr::one()));
         info!("constraints generated");
 
         Ok(())
