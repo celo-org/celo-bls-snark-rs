@@ -6,6 +6,7 @@ use groth16::{prepare_verifying_key, verify_proof, Proof, VerifyingKey};
 use r1cs_core::SynthesisError;
 use thiserror::Error;
 use tracing::info;
+use algebra::One;
 
 #[derive(Debug, Error)]
 /// Error raised while verifying the SNARK proof
