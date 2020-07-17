@@ -8,7 +8,6 @@ use fixtures::generate_test_data;
 
 
 #[test]
-#[ignore] // This test makes CI run out of memory and takes too long. It works though!
 fn prover_verifier_groth16() {
     let rng = &mut rand::thread_rng();
     let num_transitions = 2;
@@ -149,7 +148,8 @@ fn prover_verifier_marlin() {
 
     let hash = hash_first_last_epoch_block(&first_epoch, &last_epoch).unwrap();
     // packs them
-    let public_inputs = pack::<CPField, CPFrParams>(&hash).unwrap();
+    let mut public_inputs = pack::<CPField, CPFrParams>(&hash).unwrap();
+    public_inputs.push(Fr::one());
     let verify_time = start_timer!(|| "Marlin verify time");
     assert!(MarlinInst::verify(&index_vk, &public_inputs, &proof, rng).unwrap());
     end_timer!(verify_time);
