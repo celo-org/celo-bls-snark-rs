@@ -38,9 +38,8 @@ fn prover_verifier_groth16() {
 
     // Verifier checks the proof
     let verify_time = start_timer!(|| "Groth16 verify time");
-    let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
+    verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof).unwrap();
     end_timer!(verify_time);
-    assert!(res.is_ok());
 
     // Serialize the proof / vk
     let mut serialized_vk = vec![];
