@@ -13,7 +13,7 @@ r1cs-core = { git = "https://github.com/scipr-lab/zexe" }
 r1cs-std = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
 crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["r1cs", "groth16", "parallel"] }
 groth16 = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
-marlin = { path = "../../../marlin", features = ["parallel"] }
+marlin = { path = "../../../marlin", features = ["parallel", "print-trace"] }
 digest = { version = "0.8" }
 poly-commit = { git = "https://github.com/scipr-lab/poly-commit", default-features = false }
 blake2 = { version = "0.8", default-features = false }

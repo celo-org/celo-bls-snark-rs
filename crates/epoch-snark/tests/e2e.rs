@@ -90,7 +90,7 @@ fn prover_verifier_marlin() {
 
     type MultiPC = MarlinKZG10<BW6_761>;
     type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
-    let universal_srs = MarlinInst::universal_setup(100, 25, 100, rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(514023, 514019, 2570867, rng).unwrap();
 
 
     info!(
