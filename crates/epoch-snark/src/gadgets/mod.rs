@@ -57,7 +57,7 @@ pub mod test_helpers {
     }
 }
 
-pub(super) fn pack<F: PrimeField, P: FpParameters>(
+pub fn pack<F: PrimeField, P: FpParameters>(
     values: &[bool],
 ) -> Result<Vec<F>, SynthesisError> {
     values

@@ -28,7 +28,7 @@ mod encoding;
 pub use encoding::EncodingError;
 
 mod epoch_block;
-pub use epoch_block::{EpochBlock, EpochTransition};
+pub use epoch_block::{EpochBlock, EpochTransition, hash_first_last_epoch_block};
 
 mod gadgets;
-pub use gadgets::ValidatorSetUpdate;
+pub use gadgets::{ValidatorSetUpdate, pack};

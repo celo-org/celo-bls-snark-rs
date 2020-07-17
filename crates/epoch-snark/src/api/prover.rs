@@ -107,7 +107,7 @@ fn generate_hash_helper(
     })
 }
 
-fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
+pub fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
         maximum_non_signers: block.maximum_non_signers,
@@ -119,7 +119,7 @@ fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     }
 }
 
-fn to_update(transition: &EpochTransition) -> SingleUpdate<BLSCurve> {
+pub fn to_update(transition: &EpochTransition) -> SingleUpdate<BLSCurve> {
     SingleUpdate {
         epoch_data: to_epoch_data(&transition.block),
         signed_bitmap: transition

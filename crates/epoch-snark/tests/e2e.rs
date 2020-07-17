@@ -1,5 +1,6 @@
+use bench_utils::{end_timer, start_timer};
 use algebra::serialize::CanonicalSerialize;
-use epoch_snark::{prove, trusted_setup, verify, ValidatorSetUpdate};
+use epoch_snark::{prove, trusted_setup, verify, ValidatorSetUpdate, BLSCurve, CPCurve, CPField, CPFrParams, to_update, to_epoch_data, hash_first_last_epoch_block, pack};
 use tracing::{info, span, Level};
 
 mod fixtures;
@@ -31,11 +32,15 @@ fn prover_verifier_groth16() {
     let (first_epoch, transitions, last_epoch) =
         generate_test_data(num_validators, faults, num_transitions);
 
+    let prove_time = start_timer!(|| "Groth16 prove time");
     // Prover generates the proof given the params
     let proof = prove(&params, num_validators as u32, &first_epoch, &transitions).unwrap();
+    end_timer!(prove_time);
 
     // Verifier checks the proof
+    let verify_time = start_timer!(|| "Groth16 verify time");
     let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
+    end_timer!(verify_time);
     assert!(res.is_ok());
 
     // Serialize the proof / vk
@@ -69,6 +74,7 @@ use poly_commit::marlin_pc::MarlinKZG10;
 use marlin::Marlin;
 use groth16::KeypairAssembly;
 use r1cs_core::{ConstraintSystem, ConstraintSynthesizer};
+use bls_crypto::Signature;
 
 type MultiPC = MarlinKZG10<BW6_761>;
 type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
@@ -120,6 +126,33 @@ fn prover_verifier_marlin() {
     // Note: This is all data which should be fetched via the Celo blockchain
     let (first_epoch, transitions, last_epoch) =
         generate_test_data(num_validators, faults, num_transitions);
+
+    let epochs = transitions
+        .iter()
+        .map(|transition| to_update(transition))
+        .collect::<Vec<_>>();
+
+    let asig = Signature::aggregate(transitions.iter().map(|epoch| &epoch.aggregate_signature));
+
+    let circuit = ValidatorSetUpdate::<BLSCurve> {
+        initial_epoch: to_epoch_data(&first_epoch),
+        epochs,
+        aggregated_signature: Some(*asig.as_ref()),
+        num_validators: num_validators as u32,
+        hash_helper: None,
+    };
+
+    let prove_time = start_timer!(|| "Marlin prove time");
+    let proof = MarlinInst::prove(&index_pk, circuit, rng).unwrap();
+    end_timer!(prove_time);
+    println!("Called prover");
+
+    let hash = hash_first_last_epoch_block(&first_epoch, &last_epoch).unwrap();
+    // packs them
+    let public_inputs = pack::<CPField, CPFrParams>(&hash).unwrap();
+    let verify_time = start_timer!(|| "Marlin verify time");
+    assert!(MarlinInst::verify(&index_vk, &public_inputs, &proof, rng).unwrap());
+    end_timer!(verify_time);
 
    let mut first_pubkeys = vec![];
     first_epoch
