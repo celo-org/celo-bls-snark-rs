@@ -1,5 +1,5 @@
 use super::{CPCurve, CPField, CPFrParams};
-use crate::encoding::EncodingError;
+use crate::encoding::{EncodingError, encode_public_key};
 use crate::epoch_block::{hash_first_last_epoch_block, EpochBlock};
 use crate::gadgets::pack;
 use groth16::{prepare_verifying_key, verify_proof, Proof, VerifyingKey};
@@ -30,7 +30,8 @@ pub fn verify(
     // Hash the first-last block together
     let hash = hash_first_last_epoch_block(first_epoch, last_epoch)?;
     // packs them
-    let public_inputs = pack::<CPField, CPFrParams>(&hash)?;
+    let mut public_inputs = pack::<CPField, CPFrParams>(&hash)?;
+    public_inputs.push(CPField::one());
     // verifies the BLS proof by using the First/Last epoch as public inputs over CP
     if verify_proof(&prepare_verifying_key(vk), proof, &public_inputs)? {
         Ok(())
