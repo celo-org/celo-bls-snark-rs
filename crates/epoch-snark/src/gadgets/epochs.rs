@@ -461,7 +461,7 @@ mod tests {
 
             // dummy sig is the same as the message, since sk is 1.
             let dummy_message = G1Projective::prime_subgroup_generator();
-            let dummy_sig = dummy_message.clone();
+            let dummy_sig = dummy_message;
 
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
 
@@ -474,7 +474,7 @@ mod tests {
                 &[epochs[3].clone()],
             ]
             .concat();
-            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3].clone()]].concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
@@ -554,7 +554,7 @@ mod tests {
 
             // dummy sig is the same as the message, since sk is 1.
             let dummy_message = G1Projective::prime_subgroup_generator();
-            let dummy_sig = dummy_message.clone();
+            let dummy_sig = dummy_message;
 
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
 
@@ -567,7 +567,7 @@ mod tests {
                 &[epochs[3].clone()],
             ]
             .concat();
-            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3].clone()]].concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
