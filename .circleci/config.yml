@@ -7,7 +7,7 @@ rust_defaults: &rust_defaults
   <<: *defaults
   docker:
     - image: circleci/rust:latest
-  resource_class: large
+  resource_class: xlarge
 
 jobs:
   checkout-repo:
