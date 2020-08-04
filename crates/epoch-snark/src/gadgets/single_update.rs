@@ -91,14 +91,13 @@ impl SingleUpdate<Bls12_377> {
 
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
-        let (message_hash, aggregated_public_key) =
-            BlsGadget::enforce_bitmap(
-                cs.ns(|| "verify signature partial"),
-                previous_pubkeys,
-                &signed_bitmap,
-                &epoch_data.message_hash,
-                &previous_max_non_signers,
-            )?;
+        let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
+            cs.ns(|| "verify signature partial"),
+            previous_pubkeys,
+            &signed_bitmap,
+            &epoch_data.message_hash,
+            &previous_max_non_signers,
+        )?;
 
         Ok(ConstrainedEpoch {
             new_pubkeys: epoch_data.pubkeys,
@@ -137,11 +136,11 @@ pub mod test_helpers {
         }
     }
 
-    pub fn generate_dummy_update<E: PairingEngine>(
-        num_validators: u32,
-    ) -> SingleUpdate<E> {
+    pub fn generate_dummy_update<E: PairingEngine>(num_validators: u32) -> SingleUpdate<E> {
         let bitmap = (0..num_validators).map(|_| true).collect::<Vec<_>>();
-        let public_keys = (0..num_validators).map(|_| E::G2Projective::prime_subgroup_generator()).collect::<Vec<_>>();
+        let public_keys = (0..num_validators)
+            .map(|_| E::G2Projective::prime_subgroup_generator())
+            .collect::<Vec<_>>();
         let epoch_data = EpochData::<E> {
             index: Some(0),
             maximum_non_signers: 0u32,

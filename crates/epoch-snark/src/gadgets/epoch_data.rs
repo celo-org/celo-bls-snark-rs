@@ -143,11 +143,13 @@ impl EpochData<Bls12_377> {
         let previous_plus_one =
             previous_index.add_constant(cs.ns(|| "previous plus_one"), &Fr::one())?;
 
-        let index_bit = YToBitGadget::<Parameters>::is_eq_zero(
-            &mut cs.ns(|| "is index zero"),
-            index,
-        )?.not();
-        index.conditional_enforce_equal(cs.ns(|| "index enforce equal"), &previous_plus_one, &index_bit)?;
+        let index_bit =
+            YToBitGadget::<Parameters>::is_eq_zero(&mut cs.ns(|| "is index zero"), index)?.not();
+        index.conditional_enforce_equal(
+            cs.ns(|| "index enforce equal"),
+            &previous_plus_one,
+            &index_bit,
+        )?;
         Ok(())
     }
 

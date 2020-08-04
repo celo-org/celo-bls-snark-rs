@@ -2,13 +2,17 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
-use algebra::{bls12_377::{Bls12_377, Parameters, G1Projective, G2Projective}, bw6_761::Fr, ProjectiveCurve, PairingEngine};
+use algebra::{
+    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters},
+    bw6_761::Fr,
+    PairingEngine, ProjectiveCurve,
+};
 use r1cs_std::prelude::*;
 use r1cs_std::{
-    pairing::PairingGadget as _,
     bls12_377::{G1Gadget, G2Gadget, PairingGadget},
     bls12_377::{G1PreparedGadget, G2PreparedGadget},
     fields::fp::FpGadget,
+    pairing::PairingGadget as _,
     Assignment,
 };
 use tracing::{debug, info, span, Level};
@@ -190,7 +194,8 @@ impl ValidatorSetUpdate<Bls12_377> {
             let index_bit = YToBitGadget::<Parameters>::is_eq_zero(
                 &mut cs.ns(|| format!("is index {} zero", i)),
                 &constrained_epoch.index,
-            )?.not();
+            )?
+            .not();
 
             // Update the pubkeys for the next iteration
             previous_epoch_index = FrGadget::conditionally_select(
@@ -199,16 +204,22 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &constrained_epoch.index,
                 &previous_epoch_index,
             )?;
-            previous_pubkey_vars = constrained_epoch.new_pubkeys
+            previous_pubkey_vars = constrained_epoch
+                .new_pubkeys
                 .iter()
                 .zip(previous_pubkey_vars.iter())
                 .enumerate()
-                .map(|(j, (new_pk, old_pk))| G2Gadget::conditionally_select(
-                    cs.ns(|| format!("conditionally update previous pub key {} in epoch {}", j, i)),
-                    &index_bit,
-                    new_pk,
-                    old_pk,
-                )).collect::<Result<Vec<_>, _>>()?;
+                .map(|(j, (new_pk, old_pk))| {
+                    G2Gadget::conditionally_select(
+                        cs.ns(|| {
+                            format!("conditionally update previous pub key {} in epoch {}", j, i)
+                        }),
+                        &index_bit,
+                        new_pk,
+                        old_pk,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             previous_max_non_signers = FrGadget::conditionally_select(
                 cs.ns(|| format!("conditionally update previous max non signers {}", i)),
                 &index_bit,
@@ -456,14 +467,14 @@ mod tests {
 
             let epochs = [
                 &epochs[0..3],
-                &[generate_dummy_update(num_validators), generate_dummy_update(num_validators)],
+                &[
+                    generate_dummy_update(num_validators),
+                    generate_dummy_update(num_validators),
+                ],
                 &[epochs[3].clone()],
-            ].concat();
-            let asigs = [
-                &asigs[0..3],
-                &[dummy_sig, dummy_sig],
-                &[asigs[3].clone()],
-            ].concat();
+            ]
+            .concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3].clone()]].concat();
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
@@ -549,14 +560,14 @@ mod tests {
 
             let epochs = [
                 &epochs[0..3],
-                &[generate_dummy_update(num_validators), generate_dummy_update(num_validators)],
+                &[
+                    generate_dummy_update(num_validators),
+                    generate_dummy_update(num_validators),
+                ],
                 &[epochs[3].clone()],
-            ].concat();
-            let asigs = [
-                &asigs[0..3],
-                &[dummy_sig, dummy_sig],
-                &[asigs[3].clone()],
-            ].concat();
+            ]
+            .concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3].clone()]].concat();
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {

@@ -51,7 +51,14 @@ fn main() {
 
     // Prover generates the proof given the params
     let time = start_timer!(|| "Generate proof");
-    let proof = prove(&params, num_validators as u32, &first_epoch, &transitions, num_epochs).unwrap();
+    let proof = prove(
+        &params,
+        num_validators as u32,
+        &first_epoch,
+        &transitions,
+        num_epochs,
+    )
+    .unwrap();
     end_timer!(time);
 
     // Verifier checks the proof

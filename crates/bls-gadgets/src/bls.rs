@@ -55,15 +55,11 @@ where
             maximum_non_signers,
         )?;
 
-        let prepared_aggregated_pk = P::prepare_g2(
-            cs.ns(|| "prepare aggregate pk in epoch"),
-            &aggregated_pk,
-        )?;
+        let prepared_aggregated_pk =
+            P::prepare_g2(cs.ns(|| "prepare aggregate pk in epoch"), &aggregated_pk)?;
 
-        let prepared_message_hash = P::prepare_g1(
-            cs.ns(|| "prepare message hash in epoch"),
-            &message_hash,
-        )?;
+        let prepared_message_hash =
+            P::prepare_g1(cs.ns(|| "prepare message hash in epoch"), &message_hash)?;
 
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
@@ -224,8 +220,7 @@ where
         trace!("enforcing bitmap");
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
-        let aggregated_pk =
-            Self::enforce_aggregated_pubkeys(&mut cs, pub_keys, signed_bitmap)?;
+        let aggregated_pk = Self::enforce_aggregated_pubkeys(&mut cs, pub_keys, signed_bitmap)?;
 
         Ok((message_hash.clone(), aggregated_pk))
     }
