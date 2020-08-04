@@ -73,7 +73,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
         Ok(y_bit)
     }
 
-    fn is_eq_zero<CS: ConstraintSystem<P::Fp>>(
+    pub fn is_eq_zero<CS: ConstraintSystem<P::Fp>>(
         cs: &mut CS,
         el: &FpGadget<P::Fp>,
     ) -> Result<Boolean, SynthesisError> {
