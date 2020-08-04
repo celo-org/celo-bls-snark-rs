@@ -1,4 +1,4 @@
-use super::{setup::Parameters, BLSCurve, BLSCurveG2, CPCurve};
+use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, CPCurve};
 use algebra::ProjectiveCurve;
 use crate::{epoch_block::{EpochBlock, EpochTransition}, gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate}};
 use bls_crypto::{
@@ -58,6 +58,9 @@ pub fn prove(
 
     // Generate the BLS proof
     let asig = Signature::aggregate(transitions.iter().map(|epoch| &epoch.aggregate_signature));
+    let mut asig_dummy = (0..max_transitions - num_epochs).map(|_| Signature::from(BLSCurveG1::prime_subgroup_generator())).collect::<Vec<_>>();
+    asig_dummy.push(asig);
+    let asig = Signature::aggregate(&asig_dummy);
 
     let circuit = ValidatorSetUpdate::<BLSCurve> {
         initial_epoch: to_epoch_data(initial_epoch),
