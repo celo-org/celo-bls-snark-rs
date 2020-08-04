@@ -81,7 +81,7 @@ impl<P: Bls12Parameters> YToBitGadget<P> {
             Ok(el.get_value().get()? == P::Fp::zero())
         })?;
 
-        // This enforces bit = 1 <=> el != 0.
+        // This enforces bit = 1 <=> el == 0.
         // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
         // forces result to be 1. If el is non-zero, then a constraint of the form
         // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
