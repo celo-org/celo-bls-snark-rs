@@ -3,7 +3,7 @@ use algebra::{
     bw6_761::Fr,
     One, PairingEngine,
 };
-use bls_gadgets::{utils::is_setup, HashToGroupGadget};
+use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget},
@@ -142,7 +142,14 @@ impl EpochData<Bls12_377> {
         trace!("enforcing next epoch");
         let previous_plus_one =
             previous_index.add_constant(cs.ns(|| "previous plus_one"), &Fr::one())?;
-        index.enforce_equal(cs.ns(|| "index enforce equal"), &previous_plus_one)?;
+
+        let index_bit =
+            YToBitGadget::<Parameters>::is_eq_zero(&mut cs.ns(|| "is index zero"), index)?.not();
+        index.conditional_enforce_equal(
+            cs.ns(|| "index enforce equal"),
+            &previous_plus_one,
+            &index_bit,
+        )?;
         Ok(())
     }
 
@@ -265,6 +272,8 @@ mod tests {
             (1, 3, false),
             (3, 1, false),
             (100, 101, true),
+            (1, 0, true),
+            (5, 0, true),
         ] {
             let mut cs = TestConstraintSystem::<Fr>::new();
             let epoch1 = to_fr(&mut cs.ns(|| "1"), Some(*index1)).unwrap();

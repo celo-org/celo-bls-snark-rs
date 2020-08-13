@@ -47,13 +47,19 @@ where
         let _enter = span.enter();
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
-        let (prepared_message_hash, prepared_aggregated_pk) = Self::enforce_bitmap_and_prepare(
+        let (message_hash, aggregated_pk) = Self::enforce_bitmap(
             cs.ns(|| "verify partial"),
             pub_keys,
             signed_bitmap,
             message_hash,
             maximum_non_signers,
         )?;
+
+        let prepared_aggregated_pk =
+            P::prepare_g2(cs.ns(|| "prepare aggregate pk in epoch"), &aggregated_pk)?;
+
+        let prepared_message_hash =
+            P::prepare_g1(cs.ns(|| "prepare message hash in epoch"), &message_hash)?;
 
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
@@ -138,7 +144,7 @@ where
         mut cs: CS,
         pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
-    ) -> Result<P::G2PreparedGadget, SynthesisError> {
+    ) -> Result<P::G2Gadget, SynthesisError> {
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
@@ -167,9 +173,7 @@ where
         // Subtract the generator to get the correct aggregate pubkey
         aggregated_pk = aggregated_pk.sub(cs.ns(|| "add neg generator"), &g2_generator)?;
 
-        let prepared_aggregated_pk =
-            P::prepare_g2(cs.ns(|| "prepared aggregated pk"), &aggregated_pk)?;
-        Ok(prepared_aggregated_pk)
+        Ok(aggregated_pk)
     }
 
     /// Returns a gadget which checks that an aggregate pubkey is correctly calculated
@@ -206,23 +210,19 @@ where
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length (due to internal call to `enforced_aggregated_pubkeys`)
-    pub fn enforce_bitmap_and_prepare<CS: ConstraintSystem<F>>(
+    pub fn enforce_bitmap<CS: ConstraintSystem<F>>(
         mut cs: CS,
         pub_keys: &[P::G2Gadget],
         signed_bitmap: &[Boolean],
         message_hash: &P::G1Gadget,
         maximum_non_signers: &FpGadget<F>,
-    ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
+    ) -> Result<(P::G1Gadget, P::G2Gadget), SynthesisError> {
         trace!("enforcing bitmap");
         enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
 
-        trace!("preparing message hash and aggregated pubkey");
-        let prepared_message_hash =
-            P::prepare_g1(cs.ns(|| "prepared message hash"), &message_hash)?;
-        let prepared_aggregated_pk =
-            Self::enforce_aggregated_pubkeys(&mut cs, pub_keys, signed_bitmap)?;
+        let aggregated_pk = Self::enforce_aggregated_pubkeys(&mut cs, pub_keys, signed_bitmap)?;
 
-        Ok((prepared_message_hash, prepared_aggregated_pk))
+        Ok((message_hash.clone(), aggregated_pk))
     }
 
     /// Verifying BLS signatures requires preparing a G1 Signature and

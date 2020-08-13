@@ -2,24 +2,28 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
-use algebra::{bls12_377::Bls12_377, bw6_761::Fr};
+use algebra::{
+    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters},
+    bw6_761::Fr,
+    PairingEngine, ProjectiveCurve,
+};
 use r1cs_std::prelude::*;
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget, PairingGadget},
     bls12_377::{G1PreparedGadget, G2PreparedGadget},
     fields::fp::FpGadget,
+    pairing::PairingGadget as _,
     Assignment,
 };
 use tracing::{debug, info, span, Level};
 
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
-use algebra::PairingEngine;
 use groth16::{Proof, VerifyingKey};
 
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 
-use bls_gadgets::BlsVerifyGadget;
+use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
 type FrGadget = FpGadget<Fr>;
 
@@ -158,6 +162,15 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "verify_intermediate_epochs");
         let _enter = span.enter();
 
+        let dummy_pk = G2Gadget::alloc_constant(
+            cs.ns(|| "dummy public key"),
+            G2Projective::prime_subgroup_generator(),
+        )?;
+        let dummy_message = G1Gadget::alloc_constant(
+            cs.ns(|| "dummy sig"),
+            G1Projective::prime_subgroup_generator(),
+        )?;
+
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
@@ -178,14 +191,69 @@ impl ValidatorSetUpdate<Bls12_377> {
                 self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
             )?;
 
+            let index_bit = YToBitGadget::<Parameters>::is_eq_zero(
+                &mut cs.ns(|| format!("is index {} zero", i)),
+                &constrained_epoch.index,
+            )?
+            .not();
+
             // Update the pubkeys for the next iteration
-            previous_epoch_index = constrained_epoch.index;
-            previous_pubkey_vars = constrained_epoch.new_pubkeys;
-            previous_max_non_signers = constrained_epoch.new_max_non_signers;
+            previous_epoch_index = FrGadget::conditionally_select(
+                cs.ns(|| format!("conditionally update previous epoch index {}", i)),
+                &index_bit,
+                &constrained_epoch.index,
+                &previous_epoch_index,
+            )?;
+            previous_pubkey_vars = constrained_epoch
+                .new_pubkeys
+                .iter()
+                .zip(previous_pubkey_vars.iter())
+                .enumerate()
+                .map(|(j, (new_pk, old_pk))| {
+                    G2Gadget::conditionally_select(
+                        cs.ns(|| {
+                            format!("conditionally update previous pub key {} in epoch {}", j, i)
+                        }),
+                        &index_bit,
+                        new_pk,
+                        old_pk,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            previous_max_non_signers = FrGadget::conditionally_select(
+                cs.ns(|| format!("conditionally update previous max non signers {}", i)),
+                &index_bit,
+                &constrained_epoch.new_max_non_signers,
+                &previous_max_non_signers,
+            )?;
+
+            let aggregate_pk = G2Gadget::conditionally_select(
+                cs.ns(|| format!("conditionally select aggregate pk in epoch {}", i)),
+                &index_bit,
+                &constrained_epoch.aggregate_pk,
+                &dummy_pk,
+            )?;
+
+            let prepared_aggregate_pk = PairingGadget::prepare_g2(
+                cs.ns(|| format!("prepare aggregate pk in epoch {}", i)),
+                &aggregate_pk,
+            )?;
+
+            let message_hash = G1Gadget::conditionally_select(
+                cs.ns(|| format!("conditionally select message hash in epoch {}", i)),
+                &index_bit,
+                &constrained_epoch.message_hash,
+                &dummy_message,
+            )?;
+
+            let prepared_message_hash = PairingGadget::prepare_g1(
+                cs.ns(|| format!("prepare message hash in epoch {}", i)),
+                &message_hash,
+            )?;
 
             // Save the aggregated pubkey / message hash pair for the BLS batch verification
-            prepared_aggregated_public_keys.push(constrained_epoch.aggregate_pk);
-            prepared_message_hashes.push(constrained_epoch.message_hash);
+            prepared_aggregated_public_keys.push(prepared_aggregate_pk);
+            prepared_message_hashes.push(prepared_message_hash);
 
             // Save the xof/crh and the last epoch's bits for compressing the public inputs
             all_crh_bits.extend_from_slice(&constrained_epoch.crh_bits);
@@ -199,6 +267,12 @@ impl ValidatorSetUpdate<Bls12_377> {
                     g2_to_bits(&mut cs.ns(|| "last epoch aggregated pk bits"), &last_apk)?;
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
+
+                // make sure the last epoch index is not zero
+                index_bit.enforce_equal(
+                    cs.ns(|| "last epoch index is not zero"),
+                    &Boolean::Constant(true),
+                )?;
             }
             debug!("epoch {} constrained", i);
         }
@@ -240,7 +314,7 @@ mod tests {
     use super::*;
 
     use crate::gadgets::single_update::test_helpers::generate_single_update;
-    use algebra::bls12_377::G1Projective;
+    use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
     use r1cs_std::test_constraint_system::TestConstraintSystem;
 
@@ -249,6 +323,7 @@ mod tests {
     // let's run our tests with 7 validators and 2 faulty ones
     mod epoch_batch_verification {
         use super::*;
+        use crate::gadgets::single_update::test_helpers::generate_dummy_update;
 
         #[test]
         fn test_multiple_epochs() {
@@ -322,6 +397,192 @@ mod tests {
 
             let mut cs = TestConstraintSystem::<Fr>::new();
             valset.enforce(&mut cs).unwrap();
+            assert!(cs.is_satisfied());
+        }
+
+        #[test]
+        fn test_multiple_epochs_with_dummy() {
+            let faults: u32 = 2;
+            let num_validators = 3 * faults + 1;
+            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+            let initial_epoch =
+                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
+                    .epoch_data;
+
+            let num_epochs = 4;
+            // no more than `faults` 0s exist in the bitmap
+            // (i.e. at most `faults` validators who do not sign on the next validator set)
+            let bitmaps = &[
+                &[true, true, false, true, true, true, true],
+                &[true, true, false, true, true, true, true],
+                &[true, true, true, true, false, false, true],
+                &[true, true, true, true, true, true, true],
+            ];
+            // Generate validators for each of the epochs
+            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
+            // Generate `num_epochs` epochs
+            let epochs = validators
+                .1
+                .iter()
+                .enumerate()
+                .map(|(epoch_index, epoch_validators)| {
+                    generate_single_update::<Curve>(
+                        epoch_index as u16 + 1,
+                        faults,
+                        epoch_validators,
+                        bitmaps[epoch_index],
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            // The i-th validator set, signs on the i+1th epoch's G1 hash
+            let mut signers = vec![initial_validator_set.0];
+            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
+
+            // Filter the private keys which had a 1 in the boolean per epoch
+            let mut signers_filtered = Vec::new();
+            for i in 0..signers.len() {
+                let mut epoch_signers_filtered = Vec::new();
+                let epoch_signers = &signers[i];
+                let epoch_bitmap = bitmaps[i];
+                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
+                    if epoch_bitmap[j] {
+                        epoch_signers_filtered.push(*epoch_signer);
+                    }
+                }
+                signers_filtered.push(epoch_signers_filtered);
+            }
+
+            use crate::gadgets::test_helpers::hash_epoch;
+            let epoch_hashes = epochs
+                .iter()
+                .map(|update| hash_epoch(&update.epoch_data))
+                .collect::<Vec<G1Projective>>();
+
+            // dummy sig is the same as the message, since sk is 1.
+            let dummy_message = G1Projective::prime_subgroup_generator();
+            let dummy_sig = dummy_message;
+
+            let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
+
+            let epochs = [
+                &epochs[0..3],
+                &[
+                    generate_dummy_update(num_validators),
+                    generate_dummy_update(num_validators),
+                ],
+                &[epochs[3].clone()],
+            ]
+            .concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
+            let aggregated_signature = sum(&asigs);
+
+            let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch,
+                epochs,
+                num_validators,
+                aggregated_signature: Some(aggregated_signature),
+                hash_helper: None,
+            };
+
+            let mut cs = TestConstraintSystem::<Fr>::new();
+            valset.enforce(&mut cs).unwrap();
+            if !cs.is_satisfied() {
+                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
+            }
+            assert!(cs.is_satisfied());
+        }
+
+        #[test]
+        fn test_multiple_epochs_with_wrong_dummy() {
+            let faults: u32 = 2;
+            let num_validators = 3 * faults + 1;
+            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+            let initial_epoch =
+                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
+                    .epoch_data;
+
+            let num_epochs = 4;
+            // no more than `faults` 0s exist in the bitmap
+            // (i.e. at most `faults` validators who do not sign on the next validator set)
+            let bitmaps = &[
+                &[true, true, false, true, true, true, true],
+                &[true, true, false, true, true, true, true],
+                &[true, true, true, true, false, false, true],
+                &[true, true, true, true, true, true, true],
+            ];
+            // Generate validators for each of the epochs
+            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
+            // Generate `num_epochs` epochs
+            let epochs = validators
+                .1
+                .iter()
+                .enumerate()
+                .map(|(epoch_index, epoch_validators)| {
+                    generate_single_update::<Curve>(
+                        epoch_index as u16 + 1,
+                        faults,
+                        epoch_validators,
+                        bitmaps[epoch_index],
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            // The i-th validator set, signs on the i+1th epoch's G1 hash
+            let mut signers = vec![initial_validator_set.0];
+            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
+
+            // Filter the private keys which had a 1 in the boolean per epoch
+            let mut signers_filtered = Vec::new();
+            for i in 0..signers.len() {
+                let mut epoch_signers_filtered = Vec::new();
+                let epoch_signers = &signers[i];
+                let epoch_bitmap = bitmaps[i];
+                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
+                    if epoch_bitmap[j] {
+                        epoch_signers_filtered.push(*epoch_signer);
+                    }
+                }
+                signers_filtered.push(epoch_signers_filtered);
+            }
+
+            use crate::gadgets::test_helpers::hash_epoch;
+            let epoch_hashes = epochs
+                .iter()
+                .map(|update| hash_epoch(&update.epoch_data))
+                .collect::<Vec<G1Projective>>();
+
+            // dummy sig is the same as the message, since sk is 1.
+            let dummy_message = G1Projective::prime_subgroup_generator();
+            let dummy_sig = dummy_message;
+
+            let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
+
+            let epochs = [
+                &epochs[0..3],
+                &[
+                    generate_dummy_update(num_validators),
+                    generate_dummy_update(num_validators),
+                ],
+                &[epochs[3].clone()],
+            ]
+            .concat();
+            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
+            let aggregated_signature = sum(&asigs);
+
+            let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch,
+                epochs,
+                num_validators,
+                aggregated_signature: Some(aggregated_signature),
+                hash_helper: None,
+            };
+
+            let mut cs = TestConstraintSystem::<Fr>::new();
+            valset.enforce(&mut cs).unwrap();
+            if !cs.is_satisfied() {
+                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
+            }
             assert!(cs.is_satisfied());
         }
     }

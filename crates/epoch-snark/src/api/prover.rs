@@ -1,8 +1,9 @@
-use super::{setup::Parameters, BLSCurve, CPCurve};
+use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, CPCurve};
 use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
 };
+use algebra::ProjectiveCurve;
 use bls_crypto::{
     hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1,
     hashers::{Hasher, COMPOSITE_HASHER},
@@ -24,6 +25,7 @@ pub fn prove(
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
+    max_transitions: usize,
 ) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
     info!(
         "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
@@ -35,10 +37,22 @@ pub fn prove(
     let span = span!(Level::TRACE, "prove");
     let _enter = span.enter();
 
-    let epochs = transitions
+    let mut epochs = transitions
         .iter()
         .map(|transition| to_update(transition))
         .collect::<Vec<_>>();
+
+    let num_epochs = epochs.len();
+    if num_epochs < max_transitions {
+        epochs = [
+            &epochs[..num_epochs - 1],
+            &(0..max_transitions - num_epochs)
+                .map(|_| to_dummy_update(num_validators))
+                .collect::<Vec<_>>(),
+            &[epochs[num_epochs - 1].clone()],
+        ]
+        .concat();
+    }
 
     // Generate a helping proof if a Proving Key for the HashToBits
     // circuit was provided
@@ -50,6 +64,11 @@ pub fn prove(
 
     // Generate the BLS proof
     let asig = Signature::aggregate(transitions.iter().map(|epoch| &epoch.aggregate_signature));
+    let mut asig_dummy = (0..max_transitions - num_epochs)
+        .map(|_| Signature::from(BLSCurveG1::prime_subgroup_generator()))
+        .collect::<Vec<_>>();
+    asig_dummy.push(asig);
+    let asig = Signature::aggregate(&asig_dummy);
 
     let circuit = ValidatorSetUpdate::<BLSCurve> {
         initial_epoch: to_epoch_data(initial_epoch),
@@ -127,5 +146,18 @@ fn to_update(transition: &EpochTransition) -> SingleUpdate<BLSCurve> {
             .iter()
             .map(|b| Some(*b))
             .collect::<Vec<_>>(),
+    }
+}
+
+fn to_dummy_update(num_validators: u32) -> SingleUpdate<BLSCurve> {
+    SingleUpdate {
+        epoch_data: EpochData {
+            maximum_non_signers: 0,
+            index: Some(0),
+            public_keys: (0..num_validators)
+                .map(|_| Some(BLSCurveG2::prime_subgroup_generator()))
+                .collect::<Vec<_>>(),
+        },
+        signed_bitmap: (0..num_validators).map(|_| Some(true)).collect::<Vec<_>>(),
     }
 }

@@ -1,7 +1,7 @@
 use algebra::{bls12_377::Bls12_377, bw6_761::Fr, PairingEngine};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
-    bls12_377::{G1PreparedGadget, G2Gadget, G2PreparedGadget, PairingGadget},
+    bls12_377::{G1Gadget, G2Gadget, PairingGadget},
     boolean::Boolean,
     fields::fp::FpGadget,
 };
@@ -44,10 +44,10 @@ pub struct ConstrainedEpoch {
     /// The new threshold needed for signatures
     pub new_max_non_signers: FrGadget,
     /// The epoch's G1 Hash
-    pub message_hash: G1PreparedGadget,
+    pub message_hash: G1Gadget,
     /// The aggregate pubkey based on the bitmap of the validators
     /// of the previous epoch
-    pub aggregate_pk: G2PreparedGadget,
+    pub aggregate_pk: G2Gadget,
     /// The epoch's index
     pub index: FrGadget,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
@@ -91,20 +91,19 @@ impl SingleUpdate<Bls12_377> {
 
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
-        let (prepared_message_hash, prepared_aggregated_public_key) =
-            BlsGadget::enforce_bitmap_and_prepare(
-                cs.ns(|| "verify signature partial"),
-                previous_pubkeys,
-                &signed_bitmap,
-                &epoch_data.message_hash,
-                &previous_max_non_signers,
-            )?;
+        let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
+            cs.ns(|| "verify signature partial"),
+            previous_pubkeys,
+            &signed_bitmap,
+            &epoch_data.message_hash,
+            &previous_max_non_signers,
+        )?;
 
         Ok(ConstrainedEpoch {
             new_pubkeys: epoch_data.pubkeys,
             new_max_non_signers: epoch_data.maximum_non_signers,
-            message_hash: prepared_message_hash,
-            aggregate_pk: prepared_aggregated_public_key,
+            message_hash,
+            aggregate_pk: aggregated_public_key,
             index: epoch_data.index,
             bits: epoch_data.bits,
             xof_bits: epoch_data.xof_bits,
@@ -117,6 +116,7 @@ impl SingleUpdate<Bls12_377> {
 pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
+    use algebra::ProjectiveCurve;
 
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
@@ -133,6 +133,23 @@ pub mod test_helpers {
         SingleUpdate::<E> {
             epoch_data,
             signed_bitmap: to_option_iter(bitmap),
+        }
+    }
+
+    pub fn generate_dummy_update<E: PairingEngine>(num_validators: u32) -> SingleUpdate<E> {
+        let bitmap = (0..num_validators).map(|_| true).collect::<Vec<_>>();
+        let public_keys = (0..num_validators)
+            .map(|_| E::G2Projective::prime_subgroup_generator())
+            .collect::<Vec<_>>();
+        let epoch_data = EpochData::<E> {
+            index: Some(0),
+            maximum_non_signers: 0u32,
+            public_keys: to_option_iter(public_keys.as_slice()),
+        };
+
+        SingleUpdate::<E> {
+            epoch_data,
+            signed_bitmap: to_option_iter(&bitmap),
         }
     }
 }
