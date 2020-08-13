@@ -103,6 +103,10 @@ pub enum BLSError {
     #[error("Could not hash to curve")]
     HashToCurveError,
 
+    /// There must be the same number of keys and messages
+    #[error("there must be the same number of keys and messages")]
+    UnevenNumKeysMessages,
+
     /// Serialization error in Zexe
     #[error(transparent)]
     SerializationError(#[from] algebra::SerializationError),
