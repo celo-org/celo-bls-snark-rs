@@ -5,7 +5,7 @@ use algebra::{
 
 use bls_crypto::test_helpers::{keygen_batch, keygen_mul};
 use bls_crypto::{PublicKey, Signature};
-use epoch_snark::{EpochBlock, EpochTransition};
+use epoch_snark::{EpochBlock, EpochTransition, PREVIOUS_EPOCH_HASH_BITS};
 
 // Returns the initial epoch and a list of signed `num_epochs` state transitions
 pub fn generate_test_data(
@@ -22,7 +22,8 @@ pub fn generate_test_data(
         .iter()
         .map(|pk| PublicKey::from(*pk))
         .collect::<Vec<_>>();
-    let first_epoch = generate_block(0, faults, &initial_pubkeys);
+    let first_epoch = generate_block(&[0; PREVIOUS_EPOCH_HASH_BITS/8], 0, faults, &initial_pubkeys);
+    let (_, first_epoch_xof_hash) = first_epoch.hash_to_g1().unwrap();
 
     // Generate keys for the validators of each epoch
     let validators = keygen_batch::<Bls12_377>(num_epochs, num_validators as usize);
@@ -37,10 +38,12 @@ pub fn generate_test_data(
     let mut signers = vec![initial_validator_set.0];
     signers.extend_from_slice(&validators.0[..validators.0.len() - 1]);
     // sign each state transition
+    let mut previous_xof_hash = first_epoch_xof_hash;
     let mut transitions = vec![];
     for (i, signers_epoch) in signers.iter().enumerate() {
-        let block: EpochBlock = generate_block(i + 1, faults, &pubkeys[i]);
-        let hash = block.hash_to_g1().unwrap();
+        let block: EpochBlock = generate_block(&previous_xof_hash,i + 1, faults, &pubkeys[i]);
+        let (hash, xof_hash) = block.hash_to_g1().unwrap();
+        previous_xof_hash = xof_hash;
 
         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
         let bitmap_epoch = &bitmaps[i];
@@ -67,8 +70,9 @@ pub fn generate_test_data(
     (first_epoch, transitions, last_epoch)
 }
 
-fn generate_block(index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
+fn generate_block(previous_epoch_hash: &[u8], index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
     EpochBlock {
+        previous_epoch_hash: previous_epoch_hash.to_vec(),
         index: index as u16,
         maximum_non_signers: non_signers as u32,
         new_public_keys: pubkeys.to_vec(),

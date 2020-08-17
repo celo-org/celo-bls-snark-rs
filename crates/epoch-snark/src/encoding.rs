@@ -17,6 +17,8 @@ pub enum EncodingError {
     IoError(#[from] std::io::Error),
 }
 
+pub const PREVIOUS_EPOCH_HASH_BITS: usize = 128;
+
 /// The function assumes that the public key is not the point in infinity, which is true for
 /// BLS public keys
 pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingError> {

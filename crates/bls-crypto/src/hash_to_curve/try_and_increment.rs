@@ -84,7 +84,7 @@ where
         domain: &[u8],
         message: &[u8],
         extra_data: &[u8],
-    ) -> Result<(GroupProjective<P>, usize), BLSError> {
+    ) -> Result<(GroupProjective<P>, Vec<u8>, usize), BLSError> {
         let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
@@ -127,7 +127,7 @@ where
                     continue;
                 }
 
-                return Ok((scaled, c as usize));
+                return Ok((scaled, candidate_hash[..num_bytes].to_vec(), c as usize));
             }
         }
         Err(BLSError::HashToCurveError)

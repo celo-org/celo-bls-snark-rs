@@ -15,6 +15,8 @@ const PUBKEY_BYTES: usize = 96;
 
 #[no_mangle]
 pub extern "C" fn encode_epoch_block_to_bytes(
+    in_pervious_epoch_hash: *const u8,
+    in_pervious_epoch_hash_len: c_int,
     in_epoch_index: c_ushort,
     in_maximum_non_signers: c_uint,
     in_added_public_keys: *const *const PublicKey,
@@ -24,6 +26,9 @@ pub extern "C" fn encode_epoch_block_to_bytes(
     out_len: *mut c_int,
 ) -> bool {
     convert_result_to_bool::<_, EncodingError, _>(|| {
+        let previous_epoch_hash = unsafe {
+            slice::from_raw_parts(in_pervious_epoch_hash, in_pervious_epoch_hash_len as usize)
+        };
         let added_public_keys_ptrs = unsafe {
             slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
         };
@@ -34,6 +39,7 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .collect::<Vec<PublicKey>>();
 
         let epoch_block = EpochBlock::new(
+            previous_epoch_hash,
             in_epoch_index as u16,
             in_maximum_non_signers as u32,
             added_public_keys,

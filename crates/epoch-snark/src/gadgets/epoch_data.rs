@@ -72,12 +72,13 @@ impl EpochData<Bls12_377> {
     pub fn constrain<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
+        previous_epoch_hash: &[Boolean],
         previous_index: &FrGadget,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs, previous_epoch_hash)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
@@ -102,6 +103,7 @@ impl EpochData<Bls12_377> {
     pub fn to_bits<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
+        previous_epoch_hash: &[Boolean],
     ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
         let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
@@ -116,7 +118,7 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [previous_epoch_hash.to_vec(), index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -189,7 +191,7 @@ impl EpochData<Bls12_377> {
                 .map(|b| b.get_value().get())
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let (_, counter) = COMPOSITE_HASH_TO_G1
+            let (_, _, counter) = COMPOSITE_HASH_TO_G1
                 .hash_with_attempt(SIG_DOMAIN, &input_bytes, &[])
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
             counter
@@ -236,7 +238,7 @@ mod tests {
         let mut cs = TestConstraintSystem::<Fr>::new();
         let index = to_fr(&mut cs.ns(|| "index"), Some(9u32)).unwrap();
         epoch
-            .constrain(&mut cs.ns(|| "constraint"), &index, false)
+            .constrain(&mut cs.ns(|| "constraint"), &[], &index, false)
             .unwrap();
         assert!(cs.is_satisfied());
     }
@@ -250,16 +252,16 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let epoch_bytes = EpochBlock::new(&[], epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bytes()
             .unwrap();
-        let (hash, _) = COMPOSITE_HASH_TO_G1
+        let (hash, _, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes
         let mut cs = TestConstraintSystem::<Fr>::new();
-        let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
+        let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits"), &[]).unwrap().0;
         let ret =
             EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
         assert_eq!(ret.0.get_value().unwrap(), hash);
@@ -293,6 +295,7 @@ mod tests {
 
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
+            &[],
             epoch.index.unwrap(),
             epoch.maximum_non_signers,
             pubkeys.clone(),
@@ -301,13 +304,13 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let bits_wrong = EpochBlock::new(&[], epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bits_with_aggregated_pk()
             .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
-        let ret = epoch.to_bits(&mut cs).unwrap();
+        let ret = epoch.to_bits(&mut cs, &[]).unwrap();
 
         // compare with the result
         let bits_inner = ret

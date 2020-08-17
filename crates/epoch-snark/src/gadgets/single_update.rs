@@ -9,6 +9,7 @@ use r1cs_std::{
 use super::{constrain_bool, EpochData};
 use bls_gadgets::BlsVerifyGadget;
 use tracing::{span, Level};
+use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
 
 // Instantiate the BLS Verification gadget
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
@@ -58,6 +59,12 @@ pub struct ConstrainedEpoch {
     pub crh_bits: Vec<Boolean>,
 }
 
+impl ConstrainedEpoch {
+    pub fn extract_previous_hash_bits(&self) -> Vec<Boolean> {
+        self.xof_bits[0..PREVIOUS_EPOCH_HASH_BITS].to_vec()
+    }
+}
+
 impl SingleUpdate<Bls12_377> {
     /// Ensures that enough validators are present on the bitmap and generates
     /// the epoch's G1 Hash and Aggregated Public Key
@@ -68,6 +75,7 @@ impl SingleUpdate<Bls12_377> {
     pub fn constrain<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
+        previous_epoch_hash: &[Boolean],
         previous_pubkeys: &[G2Gadget],
         previous_epoch_index: &FrGadget,
         previous_max_non_signers: &FrGadget,
@@ -82,6 +90,7 @@ impl SingleUpdate<Bls12_377> {
         // Get the constrained epoch data
         let epoch_data = self.epoch_data.constrain(
             &mut cs.ns(|| "constrain"),
+            previous_epoch_hash,
             previous_epoch_index,
             generate_constraints_for_hash,
         )?;
@@ -224,6 +233,7 @@ mod tests {
         next_epoch
             .constrain(
                 &mut cs.ns(|| "constrain epoch 2"),
+                &[],
                 &prev_validators,
                 &prev_index,
                 &prev_max_non_signers,

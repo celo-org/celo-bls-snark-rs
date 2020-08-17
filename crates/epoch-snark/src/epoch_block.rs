@@ -2,10 +2,11 @@ use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
 use algebra::bls12_377::G1Projective;
 use blake2s_simd::Params;
 use bls_crypto::{
-    hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
+    hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
+use crate::PREVIOUS_EPOCH_HASH_BITS;
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -25,6 +26,8 @@ pub struct EpochTransition {
 /// Metadata about the next epoch
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpochBlock {
+    /// The previous epoch hash
+    pub previous_epoch_hash: Vec<u8>,
     /// The block number
     pub index: u16,
     /// The maximum allowed number of signers that may be absent
@@ -35,8 +38,9 @@ pub struct EpochBlock {
 
 impl EpochBlock {
     /// Creates a new epoch block
-    pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
+    pub fn new(previous_epoch_hash: &[u8], index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
+            previous_epoch_hash: previous_epoch_hash.to_vec(),
             index,
             maximum_non_signers,
             new_public_keys,
@@ -45,11 +49,11 @@ impl EpochBlock {
 
     /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
     /// group using `SIG_DOMAIN` as a domain separator
-    pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
+    pub fn hash_to_g1(&self) -> Result<(G1Projective, Vec<u8>), EncodingError> {
         let input = self.encode_to_bytes()?;
-        let expected_hash: G1Projective =
-            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &[]).unwrap();
-        Ok(expected_hash)
+        let (expected_hash, expected_xof_hash, _) =
+            COMPOSITE_HASH_TO_G1.hash_with_attempt(SIG_DOMAIN, &input, &[]).unwrap();
+        Ok((expected_hash, expected_xof_hash))
     }
 
     /// Encodes the block to bytes and then hashes it with Blake2
@@ -65,6 +69,8 @@ impl EpochBlock {
     /// Encodes the block to LE bits
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
+        let previous_epoch_hash_bits = bytes_to_bits(&self.previous_epoch_hash, PREVIOUS_EPOCH_HASH_BITS).into_iter().rev().collect::<Vec<_>>();
+        epoch_bits.extend_from_slice(&previous_epoch_hash_bits);
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {

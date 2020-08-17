@@ -24,6 +24,8 @@ use groth16::{Proof, VerifyingKey};
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 
 use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
+use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
+
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
 type FrGadget = FpGadget<Fr>;
 
@@ -32,6 +34,7 @@ type FrGadget = FpGadget<Fr>;
 /// aggregated signature is calculated over all epoch blokc changes. Providing the hash helper
 /// will not constrain the CRH->XOF calculation.
 pub struct ValidatorSetUpdate<E: PairingEngine> {
+    pub initial_epoch_previous_hash: Vec<Option<bool>>,
     pub initial_epoch: EpochData<E>,
     /// The number of validators over all the epochs
     pub num_validators: u32,
@@ -69,6 +72,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
         });
 
         ValidatorSetUpdate {
+            initial_epoch_previous_hash: vec![Some(false); PREVIOUS_EPOCH_HASH_BITS],
             initial_epoch: EpochData::empty(num_validators, maximum_non_signers),
             num_validators: num_validators as u32,
             epochs: vec![empty_update; num_epochs],
@@ -102,10 +106,18 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
+        let initial_epoch_previous_hash = self.initial_epoch_previous_hash
+            .iter()
+            .enumerate()
+            .map(|(i, b)| Boolean::alloc_checked(
+                cs.ns(|| format!("initial epoch previous hash {}", i)),
+                || Ok(b.get()?)
+            )).collect::<Result<Vec<_>, _>>()?;
+
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
-            self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
+            self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"), &initial_epoch_previous_hash)?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
@@ -118,6 +130,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             prepared_message_hashes,
         ) = self.verify_intermediate_epochs(
             &mut cs.ns(|| "verify epochs"),
+            initial_epoch_previous_hash,
             first_epoch_index,
             initial_pubkey_vars,
             initial_maximum_non_signers,
@@ -146,6 +159,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     fn verify_intermediate_epochs<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
+        initial_epoch_hash: Vec<Boolean>,
         first_epoch_index: FrGadget,
         initial_pubkey_vars: Vec<G2Gadget>,
         initial_max_non_signers: FrGadget,
@@ -174,6 +188,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
+        let mut previous_epoch_hash = initial_epoch_hash;
         let mut previous_epoch_index = first_epoch_index;
         let mut previous_pubkey_vars = initial_pubkey_vars;
         let mut previous_max_non_signers = initial_max_non_signers;
@@ -184,6 +199,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
                 &mut cs.ns(|| format!("epoch {}", i)),
+                &previous_epoch_hash,
                 &previous_pubkey_vars,
                 &previous_epoch_index,
                 &previous_max_non_signers,
@@ -226,6 +242,19 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &constrained_epoch.new_max_non_signers,
                 &previous_max_non_signers,
             )?;
+            previous_epoch_hash = constrained_epoch
+                .extract_previous_hash_bits().iter()
+                .zip(previous_epoch_hash.iter())
+                .enumerate()
+                .map(|(j, (new_bit, old_bit))| {
+                    Boolean::conditionally_select(
+                        cs.ns(|| format!("conditionally update previous epoch hash bit {} in epoch {}", j, i)),
+                        &index_bit,
+                        &new_bit,
+                        &old_bit,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
 
             let aggregate_pk = G2Gadget::conditionally_select(
                 cs.ns(|| format!("conditionally select aggregate pk in epoch {}", i)),
@@ -379,15 +408,20 @@ mod tests {
             }
 
             use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
+
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut epoch_hashes = vec![];
+            for update in epochs.iter() {
+                let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
+                epoch_hashes.push(h);
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+            }
 
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch_previous_hash: vec![Some(false); PREVIOUS_EPOCH_HASH_BITS],
                 initial_epoch,
                 epochs,
                 num_validators,
@@ -454,10 +488,13 @@ mod tests {
             }
 
             use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut epoch_hashes = vec![];
+            for update in epochs.iter() {
+                let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
+                epoch_hashes.push(h);
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+            }
 
             // dummy sig is the same as the message, since sk is 1.
             let dummy_message = G1Projective::prime_subgroup_generator();
@@ -478,6 +515,7 @@ mod tests {
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch_previous_hash: vec![Some(false); PREVIOUS_EPOCH_HASH_BITS],
                 initial_epoch,
                 epochs,
                 num_validators,
@@ -547,10 +585,13 @@ mod tests {
             }
 
             use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut epoch_hashes = vec![];
+            for update in epochs.iter() {
+                let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
+                epoch_hashes.push(h);
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+            }
 
             // dummy sig is the same as the message, since sk is 1.
             let dummy_message = G1Projective::prime_subgroup_generator();
@@ -571,6 +612,7 @@ mod tests {
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch_previous_hash: vec![Some(false); PREVIOUS_EPOCH_HASH_BITS],
                 initial_epoch,
                 epochs,
                 num_validators,

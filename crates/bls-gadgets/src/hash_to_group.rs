@@ -390,7 +390,7 @@ mod test {
 
     fn hash_to_group(input: &[u8]) {
         let try_and_increment = &*COMPOSITE_HASH_TO_G1;
-        let (expected_hash, attempt) = try_and_increment
+        let (expected_hash, _, attempt) = try_and_increment
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
 

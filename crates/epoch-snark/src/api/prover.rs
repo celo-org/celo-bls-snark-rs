@@ -15,6 +15,7 @@ use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Grot
 use r1cs_core::SynthesisError;
 
 use tracing::{info, span, Level};
+use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
 
 /// Given the SNARK's Public Parameters, the initial epoch, and a list of state transitions,
 /// generates a SNARK which proves that the final epoch is correctly calculated from the first
@@ -71,6 +72,7 @@ pub fn prove(
     let asig = Signature::aggregate(&asig_dummy);
 
     let circuit = ValidatorSetUpdate::<BLSCurve> {
+        initial_epoch_previous_hash: vec![Some(false); PREVIOUS_EPOCH_HASH_BITS],
         initial_epoch: to_epoch_data(initial_epoch),
         epochs,
         aggregated_signature: Some(*asig.as_ref()),
@@ -99,7 +101,7 @@ fn generate_hash_helper(
             let epoch_bytes = block.encode_to_bytes().unwrap();
 
             // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
-            let (_, counter) = hash_to_g1
+            let (_, _, counter) = hash_to_g1
                 .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
                 .unwrap();
             let crh_bytes = composite_hasher

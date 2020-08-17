@@ -25,7 +25,7 @@ mod api;
 pub use api::*;
 
 mod encoding;
-pub use encoding::EncodingError;
+pub use encoding::{EncodingError, PREVIOUS_EPOCH_HASH_BITS};
 
 mod epoch_block;
 pub use epoch_block::{EpochBlock, EpochTransition};
