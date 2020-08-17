@@ -118,7 +118,12 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> = [previous_epoch_hash.to_vec(), index_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [
+            previous_epoch_hash.to_vec(),
+            index_bits,
+            maximum_non_signers_bits,
+        ]
+        .concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -252,9 +257,14 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(&[], epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
-            .encode_to_bytes()
-            .unwrap();
+        let epoch_bytes = EpochBlock::new(
+            &[],
+            epoch.index.unwrap(),
+            epoch.maximum_non_signers,
+            pubkeys,
+        )
+        .encode_to_bytes()
+        .unwrap();
         let (hash, _, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();
@@ -304,9 +314,14 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(&[], epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
-            .encode_to_bits_with_aggregated_pk()
-            .unwrap();
+        let bits_wrong = EpochBlock::new(
+            &[],
+            epoch.index.unwrap(),
+            epoch.maximum_non_signers,
+            pubkeys,
+        )
+        .encode_to_bits_with_aggregated_pk()
+        .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();

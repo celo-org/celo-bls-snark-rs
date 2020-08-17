@@ -39,16 +39,24 @@ pub mod test_helpers {
         it.iter().map(|t| Some(*t)).collect()
     }
 
-    pub fn hash_epoch(epoch: &EpochData<Bls12_377>, previous_epoch_hash: &[u8]) -> (G1Projective, Vec<u8>) {
+    pub fn hash_epoch(
+        epoch: &EpochData<Bls12_377>,
+        previous_epoch_hash: &[u8],
+    ) -> (G1Projective, Vec<u8>) {
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
             pubkeys.push(PublicKey::from(pk.unwrap()));
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(previous_epoch_hash, epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
-            .encode_to_bytes()
-            .unwrap();
+        let epoch_bytes = EpochBlock::new(
+            previous_epoch_hash,
+            epoch.index.unwrap(),
+            epoch.maximum_non_signers,
+            pubkeys,
+        )
+        .encode_to_bytes()
+        .unwrap();
         let (hash, xof_hash, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();

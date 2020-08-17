@@ -7,9 +7,9 @@ use r1cs_std::{
 };
 
 use super::{constrain_bool, EpochData};
+use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
 use bls_gadgets::BlsVerifyGadget;
 use tracing::{span, Level};
-use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
 
 // Instantiate the BLS Verification gadget
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;

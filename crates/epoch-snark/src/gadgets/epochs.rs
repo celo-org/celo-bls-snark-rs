@@ -23,8 +23,8 @@ use groth16::{Proof, VerifyingKey};
 
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 
-use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
 use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
+use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
 
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
 type FrGadget = FpGadget<Fr>;
@@ -106,18 +106,23 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
-        let initial_epoch_previous_hash = self.initial_epoch_previous_hash
+        let initial_epoch_previous_hash = self
+            .initial_epoch_previous_hash
             .iter()
             .enumerate()
-            .map(|(i, b)| Boolean::alloc_checked(
-                cs.ns(|| format!("initial epoch previous hash {}", i)),
-                || Ok(b.get()?)
-            )).collect::<Result<Vec<_>, _>>()?;
+            .map(|(i, b)| {
+                Boolean::alloc_checked(
+                    cs.ns(|| format!("initial epoch previous hash {}", i)),
+                    || Ok(b.get()?),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
-            self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"), &initial_epoch_previous_hash)?;
+            self.initial_epoch
+                .to_bits(&mut cs.ns(|| "initial epoch"), &initial_epoch_previous_hash)?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
@@ -243,12 +248,18 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_max_non_signers,
             )?;
             previous_epoch_hash = constrained_epoch
-                .extract_previous_hash_bits().iter()
+                .extract_previous_hash_bits()
+                .iter()
                 .zip(previous_epoch_hash.iter())
                 .enumerate()
                 .map(|(j, (new_bit, old_bit))| {
                     Boolean::conditionally_select(
-                        cs.ns(|| format!("conditionally update previous epoch hash bit {} in epoch {}", j, i)),
+                        cs.ns(|| {
+                            format!(
+                                "conditionally update previous epoch hash bit {} in epoch {}",
+                                j, i
+                            )
+                        }),
                         &index_bit,
                         &new_bit,
                         &old_bit,
@@ -409,12 +420,12 @@ mod tests {
 
             use crate::gadgets::test_helpers::hash_epoch;
 
-            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS / 8];
             let mut epoch_hashes = vec![];
             for update in epochs.iter() {
                 let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
                 epoch_hashes.push(h);
-                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS / 8].to_vec();
             }
 
             let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
@@ -488,12 +499,12 @@ mod tests {
             }
 
             use crate::gadgets::test_helpers::hash_epoch;
-            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS / 8];
             let mut epoch_hashes = vec![];
             for update in epochs.iter() {
                 let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
                 epoch_hashes.push(h);
-                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS / 8].to_vec();
             }
 
             // dummy sig is the same as the message, since sk is 1.
@@ -585,12 +596,12 @@ mod tests {
             }
 
             use crate::gadgets::test_helpers::hash_epoch;
-            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS/8];
+            let mut previous_epoch_hash = vec![0; PREVIOUS_EPOCH_HASH_BITS / 8];
             let mut epoch_hashes = vec![];
             for update in epochs.iter() {
                 let (h, xof_h) = hash_epoch(&update.epoch_data, &previous_epoch_hash);
                 epoch_hashes.push(h);
-                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS/8].to_vec();
+                previous_epoch_hash = xof_h[0..PREVIOUS_EPOCH_HASH_BITS / 8].to_vec();
             }
 
             // dummy sig is the same as the message, since sk is 1.

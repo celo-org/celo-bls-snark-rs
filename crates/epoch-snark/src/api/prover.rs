@@ -14,8 +14,8 @@ use bls_gadgets::utils::bytes_to_bits;
 use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
 use r1cs_core::SynthesisError;
 
-use tracing::{info, span, Level};
 use crate::encoding::PREVIOUS_EPOCH_HASH_BITS;
+use tracing::{info, span, Level};
 
 /// Given the SNARK's Public Parameters, the initial epoch, and a list of state transitions,
 /// generates a SNARK which proves that the final epoch is correctly calculated from the first

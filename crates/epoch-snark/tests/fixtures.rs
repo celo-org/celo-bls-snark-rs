@@ -22,7 +22,12 @@ pub fn generate_test_data(
         .iter()
         .map(|pk| PublicKey::from(*pk))
         .collect::<Vec<_>>();
-    let first_epoch = generate_block(&[0; PREVIOUS_EPOCH_HASH_BITS/8], 0, faults, &initial_pubkeys);
+    let first_epoch = generate_block(
+        &[0; PREVIOUS_EPOCH_HASH_BITS / 8],
+        0,
+        faults,
+        &initial_pubkeys,
+    );
     let (_, first_epoch_xof_hash) = first_epoch.hash_to_g1().unwrap();
 
     // Generate keys for the validators of each epoch
@@ -41,7 +46,7 @@ pub fn generate_test_data(
     let mut previous_xof_hash = first_epoch_xof_hash;
     let mut transitions = vec![];
     for (i, signers_epoch) in signers.iter().enumerate() {
-        let block: EpochBlock = generate_block(&previous_xof_hash,i + 1, faults, &pubkeys[i]);
+        let block: EpochBlock = generate_block(&previous_xof_hash, i + 1, faults, &pubkeys[i]);
         let (hash, xof_hash) = block.hash_to_g1().unwrap();
         previous_xof_hash = xof_hash;
 
@@ -70,7 +75,12 @@ pub fn generate_test_data(
     (first_epoch, transitions, last_epoch)
 }
 
-fn generate_block(previous_epoch_hash: &[u8], index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
+fn generate_block(
+    previous_epoch_hash: &[u8],
+    index: usize,
+    non_signers: usize,
+    pubkeys: &[PublicKey],
+) -> EpochBlock {
     EpochBlock {
         previous_epoch_hash: previous_epoch_hash.to_vec(),
         index: index as u16,
