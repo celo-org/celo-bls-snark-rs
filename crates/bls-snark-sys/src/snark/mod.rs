@@ -64,6 +64,8 @@ mod tests {
         let last_pubkeys = hex::decode(LAST_PUBKEYS).unwrap();
 
         let first_epoch = EpochBlockFFI {
+            previous_epoch_hash: std::ptr::null() as *const u8,
+            previous_epoch_hash_len: 0,
             index: 0,
             maximum_non_signers: 1,
             pubkeys_num: 4,
@@ -71,6 +73,8 @@ mod tests {
         };
 
         let last_epoch = EpochBlockFFI {
+            previous_epoch_hash: std::ptr::null() as *const u8,
+            previous_epoch_hash_len: 0,
             index: 2,
             maximum_non_signers: 1,
             pubkeys_num: 4,

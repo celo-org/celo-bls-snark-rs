@@ -63,6 +63,10 @@ pub extern "C" fn encode_epoch_block_to_bytes(
 /// an epoch block.
 #[repr(C)]
 pub struct EpochBlockFFI {
+    /// The previous epoch hash
+    pub previous_epoch_hash: *const u8,
+    /// The previous epoch hash length
+    pub previous_epoch_hash_len: usize,
     /// The epoch's index
     pub index: u16,
     /// Pointer to the public keys array
@@ -78,7 +82,9 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
 
     fn try_from(src: &EpochBlockFFI) -> Result<EpochBlock, Self::Error> {
         let pubkeys = unsafe { read_pubkeys(src.pubkeys, src.pubkeys_num as usize)? };
+        let previous_epoch_hash = unsafe { slice::from_raw_parts(src.previous_epoch_hash, src.previous_epoch_hash_len) };
         Ok(EpochBlock {
+            previous_epoch_hash: previous_epoch_hash.to_vec(),
             index: src.index,
             maximum_non_signers: src.maximum_non_signers,
             new_public_keys: pubkeys,
@@ -152,6 +158,7 @@ mod tests {
         let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
         let block = EpochBlock {
+            previous_epoch_hash: vec![],
             index: 1,
             maximum_non_signers: 19,
             new_public_keys: pubkeys,
@@ -159,6 +166,8 @@ mod tests {
         let src = block;
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
+            previous_epoch_hash: std::ptr::null() as *const u8,
+            previous_epoch_hash_len: 0,
             index: src.index,
             maximum_non_signers: src.maximum_non_signers,
             pubkeys_num: src.new_public_keys.len(),
