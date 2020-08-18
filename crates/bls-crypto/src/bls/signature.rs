@@ -84,6 +84,9 @@ impl Signature {
         messages: &[(&[u8], &[u8])],
         hash_to_g1: &H,
     ) -> Result<(), BLSError> {
+        if pubkeys.len() != messages.len() {
+            return Err(BLSError::UnevenNumKeysMessages);
+        };
         let message_hashes = messages
             .iter()
             .map(|(message, extra_data)| hash_to_g1.hash(domain, message, extra_data))
@@ -103,11 +106,15 @@ impl Signature {
         pubkeys: &[P],
         message_hashes: &[G1Projective],
     ) -> Result<(), BLSError> {
+        if pubkeys.len() != message_hashes.len() {
+            return Err(BLSError::UnevenNumKeysMessages);
+        };
         // `.into()` is needed to prepared the points
-        let mut els = vec![(
+        let mut els = Vec::with_capacity(message_hashes.len() + 1);
+        els.push((
             self.as_ref().into_affine().into(),
             G2Affine::prime_subgroup_generator().neg().into(),
-        )];
+        ));
         message_hashes
             .iter()
             .zip(pubkeys)
