@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
 ]
@@ -29,7 +29,7 @@ dependencies = [
 [[package]]
 name = "algebra-core"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core-derive",
  "derivative",
@@ -44,7 +44,7 @@ dependencies = [
 [[package]]
 name = "algebra-core-derive"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "proc-macro2 1.0.18",
  "quote 1.0.7",
@@ -98,7 +98,7 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "colored",
 ]
@@ -389,7 +389,7 @@ dependencies = [
 [[package]]
 name = "crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -491,7 +491,7 @@ dependencies = [
 [[package]]
 name = "ff-fft"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
  "rand",
@@ -501,7 +501,7 @@ dependencies = [
 [[package]]
 name = "field-assembly"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "mince",
 ]
@@ -529,7 +529,7 @@ dependencies = [
 [[package]]
 name = "gm17"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -543,7 +543,7 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
  "bench-utils",
@@ -680,7 +680,7 @@ dependencies = [
 [[package]]
 name = "mince"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "quote 1.0.7",
  "syn 1.0.33",
@@ -802,7 +802,7 @@ dependencies = [
 [[package]]
 name = "r1cs-core"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra-core",
  "smallvec",
@@ -811,7 +811,7 @@ dependencies = [
 [[package]]
 name = "r1cs-std"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?rev=38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1#38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1"
 dependencies = [
  "algebra",
  "derivative",
