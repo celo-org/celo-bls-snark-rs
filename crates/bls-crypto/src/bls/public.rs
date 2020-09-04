@@ -101,11 +101,11 @@ impl PublicKey {
 }
 
 impl CanonicalSerialize for PublicKey {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+    fn serialize<W: Write>(&self, writer: W) -> Result<(), SerializationError> {
         self.0.into_affine().serialize(writer)
     }
 
-    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+    fn serialize_uncompressed<W: Write>(&self, writer: W) -> Result<(), SerializationError> {
         self.0.into_affine().serialize_uncompressed(writer)
     }
 
@@ -115,13 +115,13 @@ impl CanonicalSerialize for PublicKey {
 }
 
 impl CanonicalDeserialize for PublicKey {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+    fn deserialize<R: Read>(reader: R) -> Result<Self, SerializationError> {
         Ok(PublicKey::from(
             G2Affine::deserialize(reader)?.into_projective(),
         ))
     }
 
-    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+    fn deserialize_uncompressed<R: Read>(reader: R) -> Result<Self, SerializationError> {
         Ok(PublicKey::from(
             G2Affine::deserialize_uncompressed(reader)?.into_projective(),
         ))
