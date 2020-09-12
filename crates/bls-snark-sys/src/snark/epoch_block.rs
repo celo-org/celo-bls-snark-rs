@@ -16,6 +16,8 @@ const PUBKEY_BYTES: usize = 96;
 #[no_mangle]
 pub extern "C" fn encode_epoch_block_to_bytes(
     in_epoch_index: c_ushort,
+    in_epoch_entropy: *const u8,
+    in_parent_entropy: *const u8,
     in_maximum_non_signers: c_uint,
     in_added_public_keys: *const *const PublicKey,
     in_added_public_keys_len: c_int,
@@ -33,8 +35,11 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
+        let epoch_entropy = unsafe { slice::from_raw_parts(in_epoch_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
+            epoch_entropy,
+            parent_entropy,
             in_maximum_non_signers as u32,
             added_public_keys,
         );
@@ -59,6 +64,10 @@ pub extern "C" fn encode_epoch_block_to_bytes(
 pub struct EpochBlockFFI {
     /// The epoch's index
     pub index: u16,
+    /// The epoch's entropy value, derived from the epoch block hash.
+    pub epoch_entropy: *const u8,
+    /// The parent epoch's entropy value.
+    pub parent_entropy: *const u8,
     /// Pointer to the public keys array
     pub pubkeys: *const u8,
     /// The number of public keys to be read from the pointer
@@ -72,8 +81,12 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
 
     fn try_from(src: &EpochBlockFFI) -> Result<EpochBlock, Self::Error> {
         let pubkeys = unsafe { read_pubkeys(src.pubkeys, src.pubkeys_num as usize)? };
+        let epoch_entropy = unsafe { slice::from_raw_parts(src.epoch_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
+        let parent_entropy = unsafe { slice::from_raw_parts(src.parent_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
         Ok(EpochBlock {
             index: src.index,
+            epoch_entropy,
+            parent_entropy,
             maximum_non_signers: src.maximum_non_signers,
             new_public_keys: pubkeys,
         })
@@ -145,8 +158,12 @@ mod tests {
     fn ffi_block_conversion() {
         let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
+        let epoch_entropy = (0u8..EpochBlock::ENTROPY_BYTES).collect();
+        let parent_entropy = (EpochBlock::ENTROPY_BYTES..2*EpochBlock::ENTROPY_BYTES).collect();
         let block = EpochBlock {
             index: 1,
+            epoch_entropy,
+            parent_entropy,
             maximum_non_signers: 19,
             new_public_keys: pubkeys,
         };
@@ -154,6 +171,8 @@ mod tests {
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
             index: src.index,
+            epoch_entropy: &src.epoch_entropy[0] as *const u8,
+            parent_entropy: &src.parent_entropy[0] as *const u8,
             maximum_non_signers: src.maximum_non_signers,
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,

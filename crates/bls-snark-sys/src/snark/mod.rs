@@ -63,8 +63,15 @@ mod tests {
         let first_pubkeys = hex::decode(FIRST_PUBKEYS).unwrap();
         let last_pubkeys = hex::decode(LAST_PUBKEYS).unwrap();
 
+        let first_epoch_entropy = &[1u8; 32].to_vec();
+        let first_parent_entropy = &[2u8; 32].to_vec();
+        let last_epoch_entropy = &[3u8; 32].to_vec();
+        let last_parent_entropy = &[4u8; 32].to_vec();
+
         let first_epoch = EpochBlockFFI {
             index: 0,
+            epoch_entropy: &first_epoch_entropy[0] as *const u8,
+            parent_entropy: &first_parent_entropy[0] as *const u8,
             maximum_non_signers: 1,
             pubkeys_num: 4,
             pubkeys: &first_pubkeys[0] as *const u8,
@@ -72,6 +79,8 @@ mod tests {
 
         let last_epoch = EpochBlockFFI {
             index: 2,
+            epoch_entropy: &last_epoch_entropy[0] as *const u8,
+            parent_entropy: &last_epoch_entropy[0] as *const u8,
             maximum_non_signers: 1,
             pubkeys_num: 4,
             pubkeys: &last_pubkeys[0] as *const u8,

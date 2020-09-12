@@ -14,7 +14,7 @@ use r1cs_std::{
 
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
-use super::{fr_to_bits, g2_to_bits, to_fr};
+use super::{bytes_to_fr, fr_to_bits, g2_to_bits, to_fr};
 use tracing::{span, trace, Level};
 
 type FrGadget = FpGadget<Fr>;
@@ -29,6 +29,10 @@ pub struct EpochData<E: PairingEngine> {
     pub maximum_non_signers: u32,
     /// The index of the initial epoch
     pub index: Option<u16>,
+    /// Unpredicatble value to add entropy to the epoch data,
+    pub epoch_entropy: Option<Vec<u8>>,
+    /// Entropy value for the previous epoch.
+    pub parent_entropy: Option<Vec<u8>>,
     /// The public keys at the epoch
     pub public_keys: Vec<Option<E::G2Projective>>,
 }
@@ -40,6 +44,10 @@ pub struct EpochData<E: PairingEngine> {
 pub struct ConstrainedEpochData {
     /// The epoch's index
     pub index: FrGadget,
+    /// Unpredicatble value to add entropy to the epoch data,
+    pub epoch_entropy: FrGadget,
+    /// Entropy value for the previous epoch.
+    pub parent_entropy: FrGadget,
     /// The new threshold needed for signatures
     pub maximum_non_signers: FrGadget,
     /// The epoch's G1 Hash
@@ -59,6 +67,8 @@ impl<E: PairingEngine> EpochData<E> {
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         EpochData::<E> {
             index: None,
+            epoch_entropy: None,
+            parent_entropy: None,
             maximum_non_signers: maximum_non_signers as u32,
             public_keys: vec![None; num_validators],
         }
@@ -77,7 +87,7 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
+        let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
@@ -90,6 +100,8 @@ impl EpochData<Bls12_377> {
         Ok(ConstrainedEpochData {
             bits,
             index,
+            epoch_entropy,
+            parent_entropy,
             maximum_non_signers,
             pubkeys,
             message_hash,
@@ -102,7 +114,7 @@ impl EpochData<Bls12_377> {
     pub fn to_bits<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
-    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
+    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
         let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
 
@@ -115,6 +127,10 @@ impl EpochData<Bls12_377> {
             &maximum_non_signers,
             32,
         )?;
+
+        // DO NOT MERGE: What should I do here?!
+        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy)?;
+        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy)?;
 
         let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
 
@@ -130,7 +146,7 @@ impl EpochData<Bls12_377> {
             pubkey_vars.push(pk_var);
         }
 
-        Ok((epoch_bits, index, maximum_non_signers, pubkey_vars))
+        Ok((epoch_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkey_vars))
     }
 
     /// Enforces that `index = previous_index + 1`
@@ -225,6 +241,8 @@ mod tests {
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
+            epoch_entropy: Some(vec![index as u8; EpochBlock::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![index-1 as u8; EpochBlock::ENTROPY_BYTES]),
             maximum_non_signers: 12,
             public_keys: pubkeys,
         }
@@ -250,7 +268,7 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy.unwrap(), epoch.parent_entropy.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bytes()
             .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
@@ -294,6 +312,8 @@ mod tests {
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
+            epoch.epoch_entropy.unwrap(),
+            epoch.parent_entropy.unwrap(),
             epoch.maximum_non_signers,
             pubkeys.clone(),
         )
@@ -301,7 +321,7 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy.unwrap(), epoch.parent_entropy.unwrap(), epoch.maximum_non_signers, pubkeys)
             .encode_to_bits_with_aggregated_pk()
             .unwrap();
 

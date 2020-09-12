@@ -129,6 +129,8 @@ fn generate_hash_helper(
 fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
+        epoch_entropy: Some(block.epoch_entropy),
+        parent_entropy: Some(block.parent_entropy),
         maximum_non_signers: block.maximum_non_signers,
         public_keys: block
             .new_public_keys
@@ -153,6 +155,8 @@ fn to_dummy_update(num_validators: u32) -> SingleUpdate<BLSCurve> {
     SingleUpdate {
         epoch_data: EpochData {
             maximum_non_signers: 0,
+            epoch_entropy: Some(vec![0u8; EpochBlock::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![0u8; EpochBlock::ENTROPY_BYTES]),
             index: Some(0),
             public_keys: (0..num_validators)
                 .map(|_| Some(BLSCurveG2::prime_subgroup_generator()))

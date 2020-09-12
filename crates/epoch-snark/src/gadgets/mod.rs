@@ -17,7 +17,7 @@ mod epochs;
 pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
-use algebra::{bls12_377::Parameters, bw6_761::Fr, BigInteger, Field, FpParameters, PrimeField};
+use algebra::{bls12_377::Parameters, bw6_761::Fr, BigInteger, BigInteger384, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
 use r1cs_std::{bls12_377::G2Gadget, fields::fp::FpGadget, Assignment};
 
@@ -25,6 +25,8 @@ type FrGadget = FpGadget<Fr>;
 use bls_gadgets::YToBitGadget;
 
 use r1cs_core::{ConstraintSystem, SynthesisError};
+
+use core::convert::TryInto;
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -74,6 +76,13 @@ fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
     num: Option<T>,
 ) -> Result<FrGadget, SynthesisError> {
     FrGadget::alloc(cs, || Ok(Fr::from(num.get()?.into())))
+}
+
+fn bytes_to_fr<T: TryInto<[u64; BigInteger384::NUM_LIMBS]>, CS: ConstraintSystem<Fr>>(
+    cs: &mut CS,
+    num: Option<T>,
+) -> Result<FrGadget, SynthesisError> {
+    FrGadget::alloc(cs, || Ok(Fr::from(BigInteger384::new(num.get()?.try_into()?))))
 }
 
 fn fr_to_bits<CS: ConstraintSystem<Fr>>(

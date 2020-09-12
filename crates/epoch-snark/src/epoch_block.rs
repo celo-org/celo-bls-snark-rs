@@ -27,6 +27,10 @@ pub struct EpochTransition {
 pub struct EpochBlock {
     /// The block number
     pub index: u16,
+    /// The entropy from this epoch, derived from the epoch block hash.
+    pub epoch_entropy: Vec<u8>,
+    /// The entropy from the parent epoch.
+    pub parent_entropy: Vec<u8>,
     /// The maximum allowed number of signers that may be absent
     pub maximum_non_signers: u32,
     /// The public keys of the new validators
@@ -34,10 +38,15 @@ pub struct EpochBlock {
 }
 
 impl EpochBlock {
+    /// Each epoch entropy value is 128 bits.
+    pub const ENTROPY_BYTES: usize = 16;
+
     /// Creates a new epoch block
-    pub fn new(index: u16, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
+    pub fn new(index: u16, epoch_entropy: Vec<u8>, parent_entropy: Vec<u8>, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
         Self {
             index,
+            epoch_entropy,
+            parent_entropy,
             maximum_non_signers,
             new_public_keys,
         }
@@ -66,6 +75,9 @@ impl EpochBlock {
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
+        // DO NOT MERGE: Handle the 0 pointer case here.
+        epoch_bits.extend_from_slice(&bytes_to_bits(&self.epoch_entropy, Self::ENTROPY_BYTES * 8));
+        epoch_bits.extend_from_slice(&bytes_to_bits(&self.parent_entropy, Self::ENTROPY_BYTES * 8));
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
