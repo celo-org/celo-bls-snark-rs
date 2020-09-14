@@ -21,9 +21,32 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+]
+
+[[package]]
+name = "algebra"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+]
+
+[[package]]
+name = "algebra-core"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core-derive 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "derivative",
+ "field-assembly 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "num-traits",
+ "rand",
+ "rayon",
+ "rustc_version",
+ "unroll",
 ]
 
 [[package]]
@@ -31,14 +54,24 @@ name = "algebra-core"
 version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core-derive",
+ "algebra-core-derive 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "derivative",
- "field-assembly",
+ "field-assembly 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "num-traits",
  "rand",
  "rayon",
  "rustc_version",
  "unroll",
+]
+
+[[package]]
+name = "algebra-core-derive"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "proc-macro2 1.0.18",
+ "quote 1.0.7",
+ "syn 1.0.33",
 ]
 
 [[package]]
@@ -98,6 +131,11 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+
+[[package]]
+name = "bench-utils"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
  "colored",
@@ -136,13 +174,13 @@ dependencies = [
 name = "bls-crypto"
 version = "0.1.4"
 dependencies = [
- "algebra",
- "bench-utils",
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
  "blake2s_simd",
  "byteorder",
  "clap",
  "criterion",
- "crypto-primitives",
+ "crypto-primitives 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
  "csv",
  "env_logger",
  "hex 0.3.2",
@@ -159,12 +197,12 @@ dependencies = [
 name = "bls-gadgets"
 version = "0.1.4"
 dependencies = [
- "algebra",
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
  "bls-crypto",
- "crypto-primitives",
- "groth16",
- "r1cs-core",
- "r1cs-std",
+ "crypto-primitives 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "groth16 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "r1cs-std 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
  "rand",
  "rand_xorshift",
  "tracing",
@@ -174,14 +212,14 @@ dependencies = [
 name = "bls-snark-sys"
 version = "0.1.4"
 dependencies = [
- "algebra",
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "bls-crypto",
  "epoch-snark",
- "groth16",
+ "groth16 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "hex 0.4.2",
  "log",
  "once_cell",
- "r1cs-core",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
 ]
 
@@ -389,18 +427,37 @@ dependencies = [
 [[package]]
 name = "crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
 dependencies = [
- "algebra-core",
- "bench-utils",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
  "blake2",
  "derivative",
  "digest",
- "ff-fft",
- "gm17",
- "groth16",
- "r1cs-core",
- "r1cs-std",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "gm17 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "groth16 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "r1cs-std 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "crypto-primitives"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "blake2",
+ "derivative",
+ "digest",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "gm17 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "groth16 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-std 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
  "rayon",
 ]
@@ -470,17 +527,17 @@ dependencies = [
 name = "epoch-snark"
 version = "0.1.4"
 dependencies = [
- "algebra",
- "bench-utils",
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
  "byteorder",
- "crypto-primitives",
- "groth16",
+ "crypto-primitives 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "groth16 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "hex 0.4.2",
- "r1cs-core",
- "r1cs-std",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-std 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
  "rand_xorshift",
  "thiserror",
@@ -491,9 +548,19 @@ dependencies = [
 [[package]]
 name = "ff-fft"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "ff-fft"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
  "rayon",
 ]
@@ -501,9 +568,17 @@ dependencies = [
 [[package]]
 name = "field-assembly"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "mince 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+]
+
+[[package]]
+name = "field-assembly"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "mince",
+ "mince 0.1.0 (git+https://github.com/scipr-lab/zexe)",
 ]
 
 [[package]]
@@ -529,12 +604,25 @@ dependencies = [
 [[package]]
 name = "gm17"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "gm17"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core",
- "bench-utils",
- "ff-fft",
- "r1cs-core",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
  "rayon",
  "smallvec",
@@ -543,12 +631,25 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "groth16"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core",
- "bench-utils",
- "ff-fft",
- "r1cs-core",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "bench-utils 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe)",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "rand",
  "rayon",
 ]
@@ -680,6 +781,15 @@ dependencies = [
 [[package]]
 name = "mince"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "quote 1.0.7",
+ "syn 1.0.33",
+]
+
+[[package]]
+name = "mince"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
  "quote 1.0.7",
@@ -802,10 +912,28 @@ dependencies = [
 [[package]]
 name = "r1cs-core"
 version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+]
+
+[[package]]
+name = "r1cs-core"
+version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra-core",
+ "algebra-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "smallvec",
+]
+
+[[package]]
+name = "r1cs-std"
+version = "0.1.0"
+source = "git+https://github.com/scipr-lab/zexe?branch=constraint-system-api#0c75a8510f9977ce53f20f0f4be3ad6952664e9d"
+dependencies = [
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
+ "derivative",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe?branch=constraint-system-api)",
 ]
 
 [[package]]
@@ -813,9 +941,9 @@ name = "r1cs-std"
 version = "0.1.0"
 source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
 dependencies = [
- "algebra",
+ "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe)",
  "derivative",
- "r1cs-core",
+ "r1cs-core 0.1.0 (git+https://github.com/scipr-lab/zexe)",
 ]
 
 [[package]]

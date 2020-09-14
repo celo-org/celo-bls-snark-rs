@@ -3,7 +3,7 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use algebra::{ed_on_bw6_761::{EdwardsParameters,EdwardsProjective}, CanonicalSerialize, ProjectiveCurve};
+use algebra::{ed_on_bw6_761::{EdwardsParameters, EdwardsProjective}, CanonicalSerialize, ProjectiveCurve};
 
 use blake2s_simd::Params;
 use crypto_primitives::crh::{

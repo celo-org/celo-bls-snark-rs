@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 bls-crypto = { path = "../bls-crypto", default-features = false }
 
-algebra = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-r1cs-core = { git = "https://github.com/scipr-lab/zexe", default-features = false }
-r1cs-std = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }
-crypto-primitives = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["parallel"] }
+algebra = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", default-features = false, features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
+r1cs-core = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", default-features = false }
+r1cs-std = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }
+crypto-primitives = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", default-features = false, features = ["parallel"] }
 
 # used only when exporting our test helpers to be used in the snark crate
 rand_xorshift = { version = "0.2", optional = true }

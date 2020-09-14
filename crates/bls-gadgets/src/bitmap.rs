@@ -1,18 +1,17 @@
 use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
+use r1cs_core::{LinearCombination, SynthesisError, Variable};
 use r1cs_std::{
-    fields::{fp::FpGadget, FieldGadget},
+    fields::{fp::FpVar},
     prelude::*,
     Assignment,
 };
 
 /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
 /// present in the provided bitmap
-pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
-    cs: &mut CS,
-    bitmap: &[Boolean],
-    max_occurrences: &FpGadget<F>,
+pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
+    bitmap: &[Boolean<F>],
+    max_occurrences: &FpVar<F>,
     value: bool,
 ) -> Result<(), SynthesisError> {
     let mut value_fp = F::one();
@@ -22,6 +21,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
     }
     // If we're in setup mode, we skip the bit counting part since the bitmap
     // will be empty
+    // TODO: Change to new setup flag in ConstraintSystem
     let is_setup = is_setup(&bitmap);
 
     let mut occurrences = 0;
@@ -35,9 +35,9 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
         // Update the constraints
         if !value {
             // add 1 here only for zeros
-            occurrences_lc += (F::one(), CS::one());
+            occurrences_lc += (F::one(), Variable::One);
         }
-        occurrences_lc = occurrences_lc + bit.lc(CS::one(), value_fp);
+        occurrences_lc = occurrences_lc + bit.lc(Variable::One, value_fp);
 
         // Update our count
         if !is_setup {
@@ -47,30 +47,32 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem
     }
 
     // Rebind `occurrences` to a constraint
-    let occurrences = FpGadget::alloc(&mut cs.ns(|| "num occurrences"), || {
-        Ok(F::from(occurrences))
-    })?;
+    // TODO: This idiom seems wrong. What if the first element of bitmap is a constant?
+    let occurences = FpVar::new_witness(bitmap[0].cs().ns(|| "num occurrences"), || { Ok(F::from(occurrences)) } )?;
+//    let occurrences = FpVar::alloc(&mut cs.ns(|| "num occurrences"), || {
+//        Ok(F::from(occurrences))
+//    })?;
 
     // Enforce `occurences <= max_occurences`
     occurrences.enforce_cmp(
-        &mut cs.ns(|| "enforce maximum number of occurrences"),
         &max_occurrences,
         std::cmp::Ordering::Less,
         true,
     )?;
 
     // Enforce that we have correctly counted the number of occurrences
-    cs.enforce(
+    occurrences_lc.enforce_equal(occurrences.get_variable());
+/*    cs.enforce(
         || "enforce num occurrences lc equal to num",
         |_| occurrences_lc,
-        |lc| lc + (F::one(), CS::one()),
+        |lc| lc + (F::one(), Variable::One),
         |lc| occurrences.get_variable() + lc,
-    );
+    );*/
 
     Ok(())
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use super::*;
     use algebra::{
@@ -81,7 +83,7 @@ mod tests {
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use r1cs_core::ConstraintSynthesizer;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+//    use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     #[test]
     // "I know of a bitmap that has at most 2 zeros"
@@ -209,4 +211,4 @@ mod tests {
             assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied());
         }
     }
-}
+}*/

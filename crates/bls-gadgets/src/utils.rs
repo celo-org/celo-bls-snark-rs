@@ -1,10 +1,12 @@
-use algebra::Field;
-use r1cs_core::{ConstraintSystem, SynthesisError};
-use r1cs_std::{alloc::AllocGadget, boolean::Boolean};
+use algebra::{ 
+    Field, PrimeField
+};
+use r1cs_core::SynthesisError;
+use r1cs_std::boolean::Boolean;
 
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup
-pub fn is_setup(message: &[Boolean]) -> bool {
+pub fn is_setup<F: PrimeField>(message: &[Boolean<F>]) -> bool {
     message.iter().any(|m| m.get_value().is_none())
 }
 
@@ -50,18 +52,17 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
-pub(crate) fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
-    cs: &mut CS,
+pub(crate) fn constrain_bool<F: Field>(
     input: &[bool],
-) -> Result<Vec<Boolean>, SynthesisError> {
+) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Boolean::alloc(cs.ns(|| format!("{}", j)), || Ok(b)))
+        .map(|(j, b)| Boolean::alloc(|| Ok(b)))
         .collect::<Result<Vec<_>, _>>()
 }
 
-#[cfg(any(test, feature = "test-helpers"))]
+/*#[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     use algebra::{Field, Group};
     use r1cs_core::ConstraintSystem;
@@ -78,4 +79,4 @@ pub mod test_helpers {
             .map(|(i, element)| GG::alloc(&mut cs.ns(|| format!("{}", i)), || Ok(element)).unwrap())
             .collect::<Vec<_>>()
     }
-}
+}*/

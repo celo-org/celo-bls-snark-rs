@@ -1,9 +1,9 @@
 use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_core::{SynthesisError};
 use r1cs_std::{
-    alloc::AllocGadget, boolean::Boolean, eq::EqGadget, fields::fp::FpGadget, fields::FieldGadget,
-    groups::GroupGadget, pairing::PairingGadget, select::CondSelectGadget,
+    boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar,
+    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget,
 };
 use std::marker::PhantomData;
 use tracing::{debug, span, trace, Level};
@@ -25,7 +25,7 @@ impl<E, F, P> BlsVerifyGadget<E, F, P>
 where
     E: PairingEngine,
     F: PrimeField,
-    P: PairingGadget<E, F>,
+    P: PairingVar<E, F>,
 {
     /// Enforces verification of a BLS Signature against a list of public keys and a bitmap indicating
     /// which of these pubkeys signed.
@@ -35,20 +35,18 @@ where
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Multi-Signature Verification"
-    pub fn verify<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        pub_keys: &[P::G2Gadget],
-        signed_bitmap: &[Boolean],
-        message_hash: &P::G1Gadget,
-        signature: &P::G1Gadget,
-        maximum_non_signers: &FpGadget<F>,
+    pub fn verify(
+        pub_keys: &[P::G2Var],
+        signed_bitmap: &[Boolean<F>],
+        message_hash: &P::G1Var,
+        signature: &P::G1Var,
+        maximum_non_signers: &FpVar<F>,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "BlsVerifyGadget_verify");
         let _enter = span.enter();
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
         let (message_hash, aggregated_pk) = Self::enforce_bitmap(
-            cs.ns(|| "verify partial"),
             pub_keys,
             signed_bitmap,
             message_hash,
@@ -56,18 +54,17 @@ where
         )?;
 
         let prepared_aggregated_pk =
-            P::prepare_g2(cs.ns(|| "prepare aggregate pk in epoch"), &aggregated_pk)?;
+            P::prepare_g1(&aggregated_pk)?;
 
         let prepared_message_hash =
-            P::prepare_g1(cs.ns(|| "prepare message hash in epoch"), &message_hash)?;
+            P::prepare_g1(&message_hash)?;
 
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
-            Self::prepare_signature_neg_generator(&mut cs, &signature)?;
+            Self::prepare_signature_neg_generator(&signature)?;
 
         // e(σ, g_2^-1) * e(H(m), apk) == 1_{G_T}
         Self::enforce_bls_equation(
-            &mut cs,
             &[prepared_signature, prepared_message_hash],
             &[prepared_g2_neg_generator, prepared_aggregated_pk],
         )?;
@@ -80,11 +77,10 @@ where
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
-    pub fn batch_verify<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        aggregated_pub_keys: &[P::G2Gadget],
-        message_hashes: &[P::G1Gadget],
-        aggregated_signature: &P::G1Gadget,
+    pub fn batch_verify(
+        aggregated_pub_keys: &[P::G2Var],
+        message_hashes: &[P::G1Var],
+        aggregated_signature: &P::G1Var,
     ) -> Result<(), SynthesisError> {
         debug!("batch verifying BLS signature");
         let prepared_message_hashes = message_hashes
@@ -92,7 +88,6 @@ where
             .enumerate()
             .map(|(i, message_hash)| {
                 P::prepare_g1(
-                    cs.ns(|| format!("prepared message hash {}", i)),
                     &message_hash,
                 )
             })
@@ -100,11 +95,10 @@ where
         let prepared_aggregated_pub_keys = aggregated_pub_keys
             .iter()
             .enumerate()
-            .map(|(i, pubkey)| P::prepare_g2(cs.ns(|| format!("prepared pubkey {}", i)), &pubkey))
+            .map(|(i, pubkey)| P::prepare_g2(&pubkey))
             .collect::<Result<Vec<_>, _>>()?;
 
         Self::batch_verify_prepared(
-            cs,
             &prepared_aggregated_pub_keys,
             &prepared_message_hashes,
             aggregated_signature,
@@ -112,15 +106,14 @@ where
     }
 
     /// Batch verification against prepared messages
-    pub fn batch_verify_prepared<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        prepared_aggregated_pub_keys: &[P::G2PreparedGadget],
-        prepared_message_hashes: &[P::G1PreparedGadget],
-        aggregated_signature: &P::G1Gadget,
+    pub fn batch_verify_prepared(
+        prepared_aggregated_pub_keys: &[P::G2PreparedVar],
+        prepared_message_hashes: &[P::G1PreparedVar],
+        aggregated_signature: &P::G1Var,
     ) -> Result<(), SynthesisError> {
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
-            Self::prepare_signature_neg_generator(&mut cs, aggregated_signature)?;
+            Self::prepare_signature_neg_generator(aggregated_signature)?;
 
         // Create the vectors which we'll batch verify
         let mut prepared_g1s = vec![prepared_signature];
@@ -130,7 +123,7 @@ where
 
         // Enforce the BLS check
         // e(σ, g_2^-1) * e(H(m0), pk_0) * e(H(m1), pk_1) ...  * e(H(m_n), pk_n)) == 1_{G_T}
-        Self::enforce_bls_equation(&mut cs, &prepared_g1s, &prepared_g2s)?;
+        Self::enforce_bls_equation(&prepared_g1s, &prepared_g2s)?;
 
         Ok(())
     }
@@ -140,16 +133,14 @@ where
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length
-    pub fn enforce_aggregated_pubkeys<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        pub_keys: &[P::G2Gadget],
-        signed_bitmap: &[Boolean],
-    ) -> Result<P::G2Gadget, SynthesisError> {
+    pub fn enforce_aggregated_pubkeys(
+        pub_keys: &[P::G2Var],
+        signed_bitmap: &[Boolean<F>],
+    ) -> Result<P::G2Var, SynthesisError> {
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
-        let g2_generator = P::G2Gadget::alloc_constant(
-            cs.ns(|| "G2 generator"),
+        let g2_generator = P::G2Var::alloc_constant(
             E::G2Projective::prime_subgroup_generator(),
         )?;
 
@@ -162,29 +153,26 @@ where
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // Add the pubkey to the sum
             // if bit: aggregated_pk += pk
-            let added = aggregated_pk.add(cs.ns(|| format!("add pk {}", i)), pk)?;
+            let added = aggregated_pk.add(pk)?;
             aggregated_pk = P::G2Gadget::conditionally_select(
-                &mut cs.ns(|| format!("cond_select {}", i)),
                 &bit,
                 &added,
                 &aggregated_pk,
             )?;
         }
         // Subtract the generator to get the correct aggregate pubkey
-        aggregated_pk = aggregated_pk.sub(cs.ns(|| "add neg generator"), &g2_generator)?;
+        aggregated_pk = aggregated_pk.sub(&g2_generator)?;
 
         Ok(aggregated_pk)
     }
 
     /// Returns a gadget which checks that an aggregate pubkey is correctly calculated
     /// by the sum of the pub keys
-    pub fn enforce_aggregated_all_pubkeys<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        pub_keys: &[P::G2Gadget],
-    ) -> Result<P::G2Gadget, SynthesisError> {
+    pub fn enforce_aggregated_all_pubkeys(
+        pub_keys: &[P::G2Var],
+    ) -> Result<P::G2Var, SynthesisError> {
         // Allocate the G2 Generator
-        let g2_generator = P::G2Gadget::alloc_constant(
-            cs.ns(|| "G2 generator"),
+        let g2_generator = P::G2Var::alloc_constant(
             E::G2Projective::prime_subgroup_generator(),
         )?;
 
@@ -197,10 +185,10 @@ where
         for (i, pk) in pub_keys.iter().enumerate() {
             // Add the pubkey to the sum
             // aggregated_pk += pk
-            aggregated_pk = aggregated_pk.add(&mut cs.ns(|| format!("add pk {}", i)), pk)?;
+            aggregated_pk = aggregated_pk.add(pk)?;
         }
         // Subtract the generator to get the correct aggregate pubkey
-        aggregated_pk = aggregated_pk.sub(cs.ns(|| "add neg generator"), &g2_generator)?;
+        aggregated_pk = aggregated_pk.sub(&g2_generator)?;
 
         Ok(aggregated_pk)
     }
@@ -210,39 +198,36 @@ where
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length (due to internal call to `enforced_aggregated_pubkeys`)
-    pub fn enforce_bitmap<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        pub_keys: &[P::G2Gadget],
-        signed_bitmap: &[Boolean],
-        message_hash: &P::G1Gadget,
-        maximum_non_signers: &FpGadget<F>,
-    ) -> Result<(P::G1Gadget, P::G2Gadget), SynthesisError> {
+    pub fn enforce_bitmap(
+        pub_keys: &[P::G2Var],
+        signed_bitmap: &[Boolean<F>],
+        message_hash: &P::G1Var,
+        maximum_non_signers: &FpVar<F>,
+    ) -> Result<(P::G1Var, P::G2Var), SynthesisError> {
         trace!("enforcing bitmap");
-        enforce_maximum_occurrences_in_bitmap(&mut cs, signed_bitmap, maximum_non_signers, false)?;
+        enforce_maximum_occurrences_in_bitmap(signed_bitmap, maximum_non_signers, false)?;
 
-        let aggregated_pk = Self::enforce_aggregated_pubkeys(&mut cs, pub_keys, signed_bitmap)?;
+        let aggregated_pk = Self::enforce_aggregated_pubkeys(pub_keys, signed_bitmap)?;
 
         Ok((message_hash.clone(), aggregated_pk))
     }
 
     /// Verifying BLS signatures requires preparing a G1 Signature and
     /// preparing a negated G2 generator
-    fn prepare_signature_neg_generator<CS: ConstraintSystem<F>>(
-        cs: &mut CS,
-        signature: &P::G1Gadget,
-    ) -> Result<(P::G1PreparedGadget, P::G2PreparedGadget), SynthesisError> {
+    fn prepare_signature_neg_generator(
+        signature: &P::G1Var,
+    ) -> Result<(P::G1PreparedVar, P::G2PreparedVar), SynthesisError> {
         // Ensure the signature is prepared
-        let prepared_signature = P::prepare_g1(cs.ns(|| "prepared signature"), signature)?;
+        let prepared_signature = P::prepare_g1(signature)?;
 
         // Allocate the generator on G2
-        let g2_generator = P::G2Gadget::alloc_constant(
-            cs.ns(|| "G2 generator"),
+        let g2_generator = P::G2Var::alloc_constant(
             E::G2Projective::prime_subgroup_generator(),
         )?;
         // and negate it for the purpose of verification
-        let g2_neg_generator = g2_generator.negate(cs.ns(|| "negate g2 generator"))?;
+        let g2_neg_generator = g2_generator.negate()?;
         let prepared_g2_neg_generator =
-            P::prepare_g2(cs.ns(|| "prepared g2 neg generator"), &g2_neg_generator)?;
+            P::prepare_g2(&g2_neg_generator)?;
 
         Ok((prepared_signature, prepared_g2_neg_generator))
     }
@@ -252,20 +237,19 @@ where
     ///
     /// Each G1 element is paired with the corresponding G2 element.
     /// Fails if the 2 slices have different lengths.
-    fn enforce_bls_equation<CS: ConstraintSystem<F>>(
-        cs: &mut CS,
-        g1: &[P::G1PreparedGadget],
-        g2: &[P::G2PreparedGadget],
+    fn enforce_bls_equation(
+        g1: &[P::G1PreparedVar],
+        g2: &[P::G2PreparedVar],
     ) -> Result<(), SynthesisError> {
         trace!("enforcing BLS equation");
-        let bls_equation = P::product_of_pairings(cs.ns(|| "verify BLS signature"), g1, g2)?;
-        let gt_one = &P::GTGadget::one(&mut cs.ns(|| "GT one"))?;
-        bls_equation.enforce_equal(&mut cs.ns(|| "BLS equation is one"), gt_one)?;
+        let bls_equation = P::product_of_pairings(g1, g2)?;
+        let gt_one = &P::GTVar::one()?;
+        bls_equation.enforce_equal(gt_one)?;
         Ok(())
     }
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod verify_one_message {
     use super::*;
     use crate::utils::test_helpers::alloc_vec;
@@ -278,10 +262,10 @@ mod verify_one_message {
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
-        alloc::AllocGadget,
-        bls12_377::{G1Gadget, PairingGadget as Bls12_377PairingGadget},
+        alloc::AllocVar,
+        bls12_377::{G1Var, PairingVar as Bls12_377PairingGadget},
         boolean::Boolean,
-        test_constraint_system::TestConstraintSystem,
+//        test_constraint_system::TestConstraintSystem,
     };
 
     // converts the arguments to constraints and checks them against the `verify` function
@@ -470,4 +454,4 @@ mod verify_one_message {
         );
         assert!(!cs.is_satisfied());
     }
-}
+}*/
