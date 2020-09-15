@@ -32,7 +32,7 @@ use crypto_primitives::{
 };
 use r1cs_core::{SynthesisError, Variable};
 use r1cs_std::{
-    bits::ToBitsGadget, boolean::Boolean, ed_on_cp6_782::EdwardsVar,
+    bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment,
 };
 use std::{borrow::Borrow, marker::PhantomData};
@@ -88,6 +88,7 @@ fn blake2xs_params(
 /// [hash_to_group]: ../bls_crypto/hash_to_curve/try_and_increment/index.html
 pub struct HashToGroupGadget<P, F: PrimeField> {
     parameters_type: PhantomData<P>,
+    field_type: PhantomData<F>,
 }
 
 // If we're on Bls12-377, we can have a nice public API for the whole hash to group operation

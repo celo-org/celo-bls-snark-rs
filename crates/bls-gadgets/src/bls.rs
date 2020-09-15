@@ -2,8 +2,8 @@ use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{SynthesisError};
 use r1cs_std::{
-    boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar,
-    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget,
+    boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
+    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar,
 };
 use std::marker::PhantomData;
 use tracing::{debug, span, trace, Level};
@@ -54,7 +54,7 @@ where
         )?;
 
         let prepared_aggregated_pk =
-            P::prepare_g1(&aggregated_pk)?;
+            P::prepare_g2(&aggregated_pk)?;
 
         let prepared_message_hash =
             P::prepare_g1(&message_hash)?;
@@ -140,7 +140,8 @@ where
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
-        let g2_generator = P::G2Var::alloc_constant(
+        let g2_generator = P::G2Var::new_constant(
+            pub_keys[0].cs(),
             E::G2Projective::prime_subgroup_generator(),
         )?;
 

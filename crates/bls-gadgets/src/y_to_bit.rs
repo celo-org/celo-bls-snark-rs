@@ -8,7 +8,7 @@ use r1cs_std::{
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
     Assignment,
 };
-use std::{marker::PhantomData, ops::Neg};
+use std::ops::Neg;
 
 /// The goal of the gadget is to provide the bit according to the value of y,
 /// as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
@@ -17,34 +17,49 @@ use std::{marker::PhantomData, ops::Neg};
 /// range). Then we check that the cast element is <= half, which enforces that
 /// originally they were > half. For points in G2, we also check the
 /// lexicographical ordering.
-pub struct YToBitGadget<P: Bls12Parameters> {
-    parameters_type: PhantomData<P>,
+trait YToBitGadgetG1<P: Bls12Parameters, F: PrimeField> {
+    fn y_to_bit_g1(&self) -> Result<Boolean<F>, SynthesisError>;
 }
 
-impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
-    pub fn y_to_bit_g1<F>(
-        pk: &G1Var<P>,
+trait YToBitGadgetG2<P: Bls12Parameters, F: PrimeField> {
+    fn y_to_bit_g2(&self) -> Result<Boolean<F>, SynthesisError>;
+}
+
+trait FpUtils<P: Bls12Parameters, F: PrimeField> {
+    fn is_eq_zero(
+        &self,
+    ) -> Result<Boolean<F>, SynthesisError>; 
+    fn normalize(
+        &self,
+    ) -> Result<Boolean<F>, SynthesisError>;
+}
+
+impl<P: Bls12Parameters, F: PrimeField> YToBitGadgetG1<P, F> for G1Var<P> {
+    fn y_to_bit_g1(
+        &self,
     ) -> Result<Boolean<F>, SynthesisError> {
-        let y_bit = Self::normalize(&pk.y)?;
+        let y_bit = FpVar::normalize(&self.y)?;
         Ok(y_bit)
     }
+}
 
-    pub fn y_to_bit_g2<F>(
-        pk: &G2Var<P>,
+impl<P: Bls12Parameters, F: PrimeField> YToBitGadgetG2<P, F> for G2Var<P> {
+    fn y_to_bit_g2(
+        &self,
     ) -> Result<Boolean<F>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
-        let y_bit = Boolean::new_witness(pk.cs(), || {
+            let y_bit = Boolean::new_witness(self.cs(), || {
             let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
-            let c1 = pk.y.c1.get_value().get()?;
-            let c0 = pk.y.c0.get_value().get()?;
+            let c1 = self.y.c1.get_value().get()?;
+            let c0 = self.y.c0.get_value().get()?;
 
             let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
             Ok(bit)
         })?;
 
         // Get the y_c1 and y_c0 bits
-        let y_c0_bit = Self::normalize(&pk.y.c0)?;
-        let y_c1_bit = Self::normalize(&pk.y.c1)?;
+        let y_c0_bit = Self::normalize(&self.y.c0)?;
+        let y_c1_bit = Self::normalize(&self.y.c1)?;
 
         // (1-a)*(b*c) == o - a
         // a is c1
@@ -56,10 +71,10 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
         // either c1 is 1, and then o is 1
         // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
         // else c1 is 0 and c0 is 0 (then y_eq is 1), and then o is 0
-        let y_eq_bit = Self::is_eq_zero(&pk.y.c1)?;
+        let y_eq_bit = Self::is_eq_zero(&self.y.c1)?;
         let bc = Boolean::and(&y_eq_bit, &y_c0_bit)?;
 
-        pk.cs().enforce_constraint(
+        self.cs().enforce_constraint(
             (P::Fp::one(), Variable::One) + y_c1_bit.lc(Variable::One, P::Fp::one().neg()),
             bc.lc(Variable::One, P::Fp::one()),
             y_bit.lc(Variable::One, P::Fp::one()) + y_c1_bit.lc(Variable::One, P::Fp::one().neg()),
@@ -67,12 +82,14 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
 
         Ok(y_bit)
     }
+}
 
-    pub fn is_eq_zero<F>(
-        el: &FpVar<P::Fp>,
+impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
+    fn is_eq_zero(
+        &self,
     ) -> Result<Boolean<F>, SynthesisError> {
         let bit = Boolean::new_witness(|| {
-            Ok(el.get_value().get()? == P::Fp::zero())
+            Ok(self.get_value().get()? == P::Fp::zero())
         })?;
 
         // This enforces bit = 1 <=> el == 0.
@@ -82,20 +99,20 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
         // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
         // witness calculation to pass.
         let inv = FpVar::new_witness(|| {
-            Ok(el.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
+            Ok(self.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
         })?;
 
         // (el * inv == 1 - bit)
-        el.cs().enforce_constraint(
+        self.cs().enforce_constraint(
             || "enforce y_eq_bit",
-            el.get_variable(),
+            self.get_variable(),
             inv.get_variable(),
             (P::Fp::one(), Variable::One) + bit.lc(Variable::One, P::Fp::one().neg()),
         );
 
         // (lhs * bit == 0)
-        el.cs().enforce_constraint(
-            el.get_variable(),
+        self.cs().enforce_constraint(
+            self.get_variable(),
             bit.lc(Variable::One, P::Fp::one()),
             lc!(),
         );
@@ -105,14 +122,14 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
 
     // Returns 1 if el > half, else 0.
     fn normalize(
-        el: &FpVar<P::Fp>,
+        &self,
     ) -> Result<Boolean<F>, SynthesisError> {
         let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
 
-        let bit = Boolean::new_witness(|| Ok(el.get_value().get()? > half))?;
+        let bit = Boolean::new_witness(|| Ok(self.get_value().get()? > half))?;
 
         let adjusted = FpVar::new_witness(|| {
-            let el = el.get_value().get()?;
+            let el = self.get_value().get()?;
 
             let adjusted = if el > half { el - &half } else { el };
 
@@ -120,9 +137,9 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadget<P> {
         })?;
 
         let bit_lc = bit.lc(Variable::One, half.neg());
-        el.cs().enforce_constraint(
+        self.cs().enforce_constraint(
             lc!() +  (P::Fp::one(), Variable::One),
-            el.get_variable() + bit_lc,
+            self.get_variable() + bit_lc,
             lc!() + adjusted.get_variable(),
         );
 
