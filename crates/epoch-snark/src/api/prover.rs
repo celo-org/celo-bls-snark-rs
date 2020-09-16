@@ -129,8 +129,8 @@ fn generate_hash_helper(
 fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
-        epoch_entropy: Some(block.epoch_entropy),
-        parent_entropy: Some(block.parent_entropy),
+        epoch_entropy: Some(block.epoch_entropy.to_vec()),
+        parent_entropy: Some(block.parent_entropy.to_vec()),
         maximum_non_signers: block.maximum_non_signers,
         public_keys: block
             .new_public_keys

@@ -1,9 +1,9 @@
 use algebra::{
     bls12_377::{Bls12_377, Parameters},
     bw6_761::Fr,
-    One, PairingEngine,
+    BigInteger, One, PairingEngine, PrimeField,
 };
-use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
+use bls_gadgets::{utils::{bytes_to_bits, is_setup}, HashToGroupGadget, YToBitGadget};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget},
@@ -14,7 +14,7 @@ use r1cs_std::{
 
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
-use super::{bytes_to_fr, fr_to_bits, g2_to_bits, to_fr};
+use super::{fr_to_bits, g2_to_bits, to_fr};
 use tracing::{span, trace, Level};
 
 type FrGadget = FpGadget<Fr>;
@@ -87,6 +87,7 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
+        // DO NOT MERGE: Add a constraint that the parent_entropy match the previous epoch's entropy.
         let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
@@ -128,11 +129,13 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        // DO NOT MERGE: What should I do here?!
-        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy)?;
-        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy)?;
+        // DO NOT MERGE; Extract this into a function. And should the 128 be extracted as a const?
+        let epoch_entropy = FrGadget::alloc(&mut cs.ns(|| "epoch entropy"), || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(self.epoch_entropy.as_ref().get()?, 128)))))?;
+        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &index, 128)?;
+        let parent_entropy = FrGadget::alloc(&mut cs.ns(|| "parent entropy"), || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(self.parent_entropy.as_ref().get()?, 128)))))?;
+        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &index, 128)?;
 
-        let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [index_bits, epoch_entropy_bits, parent_entropy_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -277,6 +280,7 @@ mod tests {
 
         // compare it with the one calculated in the circuit from its bytes
         let mut cs = TestConstraintSystem::<Fr>::new();
+        // DO NOT MERGE: Account for before and after the fork.
         let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
         let ret =
             EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
@@ -327,6 +331,7 @@ mod tests {
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
+        // DO NOT MERGE: Account for before and after the fork.
         let ret = epoch.to_bits(&mut cs).unwrap();
 
         // compare with the result

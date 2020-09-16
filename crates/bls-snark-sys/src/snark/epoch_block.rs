@@ -35,7 +35,9 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
+        // DO NOT MERGE: Handle the zero pointer case.
         let epoch_entropy = unsafe { slice::from_raw_parts(in_epoch_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
+        let parent_entropy = unsafe { slice::from_raw_parts(in_parent_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
             epoch_entropy,
