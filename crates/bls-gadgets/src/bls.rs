@@ -147,12 +147,11 @@ where
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
-        let g2_generator = P::G2Var::new_constant(
+        // Hack to get around incorrect type inference
+        let g2_generator = <P::G2Var as AllocVar<E::G2Projective,F>>::new_constant(
             pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None),
-            // TODO: Is it fine to convert to affine here? 
-            // Done to resolve strange compiler error
             E::G2Projective::prime_subgroup_generator(),
-        )?;
+        )?; 
 
         // We initialize the Aggregate Public Key as a generator point, in order to
         // calculate the sum of all keys which have signed according to the bitmap.
