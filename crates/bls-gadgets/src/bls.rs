@@ -3,7 +3,7 @@ use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
-    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar, curves::short_weierstrass::bls12::G2Var,
+    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar, groups::bls12::G2Var,
 };
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -159,7 +159,7 @@ where
         // After the sum is calculated, we must subtract the generator to get the
         // correct result
         // TODO: Ensure input wanted here, not witness
-        let mut aggregated_pk = P::G2Var::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
+        let mut aggregated_pk = g2_generator.clone();//<P::G2Var as AllocVar<E::G2Projective, F>>::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // Add the pubkey to the sum
             // if bit: aggregated_pk += pk
