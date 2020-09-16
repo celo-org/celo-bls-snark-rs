@@ -1,11 +1,12 @@
 use crate::enforce_maximum_occurrences_in_bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
-use r1cs_core::{SynthesisError};
+use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
-    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar,
+    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar, curves::short_weierstrass::bls12::G2Var,
 };
 use std::marker::PhantomData;
+use std::ops::Add;
 use tracing::{debug, span, trace, Level};
 
 /// BLS Signature Verification Gadget.
@@ -20,6 +21,12 @@ pub struct BlsVerifyGadget<E, F, P> {
     /// The pairing gadget we use, which MUST match our pairing engine
     pairing_gadget_type: PhantomData<P>,
 }
+
+/*impl From<std::option::NoneError> for SynthesisError {
+    fn from(error: std::option::NoneError) -> Self {
+        SynthesisError::MissingCS
+    }
+}*/
 
 impl<E, F, P> BlsVerifyGadget<E, F, P>
 where
@@ -141,7 +148,9 @@ where
         assert_eq!(signed_bitmap.len(), pub_keys.len());
         // Allocate the G2 Generator
         let g2_generator = P::G2Var::new_constant(
-            pub_keys[0].cs(),
+            pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None),
+            // TODO: Is it fine to convert to affine here? 
+            // Done to resolve strange compiler error
             E::G2Projective::prime_subgroup_generator(),
         )?;
 
@@ -150,11 +159,13 @@ where
         // This is needed since we cannot add to a Zero.
         // After the sum is calculated, we must subtract the generator to get the
         // correct result
-        let mut aggregated_pk = g2_generator.clone();
+        // TODO: Ensure input wanted here, not witness
+        let mut aggregated_pk = P::G2Var::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // Add the pubkey to the sum
             // if bit: aggregated_pk += pk
-            let added = aggregated_pk.add(pk)?;
+            let pk = *pk;
+            let added = aggregated_pk.add(pk);
             aggregated_pk = P::G2Gadget::conditionally_select(
                 &bit,
                 &added,
