@@ -63,6 +63,9 @@ pub struct ConstrainedEpochData {
 }
 
 impl<E: PairingEngine> EpochData<E> {
+    /// Each epoch entropy value is 128 bits.
+    pub const ENTROPY_BYTES: usize = 16;
+
     /// Initializes an empty epoch, to be used for the setup
     pub fn empty(num_validators: usize, maximum_non_signers: usize) -> Self {
         EpochData::<E> {
@@ -130,10 +133,10 @@ impl EpochData<Bls12_377> {
         )?;
 
         // DO NOT MERGE: Handle None value for entropy.
-        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy.as_deref())?;
-        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &epoch_entropy, 128)?;
-        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy.as_deref())?;
-        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &parent_entropy, 128)?;
+        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy.as_deref(), Self::ENTROPY_BYTES)?;
+        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
+        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy.as_deref(), Self::ENTROPY_BYTES)?;
+        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &parent_entropy, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Boolean> = [index_bits, epoch_entropy_bits, parent_entropy_bits, maximum_non_signers_bits].concat();
 

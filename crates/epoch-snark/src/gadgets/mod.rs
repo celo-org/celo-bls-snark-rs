@@ -79,9 +79,9 @@ fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
 fn bytes_to_fr<CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     bytes: Option<&[u8]>,
+    length: usize,
 ) -> Result<FrGadget, SynthesisError> {
-    // DO NOT MERGE: Should 128 be a const?
-    FrGadget::alloc(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(bytes.get()?, 128)))))
+    FrGadget::alloc(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(bytes.get()?, 8 * length)))))
 }
 
 fn fr_to_bits<CS: ConstraintSystem<Fr>>(
