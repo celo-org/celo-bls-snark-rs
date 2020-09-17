@@ -70,8 +70,8 @@ pub fn generate_test_data(
 fn generate_block(index: usize, epoch_entropy: &[u8], parent_entropy: &[u8], non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
     EpochBlock {
         index: index as u16,
-        epoch_entropy: epoch_entropy.to_vec(),
-        parent_entropy: parent_entropy.to_vec(),
+        epoch_entropy: Some(epoch_entropy.to_vec()),
+        parent_entropy: Some(parent_entropy.to_vec()),
         maximum_non_signers: non_signers as u32,
         new_public_keys: pubkeys.to_vec(),
     }

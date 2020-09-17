@@ -36,7 +36,7 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .collect::<Vec<PublicKey>>();
 
         let epoch_entropy = unsafe { read_epoch_entropy(in_epoch_entropy) };
-        let parent_entropy = unsafe{ read_epoch_entropy(in_parent_entropy) };
+        let parent_entropy = unsafe { read_epoch_entropy(in_parent_entropy) };
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
             epoch_entropy,
@@ -77,6 +77,7 @@ pub struct EpochBlockFFI {
     pub maximum_non_signers: u32,
 }
 
+// DO NOT MERGE: Add test for null pointer entropy case.
 impl TryFrom<&EpochBlockFFI> for EpochBlock {
     type Error = EncodingError;
 
@@ -148,7 +149,8 @@ unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, Enc
 ///
 /// # Safety
 ///
-/// This WILL read invalid data a pointer to less than `ENTROPY_BYTES` bytes of data. Use with caution.
+/// This WILL read invalid data if the given pointer locates less than `ENTROPY_BYTES`
+/// bytes of data. Use with caution.
 unsafe fn read_epoch_entropy(ptr: *const u8) -> Option<Vec<u8>> {
     if ptr.is_null() {
         None

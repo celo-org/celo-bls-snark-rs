@@ -90,7 +90,7 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        // DO NOT MERGE: Add a constraint that the parent_entropy match the previous epoch's entropy.
+        // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
         let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
@@ -132,11 +132,23 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        // DO NOT MERGE: Handle None value for entropy.
-        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy.as_deref(), Self::ENTROPY_BYTES)?;
-        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
-        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy.as_deref(), Self::ENTROPY_BYTES)?;
-        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &parent_entropy, 8 * Self::ENTROPY_BYTES)?;
+        let epoch_entropy = bytes_to_fr(
+            &mut cs.ns(|| "epoch entropy"),
+            self.epoch_entropy.as_deref(),
+        )?;
+        let epoch_entropy_bits = fr_to_bits(
+            &mut cs.ns(|| "epoch entropy bits"),
+            &epoch_entropy,
+            8 * Self::ENTROPY_BYTES
+        )?;
+        let parent_entropy = bytes_to_fr(
+            &mut cs.ns(|| "parent entropy"),
+            self.parent_entropy.as_deref(),
+        )?;
+        let parent_entropy_bits = fr_to_bits(
+            &mut cs.ns(|| "parent entropy bits"),
+            &parent_entropy, 8 * Self::ENTROPY_BYTES
+        )?;
 
         let mut epoch_bits: Vec<Boolean> = [index_bits, epoch_entropy_bits, parent_entropy_bits, maximum_non_signers_bits].concat();
 
@@ -274,7 +286,7 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy.unwrap(), epoch.parent_entropy.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy, epoch.parent_entropy, epoch.maximum_non_signers, pubkeys)
             .encode_to_bytes()
             .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
@@ -283,7 +295,6 @@ mod tests {
 
         // compare it with the one calculated in the circuit from its bytes
         let mut cs = TestConstraintSystem::<Fr>::new();
-        // DO NOT MERGE: Account for before and after the fork.
         let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
         let ret =
             EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
@@ -319,8 +330,8 @@ mod tests {
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.epoch_entropy.unwrap(),
-            epoch.parent_entropy.unwrap(),
+            epoch.epoch_entropy,
+            epoch.parent_entropy,
             epoch.maximum_non_signers,
             pubkeys.clone(),
         )
@@ -328,13 +339,12 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy.unwrap(), epoch.parent_entropy.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy, epoch.parent_entropy, epoch.maximum_non_signers, pubkeys)
             .encode_to_bits_with_aggregated_pk()
             .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
-        // DO NOT MERGE: Account for before and after the fork.
         let ret = epoch.to_bits(&mut cs).unwrap();
 
         // compare with the result

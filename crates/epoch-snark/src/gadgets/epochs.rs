@@ -102,10 +102,10 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
-        // DO NOT MERGE: Use the entropy values here.
+        // TODO(#185): Use the entropy values here.
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
-        let (first_epoch_bits, first_epoch_index, first_epoch_entropy, first_parent_entropy, initial_maximum_non_signers, initial_pubkey_vars) =
+        let (first_epoch_bits, first_epoch_index, _first_epoch_entropy, _first_parent_entropy, initial_maximum_non_signers, initial_pubkey_vars) =
             self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
