@@ -3,10 +3,10 @@ use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
-    groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar, groups::bls12::G2Var,
+    groups::CurveVar, pairing::PairingVar, alloc::AllocVar,
 };
 use std::marker::PhantomData;
-use std::ops::{Add, AddAssign};
+use std::ops::AddAssign;
 use tracing::{debug, span, trace, Level};
 
 /// BLS Signature Verification Gadget.
@@ -21,12 +21,6 @@ pub struct BlsVerifyGadget<E, F, P> {
     /// The pairing gadget we use, which MUST match our pairing engine
     pairing_gadget_type: PhantomData<P>,
 }
-
-/*impl From<std::option::NoneError> for SynthesisError {
-    fn from(error: std::option::NoneError) -> Self {
-        SynthesisError::MissingCS
-    }
-}*/
 
 impl<E, F, P> BlsVerifyGadget<E, F, P>
 where
@@ -147,35 +141,13 @@ where
     ) -> Result<P::G2Var, SynthesisError> {
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
-        // Allocate the G2 Generator
-        // Hack to get around incorrect type inference
-        let g2_generator = <P::G2Var as AllocVar<E::G2Projective,F>>::new_constant(
-            pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None),
-            E::G2Projective::prime_subgroup_generator(),
-        )?; 
 
-        // We initialize the Aggregate Public Key as a generator point, in order to
-        // calculate the sum of all keys which have signed according to the bitmap.
-        // This is needed since we cannot add to a Zero.
-        // After the sum is calculated, we must subtract the generator to get the
-        // correct result
-        // TODO: Ensure input wanted here, not witness
-        let mut aggregated_pk = P::G2Var::zero();//g2_generator.clone();
-       // let mut aggregated_pk = <P::G2Var as AllocVar<E::G2Projective, F>>::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
+        let mut aggregated_pk = P::G2Var::zero();
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
-            // Add the pubkey to the sum
-            // if bit: aggregated_pk += pk
-//            let pk = *pk;
-            aggregated_pk += pk;
-//            let added = P::G2Var::Add(aggregated_pk, pk);// as P::G2Var + pk as P::G2Var; 
-         //   aggregated_pk = P::G2Gadget::conditionally_select(
-          //      &bit,
-          //      &added,
-          //      &aggregated_pk,
-          //  )?;
+            // If bit = 1, add pk
+            let adder = bit.select(pk, &P::G2Var::zero())?;
+            aggregated_pk += &adder;
         }
-        // Subtract the generator to get the correct aggregate pubkey
-     //   aggregated_pk = aggregated_pk.sub(&g2_generator)?;
 
         Ok(aggregated_pk)
     }
@@ -185,24 +157,12 @@ where
     pub fn enforce_aggregated_all_pubkeys(
         pub_keys: &[P::G2Var],
     ) -> Result<P::G2Var, SynthesisError> {
-        // Allocate the G2 Generator
-        let g2_generator = P::G2Var::alloc_constant(
-            E::G2Projective::prime_subgroup_generator(),
-        )?;
-
-        // We initialize the Aggregate Public Key as a generator point, in order to
-        // calculate the sum of all keys.
-        // This is needed since we cannot add to a Zero.
-        // After the sum is calculated, we must subtract the generator to get the
-        // correct result
-        let mut aggregated_pk = g2_generator.clone();
+        let mut aggregated_pk = P::G2Var::zero();
         for (i, pk) in pub_keys.iter().enumerate() {
             // Add the pubkey to the sum
             // aggregated_pk += pk
-            aggregated_pk = aggregated_pk.add(pk)?;
+            aggregated_pk += pk; 
         }
-        // Subtract the generator to get the correct aggregate pubkey
-        aggregated_pk = aggregated_pk.sub(&g2_generator)?;
 
         Ok(aggregated_pk)
     }
@@ -235,7 +195,8 @@ where
         let prepared_signature = P::prepare_g1(signature)?;
 
         // Allocate the generator on G2
-        let g2_generator = P::G2Var::alloc_constant(
+        let g2_generator = <P::G2Var as AllocVar<E::G2Projective,F>>::new_constant(
+            signature.cs().unwrap_or(ConstraintSystemRef::None),
             E::G2Projective::prime_subgroup_generator(),
         )?;
         // and negate it for the purpose of verification
@@ -257,7 +218,7 @@ where
     ) -> Result<(), SynthesisError> {
         trace!("enforcing BLS equation");
         let bls_equation = P::product_of_pairings(g1, g2)?;
-        let gt_one = &P::GTVar::one()?;
+        let gt_one = &P::GTVar::one();
         bls_equation.enforce_equal(gt_one)?;
         Ok(())
     }
