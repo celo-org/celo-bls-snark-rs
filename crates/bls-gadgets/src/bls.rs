@@ -6,7 +6,7 @@ use r1cs_std::{
     groups::CurveVar, pairing::PairingVar, select::CondSelectGadget, alloc::AllocVar, groups::bls12::G2Var,
 };
 use std::marker::PhantomData;
-use std::ops::Add;
+use std::ops::{Add, AddAssign};
 use tracing::{debug, span, trace, Level};
 
 /// BLS Signature Verification Gadget.
@@ -33,6 +33,7 @@ where
     E: PairingEngine,
     F: PrimeField,
     P: PairingVar<E, F>,
+    P::G2Var: for<'a> AddAssign<&'a P::G2Var>,
 {
     /// Enforces verification of a BLS Signature against a list of public keys and a bitmap indicating
     /// which of these pubkeys signed.
@@ -159,21 +160,22 @@ where
         // After the sum is calculated, we must subtract the generator to get the
         // correct result
         // TODO: Ensure input wanted here, not witness
-        let mut aggregated_pk = g2_generator.clone();
+        let mut aggregated_pk = P::G2Var::zero();//g2_generator.clone();
        // let mut aggregated_pk = <P::G2Var as AllocVar<E::G2Projective, F>>::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // Add the pubkey to the sum
             // if bit: aggregated_pk += pk
-            let pk = *pk;
-            let added = P::G2Var::Add(aggregated_pk, pk);// as P::G2Var + pk as P::G2Var; 
-            aggregated_pk = P::G2Gadget::conditionally_select(
-                &bit,
-                &added,
-                &aggregated_pk,
-            )?;
+//            let pk = *pk;
+            aggregated_pk += pk;
+//            let added = P::G2Var::Add(aggregated_pk, pk);// as P::G2Var + pk as P::G2Var; 
+         //   aggregated_pk = P::G2Gadget::conditionally_select(
+          //      &bit,
+          //      &added,
+          //      &aggregated_pk,
+          //  )?;
         }
         // Subtract the generator to get the correct aggregate pubkey
-        aggregated_pk = aggregated_pk.sub(&g2_generator)?;
+     //   aggregated_pk = aggregated_pk.sub(&g2_generator)?;
 
         Ok(aggregated_pk)
     }
