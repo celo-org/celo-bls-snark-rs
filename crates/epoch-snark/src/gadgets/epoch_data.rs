@@ -1,9 +1,9 @@
 use algebra::{
     bls12_377::{Bls12_377, Parameters},
     bw6_761::Fr,
-    BigInteger, One, PairingEngine, PrimeField,
+    One, PairingEngine,
 };
-use bls_gadgets::{utils::{bytes_to_bits, is_setup}, HashToGroupGadget, YToBitGadget};
+use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
 use r1cs_core::{ConstraintSystem, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Gadget, G2Gadget},
@@ -14,7 +14,7 @@ use r1cs_std::{
 
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
-use super::{fr_to_bits, g2_to_bits, to_fr};
+use super::{bytes_to_fr, fr_to_bits, g2_to_bits, to_fr};
 use tracing::{span, trace, Level};
 
 type FrGadget = FpGadget<Fr>;
@@ -129,11 +129,11 @@ impl EpochData<Bls12_377> {
             32,
         )?;
 
-        // DO NOT MERGE; Extract this into a function. And should the 128 be extracted as a const?
-        let epoch_entropy = FrGadget::alloc(&mut cs.ns(|| "epoch entropy"), || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(self.epoch_entropy.as_ref().get()?, 128)))))?;
-        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &index, 128)?;
-        let parent_entropy = FrGadget::alloc(&mut cs.ns(|| "parent entropy"), || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(self.parent_entropy.as_ref().get()?, 128)))))?;
-        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &index, 128)?;
+        // DO NOT MERGE: Handle None value for entropy.
+        let epoch_entropy = bytes_to_fr(&mut cs.ns(|| "epoch entropy"), self.epoch_entropy.as_deref())?;
+        let epoch_entropy_bits = fr_to_bits(&mut cs.ns(|| "epoch entropy bits"), &epoch_entropy, 128)?;
+        let parent_entropy = bytes_to_fr(&mut cs.ns(|| "parent entropy"), self.parent_entropy.as_deref())?;
+        let parent_entropy_bits = fr_to_bits(&mut cs.ns(|| "parent entropy bits"), &parent_entropy, 128)?;
 
         let mut epoch_bits: Vec<Boolean> = [index_bits, epoch_entropy_bits, parent_entropy_bits, maximum_non_signers_bits].concat();
 

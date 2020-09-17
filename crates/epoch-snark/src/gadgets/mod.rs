@@ -22,7 +22,7 @@ use r1cs_std::prelude::*;
 use r1cs_std::{bls12_377::G2Gadget, fields::fp::FpGadget, Assignment};
 
 type FrGadget = FpGadget<Fr>;
-use bls_gadgets::YToBitGadget;
+use bls_gadgets::{utils::bytes_to_bits, YToBitGadget};
 
 use r1cs_core::{ConstraintSystem, SynthesisError};
 
@@ -74,6 +74,14 @@ fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
     num: Option<T>,
 ) -> Result<FrGadget, SynthesisError> {
     FrGadget::alloc(cs, || Ok(Fr::from(num.get()?.into())))
+}
+
+fn bytes_to_fr<CS: ConstraintSystem<Fr>>(
+    cs: &mut CS,
+    bytes: Option<&[u8]>,
+) -> Result<FrGadget, SynthesisError> {
+    // DO NOT MERGE: Should 128 be a const?
+    FrGadget::alloc(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bytes_to_bits(bytes.get()?, 128)))))
 }
 
 fn fr_to_bits<CS: ConstraintSystem<Fr>>(
