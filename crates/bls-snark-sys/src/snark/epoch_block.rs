@@ -35,14 +35,8 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
-        let epoch_entropy = None;
-        if !in_epoch_entropy.is_null() {
-            epoch_entropy = Some(unsafe { slice::from_raw_parts(in_epoch_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec());
-        }
-        let parent_entropy = None;
-        if !in_parent_entropy.is_null() {
-            parent_entropy = Some(unsafe { slice::from_raw_parts(in_parent_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec());
-        }
+        let epoch_entropy = unsafe { read_epoch_entropy(in_epoch_entropy) };
+        let parent_entropy = unsafe{ read_epoch_entropy(in_parent_entropy) };
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
             epoch_entropy,
@@ -88,9 +82,8 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
 
     fn try_from(src: &EpochBlockFFI) -> Result<EpochBlock, Self::Error> {
         let pubkeys = unsafe { read_pubkeys(src.pubkeys, src.pubkeys_num as usize)? };
-        // DO NOT MERGE: Deal with null pointer case.
-        let epoch_entropy = unsafe { slice::from_raw_parts(src.epoch_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
-        let parent_entropy = unsafe { slice::from_raw_parts(src.parent_entropy, EpochBlock::ENTROPY_BYTES) }.to_vec();
+        let epoch_entropy = unsafe { read_epoch_entropy(src.epoch_entropy) };
+        let parent_entropy = unsafe { read_epoch_entropy(src.parent_entropy) };
         Ok(EpochBlock {
             index: src.index,
             epoch_entropy,
@@ -149,6 +142,19 @@ unsafe fn read_pubkeys(ptr: *const u8, num: usize) -> Result<Vec<PublicKey>, Enc
         pubkeys.push(PublicKey::from(key))
     }
     Ok(pubkeys)
+}
+
+/// Reads `ENTROPY_BYTES` byte epoch entropy value from the given pointer location.
+///
+/// # Safety
+///
+/// This WILL read invalid data a pointer to less than `ENTROPY_BYTES` bytes of data. Use with caution.
+unsafe fn read_epoch_entropy(ptr: *const u8) -> Option<Vec<u8>> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(slice::from_raw_parts(ptr, EpochBlock::ENTROPY_BYTES).to_vec())
+    }
 }
 
 #[cfg(test)]
