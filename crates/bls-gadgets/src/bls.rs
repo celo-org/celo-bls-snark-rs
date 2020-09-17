@@ -159,12 +159,13 @@ where
         // After the sum is calculated, we must subtract the generator to get the
         // correct result
         // TODO: Ensure input wanted here, not witness
-        let mut aggregated_pk = g2_generator.clone();//<P::G2Var as AllocVar<E::G2Projective, F>>::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
+        let mut aggregated_pk = g2_generator.clone();
+       // let mut aggregated_pk = <P::G2Var as AllocVar<E::G2Projective, F>>::new_input(pub_keys[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(g2_generator.clone()));
         for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // Add the pubkey to the sum
             // if bit: aggregated_pk += pk
             let pk = *pk;
-            let added = aggregated_pk.add(pk);
+            let added = P::G2Var::Add(aggregated_pk, pk);// as P::G2Var + pk as P::G2Var; 
             aggregated_pk = P::G2Gadget::conditionally_select(
                 &bit,
                 &added,

@@ -5,9 +5,9 @@ authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org
 edition = "2018"
 
 [dependencies]
-algebra = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", features = ["derive", "bls12_377", "ed_on_bw6_761", "parallel"] }
-crypto-primitives = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api", features = ["parallel"] }
-bench-utils = { git = "https://github.com/scipr-lab/zexe", branch = "constraint-system-api" }
+algebra = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["derive", "bls12_377", "ed_on_bw6_761", "parallel"] }
+crypto-primitives = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["parallel"] }
+bench-utils = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs" }
 
 # other deps
 rand = { version = "0.7" }

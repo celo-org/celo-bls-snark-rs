@@ -26,7 +26,7 @@ use algebra::{
 };
 use crypto_primitives::{
     crh::{
-        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget,
+        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRH,
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
@@ -144,13 +144,13 @@ impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
     ) -> Result<Vec<Boolean<F>>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
-            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::ParametersVar::alloc_constant(
+            <BHHashBW6_761 as FixedLengthCRH<CRH, _>>::Parameters::alloc_constant(
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
 
         let pedersen_hash =
-            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::evaluate(
+            <BHHashBW6_761 as FixedLengthCRH<CRH, _>>::evaluate(
                 &crh_params,
                 &input,
             )?;
