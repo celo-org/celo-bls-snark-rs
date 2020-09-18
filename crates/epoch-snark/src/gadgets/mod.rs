@@ -46,7 +46,12 @@ pub mod test_helpers {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.maximum_non_signers, pubkeys)
+        let epoch_bytes = EpochBlock::new(
+            epoch.index.unwrap(),
+            epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.maximum_non_signers,
+            pubkeys)
             .encode_to_bytes()
             .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1

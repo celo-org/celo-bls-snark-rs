@@ -259,8 +259,8 @@ mod tests {
             .collect::<Vec<_>>();
         EpochData::<Bls12_377> {
             index: Some(index),
-            epoch_entropy: Some(vec![index as u8; EpochBlock::ENTROPY_BYTES]),
-            parent_entropy: Some(vec![index-1 as u8; EpochBlock::ENTROPY_BYTES]),
+            epoch_entropy: Some(vec![index as u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![(index-1) as u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
             maximum_non_signers: 12,
             public_keys: pubkeys,
         }
@@ -286,7 +286,12 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy, epoch.parent_entropy, epoch.maximum_non_signers, pubkeys)
+        let epoch_bytes = EpochBlock::new(
+            epoch.index.unwrap(),
+            epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.maximum_non_signers,
+            pubkeys)
             .encode_to_bytes()
             .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
@@ -330,8 +335,8 @@ mod tests {
         // calculate the bits from our helper function
         let bits = EpochBlock::new(
             epoch.index.unwrap(),
-            epoch.epoch_entropy,
-            epoch.parent_entropy,
+            epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
             pubkeys.clone(),
         )
@@ -339,7 +344,12 @@ mod tests {
         .unwrap();
 
         // calculate wrong bits
-        let bits_wrong = EpochBlock::new(epoch.index.unwrap(), epoch.epoch_entropy, epoch.parent_entropy, epoch.maximum_non_signers, pubkeys)
+        let bits_wrong = EpochBlock::new(
+            epoch.index.unwrap(),
+            epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
+            epoch.maximum_non_signers,
+            pubkeys)
             .encode_to_bits_with_aggregated_pk()
             .unwrap();
 

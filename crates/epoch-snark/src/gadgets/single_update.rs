@@ -126,6 +126,8 @@ pub mod test_helpers {
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
+            epoch_entropy: Some(vec![index as u8; EpochData::<E>::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![(index-1) as u8; EpochData::<E>::ENTROPY_BYTES]),
             maximum_non_signers,
             public_keys: to_option_iter(public_keys),
         };
@@ -143,6 +145,8 @@ pub mod test_helpers {
             .collect::<Vec<_>>();
         let epoch_data = EpochData::<E> {
             index: Some(0),
+            epoch_entropy: Some(vec![0u8; EpochData::<E>::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![0u8; EpochData::<E>::ENTROPY_BYTES]),
             maximum_non_signers: 0u32,
             public_keys: to_option_iter(public_keys.as_slice()),
         };

@@ -77,7 +77,6 @@ pub struct EpochBlockFFI {
     pub maximum_non_signers: u32,
 }
 
-// DO NOT MERGE: Add test for null pointer entropy case.
 impl TryFrom<&EpochBlockFFI> for EpochBlock {
     type Error = EncodingError;
 
@@ -174,8 +173,8 @@ mod tests {
     fn ffi_block_conversion() {
         let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
-        let epoch_entropy = (0u8..EpochBlock::ENTROPY_BYTES).collect();
-        let parent_entropy = (EpochBlock::ENTROPY_BYTES..2*EpochBlock::ENTROPY_BYTES).collect();
+        let epoch_entropy = Some((0..EpochBlock::ENTROPY_BYTES).map(|n| n as u8).collect());
+        let parent_entropy = Some((EpochBlock::ENTROPY_BYTES..2*EpochBlock::ENTROPY_BYTES).map(|n| n as u8).collect());
         let block = EpochBlock {
             index: 1,
             epoch_entropy,
@@ -187,8 +186,35 @@ mod tests {
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
             index: src.index,
-            epoch_entropy: &src.epoch_entropy[0] as *const u8,
-            parent_entropy: &src.parent_entropy[0] as *const u8,
+            epoch_entropy: src.epoch_entropy.as_ref().unwrap()[0] as *const u8,
+            parent_entropy: src.parent_entropy.as_ref().unwrap()[0] as *const u8,
+            maximum_non_signers: src.maximum_non_signers,
+            pubkeys_num: src.new_public_keys.len(),
+            pubkeys: &serialized_pubkeys[0] as *const u8,
+        };
+        let block_from_ffi = EpochBlock::try_from(&ffi_block).unwrap();
+        assert_eq!(block_from_ffi, src);
+    }
+
+    #[test]
+    fn ffi_block_conversion_without_entropy() {
+        let num_keys = 10;
+        let pubkeys = rand_pubkeys(num_keys);
+        let epoch_entropy = None;
+        let parent_entropy = None;
+        let block = EpochBlock {
+            index: 1,
+            epoch_entropy,
+            parent_entropy,
+            maximum_non_signers: 19,
+            new_public_keys: pubkeys,
+        };
+        let src = block;
+        let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
+        let ffi_block = EpochBlockFFI {
+            index: src.index,
+            epoch_entropy: std::ptr::null(),
+            parent_entropy: std::ptr::null(),
             maximum_non_signers: src.maximum_non_signers,
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,

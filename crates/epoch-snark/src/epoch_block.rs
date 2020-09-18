@@ -136,3 +136,21 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
     bits.reverse();
     bits
 }
+
+/*
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_to_bytes() {
+        let epoch = EpochBlock::new(
+            index: u16,
+            epoch_entropy: Option<Vec<u8>>,
+            parent_entropy: Option<Vec<u8>>,
+            maximum_non_signers: u32,
+            new_public_keys: Vec<PublicKey>,
+        )
+    }
+}
+*/
