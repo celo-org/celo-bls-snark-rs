@@ -186,8 +186,8 @@ mod tests {
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
             index: src.index,
-            epoch_entropy: src.epoch_entropy.as_ref().unwrap()[0] as *const u8,
-            parent_entropy: src.parent_entropy.as_ref().unwrap()[0] as *const u8,
+            epoch_entropy: &src.epoch_entropy.as_ref().unwrap()[0],
+            parent_entropy: &src.parent_entropy.as_ref().unwrap()[0],
             maximum_non_signers: src.maximum_non_signers,
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,
