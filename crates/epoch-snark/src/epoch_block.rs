@@ -80,10 +80,14 @@ impl EpochBlock {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         if self.epoch_entropy.is_some() {
-            epoch_bits.extend_from_slice(&bytes_to_bits(self.epoch_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8));
+            let mut bits = bytes_to_bits(self.epoch_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8);
+            bits.reverse();
+            epoch_bits.extend_from_slice(&bits);
         }
         if self.parent_entropy.is_some() {
-            epoch_bits.extend_from_slice(&bytes_to_bits(self.parent_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8));
+            let mut bits = bytes_to_bits(self.parent_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8);
+            bits.reverse();
+            epoch_bits.extend_from_slice(&bits);
         }
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {

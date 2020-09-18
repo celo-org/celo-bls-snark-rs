@@ -349,9 +349,10 @@ mod tests {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
-            pubkeys)
-            .encode_to_bits_with_aggregated_pk()
-            .unwrap();
+            pubkeys,
+        )
+        .encode_to_bits_with_aggregated_pk()
+        .unwrap();
 
         // calculate the bits from the epoch
         let mut cs = TestConstraintSystem::<Fr>::new();
