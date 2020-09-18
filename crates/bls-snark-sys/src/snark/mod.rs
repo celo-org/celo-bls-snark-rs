@@ -52,6 +52,7 @@ mod tests {
     #[test]
     // Trimmed down version of the other E2E groth test to ensure
     // that the verifier works correctly for a proof which we have verified on our own
+    // TODO(#185) Include epoch entropy values here when a new proof is available.
     fn simple_verifier_groth16() {
         let serialized_proof = hex::decode(PROOF).unwrap();
         let serialized_vk = hex::decode(VK).unwrap();
@@ -63,15 +64,10 @@ mod tests {
         let first_pubkeys = hex::decode(FIRST_PUBKEYS).unwrap();
         let last_pubkeys = hex::decode(LAST_PUBKEYS).unwrap();
 
-        let first_epoch_entropy = &[1u8; 32].to_vec();
-        let first_parent_entropy = &[2u8; 32].to_vec();
-        let last_epoch_entropy = &[3u8; 32].to_vec();
-        let last_parent_entropy = &[4u8; 32].to_vec();
-
         let first_epoch = EpochBlockFFI {
             index: 0,
-            epoch_entropy: &first_epoch_entropy[0] as *const u8,
-            parent_entropy: &first_parent_entropy[0] as *const u8,
+            epoch_entropy: std::ptr::null(),
+            parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
             pubkeys_num: 4,
             pubkeys: &first_pubkeys[0] as *const u8,
@@ -79,8 +75,8 @@ mod tests {
 
         let last_epoch = EpochBlockFFI {
             index: 2,
-            epoch_entropy: &last_epoch_entropy[0] as *const u8,
-            parent_entropy: &last_parent_entropy[0] as *const u8,
+            epoch_entropy: std::ptr::null(),
+            parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
             pubkeys_num: 4,
             pubkeys: &last_pubkeys[0] as *const u8,
