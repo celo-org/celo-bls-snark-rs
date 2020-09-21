@@ -2,6 +2,7 @@
 use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
 use r1cs_core::{SynthesisError, Variable, lc};
 use r1cs_std::{
+    R1CSVar,
     alloc::AllocVar,
     boolean::Boolean,
     fields::{fp::FpVar},
@@ -17,15 +18,15 @@ use std::ops::Neg;
 /// range). Then we check that the cast element is <= half, which enforces that
 /// originally they were > half. For points in G2, we also check the
 /// lexicographical ordering.
-trait YToBitGadgetG1<P: Bls12Parameters, F: PrimeField> {
-    fn y_to_bit_g1(&self) -> Result<Boolean<F>, SynthesisError>;
+trait YToBitGadgetG1<P: Bls12Parameters> {
+    fn y_to_bit_g1(&self) -> Result<Boolean<P::Fp>, SynthesisError>;
 }
 
-trait YToBitGadgetG2<P: Bls12Parameters, F: PrimeField> {
-    fn y_to_bit_g2(&self) -> Result<Boolean<F>, SynthesisError>;
+trait YToBitGadgetG2<P: Bls12Parameters> {
+    fn y_to_bit_g2(&self) -> Result<Boolean<P::Fp>, SynthesisError>;
 }
 
-trait FpUtils<P: Bls12Parameters, F: PrimeField> {
+trait FpUtils<F: PrimeField> {
     fn is_eq_zero(
         &self,
     ) -> Result<Boolean<F>, SynthesisError>; 
@@ -34,19 +35,20 @@ trait FpUtils<P: Bls12Parameters, F: PrimeField> {
     ) -> Result<Boolean<F>, SynthesisError>;
 }
 
-impl<P: Bls12Parameters, F: PrimeField> YToBitGadgetG1<P, F> for G1Var<P> {
+impl<P: Bls12Parameters> YToBitGadgetG1<P> for G1Var<P> 
+{
     fn y_to_bit_g1(
         &self,
-    ) -> Result<Boolean<F>, SynthesisError> {
+    ) -> Result<Boolean<P::Fp>, SynthesisError> {
         let y_bit = FpVar::normalize(&self.y)?;
         Ok(y_bit)
     }
 }
 
-impl<P: Bls12Parameters, F: PrimeField> YToBitGadgetG2<P, F> for G2Var<P> {
+impl<P: Bls12Parameters> YToBitGadgetG2<P> for G2Var<P> {
     fn y_to_bit_g2(
         &self,
-    ) -> Result<Boolean<F>, SynthesisError> {
+    ) -> Result<Boolean<P::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
             let y_bit = Boolean::new_witness(self.cs(), || {
             let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
@@ -84,12 +86,12 @@ impl<P: Bls12Parameters, F: PrimeField> YToBitGadgetG2<P, F> for G2Var<P> {
     }
 }
 
-impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
+impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     fn is_eq_zero(
         &self,
     ) -> Result<Boolean<F>, SynthesisError> {
         let bit = Boolean::new_witness(|| {
-            Ok(self.get_value().get()? == P::Fp::zero())
+            Ok(self.get_value().get()? == F::zero())
         })?;
 
         // This enforces bit = 1 <=> el == 0.
@@ -99,7 +101,7 @@ impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
         // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
         // witness calculation to pass.
         let inv = FpVar::new_witness(|| {
-            Ok(self.get_value().get()?.inverse().unwrap_or_else(P::Fp::zero))
+            Ok(self.get_value().get()?.inverse().unwrap_or_else(F::zero()))
         })?;
 
         // (el * inv == 1 - bit)
@@ -107,13 +109,13 @@ impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
             || "enforce y_eq_bit",
             self.get_variable(),
             inv.get_variable(),
-            (P::Fp::one(), Variable::One) + bit.lc(Variable::One, P::Fp::one().neg()),
+            (F::one(), Variable::One) + bit.lc(Variable::One, F::one().neg()),
         );
 
         // (lhs * bit == 0)
         self.cs().enforce_constraint(
             self.get_variable(),
-            bit.lc(Variable::One, P::Fp::one()),
+            bit.lc(Variable::One, F::one()),
             lc!(),
         );
 
@@ -124,7 +126,7 @@ impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
     fn normalize(
         &self,
     ) -> Result<Boolean<F>, SynthesisError> {
-        let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
+        let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
 
         let bit = Boolean::new_witness(|| Ok(self.get_value().get()? > half))?;
 
@@ -138,7 +140,7 @@ impl<P: Bls12Parameters, F: PrimeField> FpUtils<P, F>  for FpVar<P::Fp> {
 
         let bit_lc = bit.lc(Variable::One, half.neg());
         self.cs().enforce_constraint(
-            lc!() +  (P::Fp::one(), Variable::One),
+            lc!() +  (F::one(), Variable::One),
             self.get_variable() + bit_lc,
             lc!() + adjusted.get_variable(),
         );

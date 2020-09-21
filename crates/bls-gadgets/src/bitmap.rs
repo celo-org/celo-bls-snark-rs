@@ -1,6 +1,6 @@
 use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{LinearCombination, SynthesisError, Variable};
+use r1cs_core::{LinearCombination, SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
     fields::{fp::FpVar},
     prelude::*,
@@ -37,18 +37,19 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
             // add 1 here only for zeros
             occurrences_lc += (F::one(), Variable::One);
         }
-        occurrences_lc = occurrences_lc + bit.lc(Variable::One, value_fp);
+        occurrences_lc = occurrences_lc + bit.lc();
 
         // Update our count
         if !is_setup {
-            let got_value = bit.get_value().get()?;
+            let got_value = bit.value()?;
             occurrences += (got_value == value) as u8;
         }
     }
 
     // Rebind `occurrences` to a constraint
     // TODO: This idiom seems wrong. What if the first element of bitmap is a constant?
-    let occurences = FpVar::new_witness(bitmap[0].cs().ns(|| "num occurrences"), || { Ok(F::from(occurrences)) } )?;
+    let occurrences = FpVar::new_witness(bitmap[0].cs().unwrap_or(ConstraintSystemRef::None)
+, || { Ok(F::from(occurrences)) } )?;
 //    let occurrences = FpVar::alloc(&mut cs.ns(|| "num occurrences"), || {
 //        Ok(F::from(occurrences))
 //    })?;
