@@ -105,8 +105,14 @@ impl ValidatorSetUpdate<Bls12_377> {
         // TODO(#185): Use the entropy values here.
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
-        let (first_epoch_bits, first_epoch_index, _first_epoch_entropy, _first_parent_entropy, initial_maximum_non_signers, initial_pubkey_vars) =
-            self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
+        let (
+            first_epoch_bits,
+            first_epoch_index,
+            _first_epoch_entropy,
+            _first_parent_entropy,
+            initial_maximum_non_signers,
+            initial_pubkey_vars,
+        ) = self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification

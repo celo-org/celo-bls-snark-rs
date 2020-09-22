@@ -46,7 +46,13 @@ impl EpochBlock {
     pub const ENTROPY_BYTES: usize = 16;
 
     /// Creates a new epoch block
-    pub fn new(index: u16, epoch_entropy: Option<Vec<u8>>, parent_entropy: Option<Vec<u8>>, maximum_non_signers: u32, new_public_keys: Vec<PublicKey>) -> Self {
+    pub fn new(
+        index: u16,
+        epoch_entropy: Option<Vec<u8>>,
+        parent_entropy: Option<Vec<u8>>,
+        maximum_non_signers: u32,
+        new_public_keys: Vec<PublicKey>,
+    ) -> Self {
         Self {
             index,
             epoch_entropy,
@@ -81,13 +87,19 @@ impl EpochBlock {
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         if self.epoch_entropy.is_some() {
             // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_to_bits(self.epoch_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8);
+            let mut bits = bytes_to_bits(
+                self.epoch_entropy.as_ref().unwrap(),
+                Self::ENTROPY_BYTES * 8,
+            );
             bits.reverse();
             epoch_bits.extend_from_slice(&bits);
         }
         if self.parent_entropy.is_some() {
             // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_to_bits(self.parent_entropy.as_ref().unwrap(), Self::ENTROPY_BYTES * 8);
+            let mut bits = bytes_to_bits(
+                self.parent_entropy.as_ref().unwrap(),
+                Self::ENTROPY_BYTES * 8,
+            );
             bits.reverse();
             epoch_bits.extend_from_slice(&bits);
         }
@@ -154,7 +166,9 @@ mod tests {
 
     #[test]
     fn encode_to_bytes() -> Result<(), EncodingError> {
-        let pubkeys = (0..10).map(|_| bls12_377::G2Projective::prime_subgroup_generator().into()).collect::<Vec<_>>();
+        let pubkeys = (0..10)
+            .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
+            .collect::<Vec<_>>();
         let epoch = EpochBlock::new(
             120u16,
             Some(vec![255u8; EpochBlock::ENTROPY_BYTES]),
@@ -162,21 +176,23 @@ mod tests {
             3,
             pubkeys,
         );
-        assert_eq!(hex::encode(epoch.encode_to_bytes()?), EXPECTED_ENCODING_WITH_ENTROPY);
+        assert_eq!(
+            hex::encode(epoch.encode_to_bytes()?),
+            EXPECTED_ENCODING_WITH_ENTROPY
+        );
         Ok(())
     }
 
     #[test]
     fn encode_to_bytes_without_entropy() -> Result<(), EncodingError> {
-        let pubkeys = (0..10).map(|_| bls12_377::G2Projective::prime_subgroup_generator().into()).collect::<Vec<_>>();
-        let epoch = EpochBlock::new(
-            120u16,
-            None,
-            None,
-            3,
-            pubkeys,
+        let pubkeys = (0..10)
+            .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
+            .collect::<Vec<_>>();
+        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
+        assert_eq!(
+            hex::encode(epoch.encode_to_bytes()?),
+            EXPECTED_ENCODING_WITHOUT_ENTROPY
         );
-        assert_eq!(hex::encode(epoch.encode_to_bytes()?), EXPECTED_ENCODING_WITHOUT_ENTROPY);
         Ok(())
     }
 }

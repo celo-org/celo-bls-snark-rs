@@ -174,7 +174,11 @@ mod tests {
         let num_keys = 10;
         let pubkeys = rand_pubkeys(num_keys);
         let epoch_entropy = Some((0..EpochBlock::ENTROPY_BYTES).map(|n| n as u8).collect());
-        let parent_entropy = Some((EpochBlock::ENTROPY_BYTES..2*EpochBlock::ENTROPY_BYTES).map(|n| n as u8).collect());
+        let parent_entropy = Some(
+            (EpochBlock::ENTROPY_BYTES..2 * EpochBlock::ENTROPY_BYTES)
+                .map(|n| n as u8)
+                .collect(),
+        );
         let block = EpochBlock {
             index: 1,
             epoch_entropy,

@@ -37,6 +37,16 @@ pub struct EpochData<E: PairingEngine> {
     pub public_keys: Vec<Option<E::G2Projective>>,
 }
 
+/// Output type of EpochData.to_bits including bit representation and gadgets.
+type EpochDataToBits = (
+    Vec<Boolean>,
+    FrGadget,
+    FrGadget,
+    FrGadget,
+    FrGadget,
+    Vec<G2Gadget>,
+);
+
 /// [`EpochData`] is constrained to a `ConstrainedEpochData` via [`EpochData.constrain`]
 ///
 /// [`EpochData`]: struct.EpochData.html
@@ -91,7 +101,8 @@ impl EpochData<Bls12_377> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
-        let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
+        let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
+            self.to_bits(cs)?;
         Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
 
         // Hash to G1
@@ -118,7 +129,7 @@ impl EpochData<Bls12_377> {
     pub fn to_bits<CS: ConstraintSystem<Fr>>(
         &self,
         cs: &mut CS,
-    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
+    ) -> Result<EpochDataToBits, SynthesisError> {
         let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
         let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
 
@@ -139,7 +150,7 @@ impl EpochData<Bls12_377> {
         let epoch_entropy_bits = fr_to_bits(
             &mut cs.ns(|| "epoch entropy bits"),
             &epoch_entropy,
-            8 * Self::ENTROPY_BYTES
+            8 * Self::ENTROPY_BYTES,
         )?;
         let parent_entropy = bytes_to_fr(
             &mut cs.ns(|| "parent entropy"),
@@ -147,10 +158,17 @@ impl EpochData<Bls12_377> {
         )?;
         let parent_entropy_bits = fr_to_bits(
             &mut cs.ns(|| "parent entropy bits"),
-            &parent_entropy, 8 * Self::ENTROPY_BYTES
+            &parent_entropy,
+            8 * Self::ENTROPY_BYTES,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> = [index_bits, epoch_entropy_bits, parent_entropy_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Boolean> = [
+            index_bits,
+            epoch_entropy_bits,
+            parent_entropy_bits,
+            maximum_non_signers_bits,
+        ]
+        .concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
@@ -164,7 +182,14 @@ impl EpochData<Bls12_377> {
             pubkey_vars.push(pk_var);
         }
 
-        Ok((epoch_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkey_vars))
+        Ok((
+            epoch_bits,
+            index,
+            epoch_entropy,
+            parent_entropy,
+            maximum_non_signers,
+            pubkey_vars,
+        ))
     }
 
     /// Enforces that `index = previous_index + 1`
@@ -260,7 +285,10 @@ mod tests {
         EpochData::<Bls12_377> {
             index: Some(index),
             epoch_entropy: Some(vec![index as u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
-            parent_entropy: Some(vec![(index-1) as u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![
+                (index - 1) as u8;
+                EpochData::<Bls12_377>::ENTROPY_BYTES
+            ]),
             maximum_non_signers: 12,
             public_keys: pubkeys,
         }
@@ -291,9 +319,10 @@ mod tests {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
-            pubkeys)
-            .encode_to_bytes()
-            .unwrap();
+            pubkeys,
+        )
+        .encode_to_bytes()
+        .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();

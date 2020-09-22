@@ -51,9 +51,10 @@ pub mod test_helpers {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
-            pubkeys)
-            .encode_to_bytes()
-            .unwrap();
+            pubkeys,
+        )
+        .encode_to_bytes()
+        .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
             .unwrap();
