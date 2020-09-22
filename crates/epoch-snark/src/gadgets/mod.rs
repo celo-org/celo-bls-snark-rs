@@ -85,8 +85,10 @@ fn bytes_to_fr<CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     bytes: Option<&[u8]>,
 ) -> Result<FrGadget, SynthesisError> {
-    let bits = &bytes_to_bits(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
-    FrGadget::alloc(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(bits))))
+    FrGadget::alloc(cs, || {
+        let bits = bytes_to_bits(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
+        Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bits)))
+    })
 }
 
 fn fr_to_bits<CS: ConstraintSystem<Fr>>(
