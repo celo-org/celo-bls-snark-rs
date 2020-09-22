@@ -1,6 +1,6 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
-use r1cs_core::{SynthesisError, Variable, lc};
+use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
     R1CSVar,
     alloc::AllocVar,
@@ -40,7 +40,7 @@ impl<P: Bls12Parameters> YToBitGadgetG1<P> for G1Var<P>
     fn y_to_bit_g1(
         &self,
     ) -> Result<Boolean<P::Fp>, SynthesisError> {
-        let y_bit = FpVar::normalize(&self.y)?;
+        let y_bit = self.y.normalize()?;
         Ok(y_bit)
     }
 }
@@ -50,18 +50,18 @@ impl<P: Bls12Parameters> YToBitGadgetG2<P> for G2Var<P> {
         &self,
     ) -> Result<Boolean<P::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
-            let y_bit = Boolean::new_witness(self.cs(), || {
+            let y_bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), || {
             let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
-            let c1 = self.y.c1.get_value().get()?;
-            let c0 = self.y.c0.get_value().get()?;
+            let c1 = self.y.c1.value()?;
+            let c0 = self.y.c0.value()?;
 
             let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
             Ok(bit)
         })?;
 
         // Get the y_c1 and y_c0 bits
-        let y_c0_bit = Self::normalize(&self.y.c0)?;
-        let y_c1_bit = Self::normalize(&self.y.c1)?;
+        let y_c0_bit = self.y.c0.normalize()?;
+        let y_c1_bit = self.y.c1.normalize()?;
 
         // (1-a)*(b*c) == o - a
         // a is c1
@@ -73,13 +73,13 @@ impl<P: Bls12Parameters> YToBitGadgetG2<P> for G2Var<P> {
         // either c1 is 1, and then o is 1
         // else c1 is 0 and c0 is 1 (then y_eq is 1), and then o is 1
         // else c1 is 0 and c0 is 0 (then y_eq is 1), and then o is 0
-        let y_eq_bit = Self::is_eq_zero(&self.y.c1)?;
+        let y_eq_bit = self.y.c1.is_eq_zero()?;
         let bc = Boolean::and(&y_eq_bit, &y_c0_bit)?;
 
-        self.cs().enforce_constraint(
-            (P::Fp::one(), Variable::One) + y_c1_bit.lc(Variable::One, P::Fp::one().neg()),
-            bc.lc(Variable::One, P::Fp::one()),
-            y_bit.lc(Variable::One, P::Fp::one()) + y_c1_bit.lc(Variable::One, P::Fp::one().neg()),
+        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+            LinearCombination::from(Variable::One) - y_c1_bit.lc(),
+            bc.lc(),
+            y_bit.lc() - y_c1_bit.lc(),
         );
 
         Ok(y_bit)
@@ -90,8 +90,8 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     fn is_eq_zero(
         &self,
     ) -> Result<Boolean<F>, SynthesisError> {
-        let bit = Boolean::new_witness(|| {
-            Ok(self.get_value().get()? == F::zero())
+        let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
+            || { Ok(self.value()? == F::zero())
         })?;
 
         // This enforces bit = 1 <=> el == 0.
@@ -100,22 +100,32 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
         // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
         // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
         // witness calculation to pass.
-        let inv = FpVar::new_witness(|| {
-            Ok(self.get_value().get()?.inverse().unwrap_or_else(F::zero()))
+        let inv = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+            || { Ok(self.value()?.inverse().unwrap_or(F::zero()))
         })?;
 
         // (el * inv == 1 - bit)
-        self.cs().enforce_constraint(
-            || "enforce y_eq_bit",
-            self.get_variable(),
-            inv.get_variable(),
-            (F::one(), Variable::One) + bit.lc(Variable::One, F::one().neg()),
+        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+            // TODO: What to do with constant FpVars here? Should probably just not enforce
+            // constraints if both are constants
+            match self { 
+                Self::Constant(_) => lc!(),
+                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
+            },
+            match inv { 
+                Self::Constant(_) => lc!(),
+                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
+            },
+            LinearCombination::from(Variable::One) - bit.lc(),
         );
 
         // (lhs * bit == 0)
-        self.cs().enforce_constraint(
-            self.get_variable(),
-            bit.lc(Variable::One, F::one()),
+        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+            match self {
+                Self::Constant(_) => lc!(),
+                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
+            },
+            bit.lc(),
             lc!(),
         );
 
@@ -128,21 +138,30 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     ) -> Result<Boolean<F>, SynthesisError> {
         let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
 
-        let bit = Boolean::new_witness(|| Ok(self.get_value().get()? > half))?;
+        let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+            || Ok(self.value()? > half))?;
 
-        let adjusted = FpVar::new_witness(|| {
-            let el = self.get_value().get()?;
+        let adjusted = FpVar::new_witness(
+            self.cs().unwrap_or(ConstraintSystemRef::None),
+            || {
+            let el = self.value()?;
 
             let adjusted = if el > half { el - &half } else { el };
 
             Ok(adjusted)
         })?;
 
-        let bit_lc = bit.lc(Variable::One, half.neg());
-        self.cs().enforce_constraint(
-            lc!() +  (F::one(), Variable::One),
-            self.get_variable() + bit_lc,
-            lc!() + adjusted.get_variable(),
+        // TODO: Figure out what to do with constant FpVar
+        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+            lc!() +  LinearCombination::from(Variable::One),
+            match self {
+                Self::Constant(_) => lc!(),
+                Self::Var(v) => LinearCombination::from(v.variable),
+            } + (bit.lc() * half.neg()),
+            match adjusted {
+                Self::Constant(_) => lc!(),
+                Self::Var(v) => LinearCombination::from(v.variable),
+            },
         );
 
         // Enforce `adjusted <= half`
