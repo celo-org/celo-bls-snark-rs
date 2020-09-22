@@ -91,6 +91,7 @@ fn bytes_to_fr<CS: ConstraintSystem<Fr>>(
     })
 }
 
+/// Returns the bit representation of the Fr element in *little-endian* ordering.
 fn fr_to_bits<CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
     input: &FrGadget,
