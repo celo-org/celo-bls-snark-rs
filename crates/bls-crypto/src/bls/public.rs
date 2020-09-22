@@ -101,12 +101,12 @@ impl PublicKey {
 }
 
 impl CanonicalSerialize for PublicKey {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-        self.0.into_affine().serialize(writer)
+    fn serialize<W: Write>(&self, mut writer: W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize(&mut writer)
     }
 
-    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-        self.0.into_affine().serialize_uncompressed(writer)
+    fn serialize_uncompressed<W: Write>(&self, mut writer: W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize_uncompressed(&mut writer)
     }
 
     fn serialized_size(&self) -> usize {
@@ -115,15 +115,15 @@ impl CanonicalSerialize for PublicKey {
 }
 
 impl CanonicalDeserialize for PublicKey {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+    fn deserialize<R: Read>(mut reader: R) -> Result<Self, SerializationError> {
         Ok(PublicKey::from(
-            G2Affine::deserialize(reader)?.into_projective(),
+            G2Affine::deserialize(&mut reader)?.into_projective(),
         ))
     }
 
-    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+    fn deserialize_uncompressed<R: Read>(mut reader: R) -> Result<Self, SerializationError> {
         Ok(PublicKey::from(
-            G2Affine::deserialize_uncompressed(reader)?.into_projective(),
+            G2Affine::deserialize_uncompressed(&mut reader)?.into_projective(),
         ))
     }
 }
