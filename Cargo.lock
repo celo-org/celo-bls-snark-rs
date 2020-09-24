@@ -198,6 +198,7 @@ name = "bls-gadgets"
 version = "0.1.4"
 dependencies = [
  "algebra 0.1.1-alpha.0",
+ "algebra-core 0.1.1-alpha.0",
  "bls-crypto",
  "crypto-primitives 0.1.1-alpha.0",
  "groth16 0.1.0",

@@ -1,5 +1,5 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
-use algebra::{curves::bls12::Bls12Parameters, Field, One, PrimeField, Zero};
+use algebra::{curves::bls12::Bls12Parameters, Field, PrimeField, Zero};
 use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
     R1CSVar,
@@ -18,15 +18,11 @@ use std::ops::Neg;
 /// range). Then we check that the cast element is <= half, which enforces that
 /// originally they were > half. For points in G2, we also check the
 /// lexicographical ordering.
-trait YToBitGadgetG1<P: Bls12Parameters> {
-    fn y_to_bit_g1(&self) -> Result<Boolean<P::Fp>, SynthesisError>;
+pub trait YToBitGadget<P: Bls12Parameters> {
+    fn y_to_bit(&self) -> Result<Boolean<P::Fp>, SynthesisError>;
 }
 
-trait YToBitGadgetG2<P: Bls12Parameters> {
-    fn y_to_bit_g2(&self) -> Result<Boolean<P::Fp>, SynthesisError>;
-}
-
-trait FpUtils<F: PrimeField> {
+pub trait FpUtils<F: PrimeField> {
     fn is_eq_zero(
         &self,
     ) -> Result<Boolean<F>, SynthesisError>; 
@@ -35,9 +31,9 @@ trait FpUtils<F: PrimeField> {
     ) -> Result<Boolean<F>, SynthesisError>;
 }
 
-impl<P: Bls12Parameters> YToBitGadgetG1<P> for G1Var<P> 
+impl<P: Bls12Parameters> YToBitGadget<P> for G1Var<P> 
 {
-    fn y_to_bit_g1(
+    fn y_to_bit(
         &self,
     ) -> Result<Boolean<P::Fp>, SynthesisError> {
         let y_bit = self.y.normalize()?;
@@ -45,8 +41,8 @@ impl<P: Bls12Parameters> YToBitGadgetG1<P> for G1Var<P>
     }
 }
 
-impl<P: Bls12Parameters> YToBitGadgetG2<P> for G2Var<P> {
-    fn y_to_bit_g2(
+impl<P: Bls12Parameters> YToBitGadget<P> for G2Var<P> {
+    fn y_to_bit(
         &self,
     ) -> Result<Boolean<P::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.

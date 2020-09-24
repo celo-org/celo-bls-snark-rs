@@ -9,8 +9,13 @@ use bls_crypto::{
     },
     SIG_DOMAIN,
 };
+use r1cs_std::alloc::AllocVar;
 
 // Imported for the BLS12-377 API
+use algebra_core::{
+    curves::{ModelParameters, TEModelParameters},
+    Field,
+};
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     ed_on_bw6_761::EdwardsProjective
@@ -26,7 +31,8 @@ use algebra::{
 };
 use crypto_primitives::{
     crh::{
-        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRH,
+        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRH, FixedLengthCRHGadget,
+        bowe_hopwood, pedersen
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
@@ -37,9 +43,11 @@ use r1cs_std::{
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
+use algebra::ed_on_bls12_377::EdwardsParameters;
 
 /// Pedersen Gadget instantiated over the Edwards BW6_761 curve over BLS12-377 Fq (384 bits)
-type BHHashBW6_761 = BHHash<EdwardsProjective, Bls12_377_Fq>;
+type BHHashBW6_761 = BHHash<EdwardsParameters, Bls12_377_Fq>;
+type ConstraintF<P> = <<P as ModelParameters>::BaseField as Field>::BasePrimeField;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]
@@ -91,6 +99,19 @@ pub struct HashToGroupGadget<P, F: PrimeField> {
     field_type: PhantomData<F>,
 }
 
+
+mod window {
+    use super::pedersen;
+
+    /// The window which will be used with the Fixed Length CRH
+    #[derive(Clone)]
+    pub struct Window;
+
+    impl pedersen::Window for Window {
+        const WINDOW_SIZE: usize = 93;
+        const NUM_WINDOWS: usize = 560;
+    }
+}
 // If we're on Bls12-377, we can have a nice public API for the whole hash to group operation
 // by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards BW6_761
 // and then hashing it to bits and to group
@@ -144,7 +165,8 @@ impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
     ) -> Result<Vec<Boolean<F>>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
-            <BHHashBW6_761 as FixedLengthCRH<CRH, _>>::Parameters::alloc_constant(
+//            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
+            <BHHashBW6_761 as FixedLengthCRHGadget<bowe_hopwood::CRH<EdwardsParameters, window::Window>, /*ConstraintF<EdwardsParameters>*/_>>::ParametersVar::new_constant(
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
