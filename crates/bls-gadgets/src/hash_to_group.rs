@@ -36,17 +36,17 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, Variable};
+use r1cs_core::{SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
-    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment,
+    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, fields::fp::FpVar, R1CSVar,
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
 use algebra::ed_on_bls12_377::EdwardsParameters;
 
 /// Pedersen Gadget instantiated over the Edwards BW6_761 curve over BLS12-377 Fq (384 bits)
-type BHHashBW6_761 = BHHash<EdwardsParameters, Bls12_377_Fq>;
+type BHHashBW6_761 = BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>>;
 type ConstraintF<P> = <<P as ModelParameters>::BaseField as Field>::BasePrimeField;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
@@ -166,7 +166,8 @@ impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
 //            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
-            <BHHashBW6_761 as FixedLengthCRHGadget<bowe_hopwood::CRH<EdwardsParameters, window::Window>, /*ConstraintF<EdwardsParameters>*/_>>::ParametersVar::new_constant(
+            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<bowe_hopwood::CRH<EdwardsParameters, window::Window>, /*ConstraintF<EdwardsParameters>*/_>>::ParametersVar::new_constant(
+                input[0].cs().unwrap_or(ConstraintSystemRef::None),
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
