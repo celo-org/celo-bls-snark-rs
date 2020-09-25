@@ -12,13 +12,9 @@ use bls_crypto::{
 use r1cs_std::alloc::AllocVar;
 
 // Imported for the BLS12-377 API
-use algebra_core::{
-    curves::{ModelParameters, TEModelParameters},
-    Field,
-};
+use algebra_core:: curves::TEModelParameters;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-    ed_on_bw6_761::EdwardsProjective
 };
 use algebra::{
     curves::{
@@ -31,23 +27,18 @@ use algebra::{
 };
 use crypto_primitives::{
     crh::{
-        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRH, FixedLengthCRHGadget,
-        bowe_hopwood, pedersen
+        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
 use r1cs_core::{SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
-    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, fields::fp::FpVar, R1CSVar,
+    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar,
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
-use algebra::ed_on_bls12_377::EdwardsParameters;
-
-/// Pedersen Gadget instantiated over the Edwards BW6_761 curve over BLS12-377 Fq (384 bits)
-type BHHashBW6_761 = BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>>;
-type ConstraintF<P> = <<P as ModelParameters>::BaseField as Field>::BasePrimeField;
+use algebra::ed_on_bw6_761::EdwardsParameters;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]
@@ -99,23 +90,10 @@ pub struct HashToGroupGadget<P, F: PrimeField> {
     field_type: PhantomData<F>,
 }
 
-
-mod window {
-    use super::pedersen;
-
-    /// The window which will be used with the Fixed Length CRH
-    #[derive(Clone)]
-    pub struct Window;
-
-    impl pedersen::Window for Window {
-        const WINDOW_SIZE: usize = 93;
-        const NUM_WINDOWS: usize = 560;
-    }
-}
 // If we're on Bls12-377, we can have a nice public API for the whole hash to group operation
 // by taking the input, compressing it via an instantiation of Pedersen Hash with a CRH over Edwards BW6_761
 // and then hashing it to bits and to group
-impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
+impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
     /// Returns the G1 constrained hash of the message with the provided counter.
     ///
     /// If `generate_constraints_for_hash` is set to `false`, then constraints will not
@@ -128,10 +106,10 @@ impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
     /// the CRH in a separate proof.
     #[allow(clippy::type_complexity)]
     pub fn enforce_hash_to_group(
-        counter: UInt8<F>,
-        message: &[UInt8<F>],
+        counter: UInt8<Bls12_377_Fq>,
+        message: &[UInt8<Bls12_377_Fq>],
         generate_constraints_for_hash: bool,
-    ) -> Result<(G1Var<Bls12_377_Parameters>, Vec<Boolean<F>>, Vec<Boolean<F>>), SynthesisError> {
+    ) -> Result<(G1Var<Bls12_377_Parameters>, Vec<Boolean<Bls12_377_Fq>>, Vec<Boolean<Bls12_377_Fq>>), SynthesisError> {
         let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
 
@@ -161,24 +139,23 @@ impl<F: PrimeField> HashToGroupGadget<Bls12_377_Parameters, F> {
 
     /// Compress the input by passing it through a Pedersen hash
     fn pedersen_hash(
-        input: &[UInt8<F>],
-    ) -> Result<Vec<Boolean<F>>, SynthesisError> {
+        input: &[UInt8<Bls12_377_Fq>],
+    ) -> Result<Vec<Boolean<Bls12_377_Fq>>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
-//            <BHHashBW6_761 as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
-            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<bowe_hopwood::CRH<EdwardsParameters, window::Window>, /*ConstraintF<EdwardsParameters>*/_>>::ParametersVar::new_constant(
+            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
                 input[0].cs().unwrap_or(ConstraintSystemRef::None),
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
 
         let pedersen_hash =
-            <BHHashBW6_761 as FixedLengthCRH<CRH, _>>::evaluate(
+            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<CRH, _>>::evaluate(
                 &crh_params,
                 &input,
             )?;
 
-        let mut crh_bits = pedersen_hash.x.to_bits().unwrap();
+        let mut crh_bits = pedersen_hash.x.to_bits_le().unwrap();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
         loop {
             if crh_bits.len() % 8 == 0 {
@@ -239,7 +216,7 @@ pub fn hash_to_bits<F: PrimeField>(
                 .into_iter()
                 .map(|n| n.to_bits_le())
                 .flatten()
-                .collect::<Vec<Boolean>>();
+                .collect::<Vec<Boolean<Bls12_377_Fq>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
         xof_bits
