@@ -12,7 +12,8 @@ use bls_crypto::{
 use r1cs_std::alloc::AllocVar;
 
 // Imported for the BLS12-377 API
-use algebra_core:: curves::TEModelParameters;
+use algebra_core::curves::TEModelParameters;
+use algebra_core::fields::*;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
 };
@@ -178,12 +179,12 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
-pub fn hash_to_bits<F: PrimeField>(
-    message: &[Boolean<F>],
+pub fn hash_to_bits(
+    message: &[Boolean<Bls12_377_Fq>],
     hash_length: u16,
     personalization: [u8; 8],
     generate_constraints_for_hash: bool,
-) -> Result<Vec<Boolean<F>>, SynthesisError> {
+) -> Result<Vec<Boolean<Bls12_377_Fq>>, SynthesisError> {
     let span = span!(
         Level::TRACE,
         "hash_to_bits",
@@ -227,7 +228,7 @@ pub fn hash_to_bits<F: PrimeField>(
         } else {
             let message = message
                 .iter()
-                .map(|m| m.get_value().get())
+                .map(|m| m.value())
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
             let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
@@ -241,12 +242,12 @@ pub fn hash_to_bits<F: PrimeField>(
     Ok(xof_bits)
 }
 
-impl<P: Bls12Parameters, F: PrimeField> HashToGroupGadget<P, F> {
+impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
     // get the hash
     fn hash_to_group(
-        xof_bits: &[Boolean<F>],
+        xof_bits: &[Boolean<Bls12_377_Fq>],
     ) -> Result<G1Var<P>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
@@ -255,7 +256,9 @@ impl<P: Bls12Parameters, F: PrimeField> HashToGroupGadget<P, F> {
 
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
-            G1Var::<P>::alloc(|| {
+            <G1Var::<Bls12_377_Parameters> as AllocVar<G1Projective<Bls12_377_Parameters>, _>>::new_witness(
+                xof_bits[0].cs().unwrap_or(ConstraintSystemRef::None),
+                || {
                 // if we're in setup mode, just return an error
                 if is_setup(&xof_bits) {
                     return Err(SynthesisError::AssignmentMissing);
@@ -268,19 +271,19 @@ impl<P: Bls12Parameters, F: PrimeField> HashToGroupGadget<P, F> {
                 // we assume that these are already encoded as LE
                 let mut bits = x_bits
                     .iter()
-                    .map(|x| x.get_value().get())
+                    .map(|x| x.value())
                     .collect::<Result<Vec<bool>, _>>()?;
 
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
                 bits.reverse();
-                let big = <P::Fp as PrimeField>::BigInt::from_bits(&bits);
-                let x = P::Fp::from_repr(big).get()?;
-                let greatest = greatest.get_value().get()?;
+                let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
+                let x = Bls12_377_Parameters::Fp::from_repr(big).get()?;
+                let greatest = greatest.value()?;
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                let p = GroupAffine::<P::G1Parameters>::get_point_from_x(x, greatest)
+                let p = GroupAffine::<Bls12_377_Parameters::G1Parameters>::get_point_from_x(x, greatest)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
@@ -288,14 +291,14 @@ impl<P: Bls12Parameters, F: PrimeField> HashToGroupGadget<P, F> {
 
         trace!("compressing y");
         // Point compression on the G1 Gadget
-        let compressed_point: Vec<Boolean> = {
+        let compressed_point: Vec<Boolean<Bls12_377_Fq>> = {
             // Convert x to LE
-            let mut bits: Vec<Boolean> =
-                expected_point_before_cofactor.x.to_bits()?;
+            let mut bits: Vec<Boolean<Bls12_377_Fq>> =
+                expected_point_before_cofactor.x.to_bits_le()?;
             bits.reverse();
 
             // Get a constraint about the y point's sign
-            let greatest_bit = YToBitGadget::<P>::y_to_bit_g1(
+            let greatest_bit = YToBitGadget::<Bls12_377_Parameters>::y_to_bit_g1(
                 &expected_point_before_cofactor,
             )?;
 
