@@ -52,16 +52,16 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
-pub(crate) fn constrain_bool<F: Field>(
+/*pub(crate) fn constrain_bool<F: Field>(
     cs: ConstraintSystemRef<F>,
     input: &[bool],
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Boolean::new_witness(cs, || Ok(b)))
+        .map(|(_j, b)| Boolean::new_witness(cs, || Ok(b)))
         .collect::<Result<Vec<_>, _>>()
-}
+}*/
 
 /*#[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {

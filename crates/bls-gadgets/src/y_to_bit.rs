@@ -1,5 +1,5 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
-use algebra::{curves::bls12::Bls12Parameters, Field, PrimeField, Zero};
+use algebra::{curves::bls12::Bls12Parameters, PrimeField, Zero};
 use algebra::bls12_377::Parameters as Bls12_377_Parameters;
 use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
@@ -10,7 +10,6 @@ use r1cs_std::{
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
     Assignment,
 };
-use std::ops::Neg;
 
 /// The goal of the gadget is to provide the bit according to the value of y,
 /// as done in point compression. The idea is that given $half = \frac{p-1}{2}$,
@@ -148,17 +147,18 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
             Ok(adjusted)
         })?;
 
+        let adjusted_var = match adjusted {
+            Self::Var(ref v) => v,
+            _ => panic!("adjusted wrong type"),
+        };
         // TODO: Figure out what to do with constant FpVar
         self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
             lc!() +  LinearCombination::from(Variable::One),
             match self {
                 Self::Constant(_) => lc!(),
-                Self::Var(v) => LinearCombination::from(v.variable),
+                Self::Var(ref v) => LinearCombination::from(v.variable),
             } + (bit.lc() * half.neg()),
-            match adjusted {
-                Self::Constant(_) => lc!(),
-                Self::Var(v) => LinearCombination::from(v.variable),
-            },
+            LinearCombination::from(adjusted_var.variable)
         );
 
         // Enforce `adjusted <= half`

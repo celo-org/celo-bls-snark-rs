@@ -2,9 +2,8 @@ use crate::utils::is_setup;
 use algebra::PrimeField;
 use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
-    fields::{fp::{FpVar, AllocatedFp}},
+    fields::{fp::FpVar},
     prelude::*,
-    Assignment,
 };
 
 /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
@@ -37,7 +36,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
             // add 1 here only for zeros
             occurrences_lc += (F::one(), Variable::One);
         }
-        occurrences_lc = occurrences_lc + bit.lc();
+        occurrences_lc = occurrences_lc + bit.lc() * value_fp;
 
         // Update our count
         if !is_setup {

@@ -1,5 +1,5 @@
 use crate::{
-    utils::{bits_to_bytes, bytes_to_bits, constrain_bool, is_setup},
+    utils::{bits_to_bytes, bytes_to_bits, is_setup},
     YToBitGadget,
 };
 use bls_crypto::{
@@ -12,8 +12,6 @@ use bls_crypto::{
 use r1cs_std::alloc::AllocVar;
 use std::ops::Sub;
 // Imported for the BLS12-377 API
-use algebra_core::curves::TEModelParameters;
-use algebra_core::fields::*;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
 };
@@ -24,7 +22,7 @@ use algebra::{
         short_weierstrass_jacobian::{GroupAffine, GroupProjective},
         SWModelParameters,
     },
-    AffineCurve, BigInteger, BitIteratorBE, One, PrimeField, ProjectiveCurve,
+    AffineCurve, BigInteger, BitIteratorBE, PrimeField, ProjectiveCurve,
 };
 use crypto_primitives::{
     crh::{
@@ -32,7 +30,7 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, Variable, ConstraintSystemRef, lc};
+use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
@@ -236,7 +234,11 @@ pub fn hash_to_bits(
             bits.reverse();
             bits
         };
-        constrain_bool(message[0].cs().unwrap_or(ConstraintSystemRef::None), &bits)?
+        bits.iter()
+        .enumerate()
+        .map(|(_j, b)| Boolean::new_witness(message[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(b)))
+        .collect::<Result<Vec<_>, _>>()?
+//        constrain_bool(message[0].cs().unwrap_or(ConstraintSystemRef::None), &bits)?
     };
 
     Ok(xof_bits)
@@ -252,20 +254,20 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
-        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
-
+//        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
+        let x_bits = &xof_bits[..X_BITS];
+        let greatest = &xof_bits[X_BITS];
+        let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             <G1Var::<Bls12_377_Parameters> as AllocVar<G1Projective<Bls12_377_Parameters>, _>>::new_witness(
                 xof_bits[0].cs().unwrap_or(ConstraintSystemRef::None),
                 || {
                 // if we're in setup mode, just return an error
-                if is_setup(&xof_bits) {
+                // TODO: setup should also be checked on sign bit
+                if is_setup(&x_bits) {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-
-                let x_bits = &xof_bits[..X_BITS];
-                let greatest = xof_bits[X_BITS];
 
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
@@ -291,7 +293,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
         trace!("compressing y");
         // Point compression on the G1 Gadget
-        let compressed_point: Vec<Boolean<Bls12_377_Fq>> = {
+        let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
             // Convert x to LE
             let mut bits: Vec<Boolean<Bls12_377_Fq>> =
                 expected_point_before_cofactor.x.to_bits_le()?;
@@ -300,19 +302,17 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             // Get a constraint about the y point's sign
             let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
 
-            // return the x point plus the greatest bit constraint
-            bits.push(greatest_bit);
-
-            bits
+            (bits, greatest_bit)
         };
 
         compressed_point
             .iter()
-            .zip(xof_bits.iter())
+            .zip(x_bits.iter())
             .enumerate()
-            .for_each(|(i, (a, b))| {
+            .for_each(|(_i, (a, b))| {
                 a.enforce_equal(&b);
             });
+        compressed_sign_bit.enforce_equal(&sign_bit);
 
         trace!("scaling by G1 cofactor");
 

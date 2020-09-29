@@ -88,7 +88,7 @@ where
         let prepared_message_hashes = message_hashes
             .iter()
             .enumerate()
-            .map(|(i, message_hash)| {
+            .map(|(_i, message_hash)| {
                 P::prepare_g1(
                     &message_hash,
                 )
@@ -97,7 +97,7 @@ where
         let prepared_aggregated_pub_keys = aggregated_pub_keys
             .iter()
             .enumerate()
-            .map(|(i, pubkey)| P::prepare_g2(&pubkey))
+            .map(|(_i, pubkey)| P::prepare_g2(&pubkey))
             .collect::<Result<Vec<_>, _>>()?;
 
         Self::batch_verify_prepared(
@@ -143,7 +143,7 @@ where
         assert_eq!(signed_bitmap.len(), pub_keys.len());
 
         let mut aggregated_pk = P::G2Var::zero();
-        for (i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
+        for (_i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
             // If bit = 1, add pk
             let adder = bit.select(pk, &P::G2Var::zero())?;
             aggregated_pk += &adder;
@@ -158,7 +158,7 @@ where
         pub_keys: &[P::G2Var],
     ) -> Result<P::G2Var, SynthesisError> {
         let mut aggregated_pk = P::G2Var::zero();
-        for (i, pk) in pub_keys.iter().enumerate() {
+        for (_i, pk) in pub_keys.iter().enumerate() {
             // Add the pubkey to the sum
             // aggregated_pk += pk
             aggregated_pk += pk; 
