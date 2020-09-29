@@ -1,5 +1,6 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 use algebra::{curves::bls12::Bls12Parameters, Field, PrimeField, Zero};
+use algebra::bls12_377::Parameters as Bls12_377_Parameters;
 use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
     R1CSVar,
@@ -31,27 +32,27 @@ pub trait FpUtils<F: PrimeField> {
     ) -> Result<Boolean<F>, SynthesisError>;
 }
 
-impl<P: Bls12Parameters> YToBitGadget<P> for G1Var<P> 
+impl YToBitGadget<Bls12_377_Parameters> for G1Var<Bls12_377_Parameters> 
 {
     fn y_to_bit(
         &self,
-    ) -> Result<Boolean<P::Fp>, SynthesisError> {
+    ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
         let y_bit = self.y.normalize()?;
         Ok(y_bit)
     }
 }
 
-impl<P: Bls12Parameters> YToBitGadget<P> for G2Var<P> {
+impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
     fn y_to_bit(
         &self,
-    ) -> Result<Boolean<P::Fp>, SynthesisError> {
+    ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
             let y_bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), || {
-            let half = P::Fp::from_repr(P::Fp::modulus_minus_one_div_two()).get()?;
+            let half = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(<Bls12_377_Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two()).get()?;
             let c1 = self.y.c1.value()?;
             let c0 = self.y.c0.value()?;
 
-            let bit = c1 > half || (c1 == P::Fp::zero() && c0 > half);
+            let bit = c1 > half || (c1 == <Bls12_377_Parameters as Bls12Parameters>::Fp::zero() && c0 > half);
             Ok(bit)
         })?;
 

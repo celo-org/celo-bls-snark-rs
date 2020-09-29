@@ -10,7 +10,7 @@ use bls_crypto::{
     SIG_DOMAIN,
 };
 use r1cs_std::alloc::AllocVar;
-
+use std::ops::Sub;
 // Imported for the BLS12-377 API
 use algebra_core::curves::TEModelParameters;
 use algebra_core::fields::*;
@@ -32,10 +32,10 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, Variable, ConstraintSystemRef};
+use r1cs_core::{SynthesisError, Variable, ConstraintSystemRef, lc};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
-    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar,
+    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
@@ -236,7 +236,7 @@ pub fn hash_to_bits(
             bits.reverse();
             bits
         };
-        constrain_bool(&bits)?
+        constrain_bool(message[0].cs().unwrap_or(ConstraintSystemRef::None), &bits)?
     };
 
     Ok(xof_bits)
@@ -248,7 +248,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // get the hash
     fn hash_to_group(
         xof_bits: &[Boolean<Bls12_377_Fq>],
-    ) -> Result<G1Var<P>, SynthesisError> {
+    ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
@@ -278,12 +278,12 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 // reverse them since they are read in LE
                 bits.reverse();
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
-                let x = Bls12_377_Parameters::Fp::from_repr(big).get()?;
+                let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
                 let greatest = greatest.value()?;
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                let p = GroupAffine::<Bls12_377_Parameters::G1Parameters>::get_point_from_x(x, greatest)
+                let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, greatest)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
@@ -298,9 +298,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             bits.reverse();
 
             // Get a constraint about the y point's sign
-            let greatest_bit = YToBitGadget::<Bls12_377_Parameters>::y_to_bit_g1(
-                &expected_point_before_cofactor,
-            )?;
+            let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
 
             // return the x point plus the greatest bit constraint
             bits.push(greatest_bit);
@@ -313,13 +311,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             .zip(xof_bits.iter())
             .enumerate()
             .for_each(|(i, (a, b))| {
-                // TODO: Change this idiom for accessing constraint system
-                xof_bits[0].cs().enforce(
-                    || format!("enforce bit {}", i),
-                    |lc| lc + (P::Fp::one(), Variable::One),
-                    |_| a.lc(Variable::One, P::Fp::one()),
-                    |_| b.lc(Variable::One, P::Fp::one()),
-                );
+                a.enforce_equal(&b);
             });
 
         trace!("scaling by G1 cofactor");
@@ -332,26 +324,27 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     }
 
     fn scale_by_cofactor_g1(
-        p: &G1Var<P>,
-    ) -> Result<G1Var<P>, SynthesisError>
+        p: &G1Var<Bls12_377_Parameters>,
+    ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError>
     where
-        G1Projective<P>: Borrow<GroupProjective<P::G1Parameters>>,
+        G1Projective<Bls12_377_Parameters>: Borrow<GroupProjective<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>>,
     {
         // get the cofactor's bits
         let mut x_bits = BitIteratorBE::new(P::G1Parameters::COFACTOR)
             .map(Boolean::constant)
-            .collect::<Vec<Boolean>>();
+            .collect::<Vec<Boolean<Bls12_377_Fq>>>();
 
         // Zexe's mul_bits requires that inputs _MUST_ be in LE form, so we have to reverse
         x_bits.reverse();
 
         // return p * cofactor - [g]_1
-        let generator = G1Var::<P>::alloc_constant(
-            G1Projective::<P>::prime_subgroup_generator(),
+        let generator = G1Var::<Bls12_377_Parameters>::new_constant(
+            p.cs().unwrap_or(ConstraintSystemRef::None),
+            G1Projective::<Bls12_377_Parameters>::prime_subgroup_generator(),
         )?;
         let scaled = p
-            .mul_bits(&generator, x_bits.iter())?
-            .sub(&generator)?;
+            .scalar_mul_le(x_bits.iter())?
+            .sub(&generator);
         Ok(scaled)
     }
 }

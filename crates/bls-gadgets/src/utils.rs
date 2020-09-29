@@ -1,13 +1,13 @@
 use algebra::{ 
     Field, PrimeField
 };
-use r1cs_core::SynthesisError;
-use r1cs_std::boolean::Boolean;
-
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
+use r1cs_std::{boolean::Boolean, alloc::AllocVar};
+use r1cs_std::R1CSVar;
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup
 pub fn is_setup<F: PrimeField>(message: &[Boolean<F>]) -> bool {
-    message.iter().any(|m| m.get_value().is_none())
+    message.iter().any(|m| m.value().is_err())
 }
 
 /// Converts the provided bits to LE bytes
@@ -53,12 +53,13 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 }
 
 pub(crate) fn constrain_bool<F: Field>(
+    cs: ConstraintSystemRef<F>,
     input: &[bool],
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Boolean::alloc(|| Ok(b)))
+        .map(|(j, b)| Boolean::new_witness(cs, || Ok(b)))
         .collect::<Result<Vec<_>, _>>()
 }
 

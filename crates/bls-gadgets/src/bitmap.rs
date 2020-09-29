@@ -1,8 +1,8 @@
 use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{LinearCombination, SynthesisError, Variable, ConstraintSystemRef};
+use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
-    fields::{fp::FpVar},
+    fields::{fp::{FpVar, AllocatedFp}},
     prelude::*,
     Assignment,
 };
@@ -61,14 +61,17 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
         true,
     )?;
 
+    let occurrences_var = match occurrences {
+        FpVar::Var(v) => v,
+        _ => panic!("occurrences wrong type"),
+    };
     // Enforce that we have correctly counted the number of occurrences
-    occurrences_lc.enforce_equal(occurrences.get_variable());
-/*    cs.enforce(
-        || "enforce num occurrences lc equal to num",
-        |_| occurrences_lc,
-        |lc| lc + (F::one(), Variable::One),
-        |lc| occurrences.get_variable() + lc,
-    );*/
+//    occurrences_lc.enforce_equal(occurrences);
+    bitmap[0].cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+        occurrences_lc,
+        lc!() + (F::one(), Variable::One),
+        lc!() + occurrences_var.variable,
+    );
 
     Ok(())
 }
