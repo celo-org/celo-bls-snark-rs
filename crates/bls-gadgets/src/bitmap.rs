@@ -6,74 +6,81 @@ use r1cs_std::{
     prelude::*,
 };
 
-/// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
-/// present in the provided bitmap
-pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
-    bitmap: &[Boolean<F>],
-    max_occurrences: &FpVar<F>,
-    value: bool,
-) -> Result<(), SynthesisError> {
-    let mut value_fp = F::one();
-    if !value {
-        // using the opposite value if we are counting 0s
-        value_fp = value_fp.neg();
-    }
-    // If we're in setup mode, we skip the bit counting part since the bitmap
-    // will be empty
-    // TODO: Change to new setup flag in ConstraintSystem
-    let is_setup = is_setup(&bitmap);
-
-    let mut occurrences = 0;
-    let mut occurrences_lc = LinearCombination::zero();
-    // For each bit, increment the number of occurences if the bit matched `value`
-    // We calculate both the number of occurrences
-    // and a linear combination over it, in order to do 2 things:
-    // 1. enforce that occurrences < maximum_occurences
-    // 2. enforce that occurrences was calculated correctly from the bitmap
-    for bit in bitmap {
-        // Update the constraints
-        if !value {
-            // add 1 here only for zeros
-            occurrences_lc += (F::one(), Variable::One);
-        }
-        occurrences_lc = occurrences_lc + bit.lc() * value_fp;
-
-        // Update our count
-        if !is_setup {
-            let got_value = bit.value()?;
-            occurrences += (got_value == value) as u8;
-        }
-    }
-
-    // Rebind `occurrences` to a constraint
-    // TODO: This idiom seems wrong. What if the first element of bitmap is a constant?
-    let occurrences = FpVar::new_witness(bitmap[0].cs().unwrap_or(ConstraintSystemRef::None)
-, || { Ok(F::from(occurrences)) } )?;
-//    let occurrences = FpVar::alloc(&mut cs.ns(|| "num occurrences"), || {
-//        Ok(F::from(occurrences))
-//    })?;
-
-    // Enforce `occurences <= max_occurences`
-    occurrences.enforce_cmp(
-        &max_occurrences,
-        std::cmp::Ordering::Less,
-        true,
-    )?;
-
-    let occurrences_var = match occurrences {
-        FpVar::Var(v) => v,
-        _ => panic!("occurrences wrong type"),
-    };
-    // Enforce that we have correctly counted the number of occurrences
-//    occurrences_lc.enforce_equal(occurrences);
-    bitmap[0].cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
-        occurrences_lc,
-        lc!() + (F::one(), Variable::One),
-        lc!() + occurrences_var.variable,
-    )?;
-
-    Ok(())
+pub trait Bitmap<F: PrimeField> {
+    fn enforce_maximum_occurrences_in_bitmap( 
+        &self,
+        max_occurrences: &FpVar<F>,
+        value: bool,
+    ) -> Result<(), SynthesisError>;
 }
+
+impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
+    /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
+    /// present in the provided bitmap
+    fn enforce_maximum_occurrences_in_bitmap(
+        &self,
+        max_occurrences: &FpVar<F>,
+        value: bool,
+    ) -> Result<(), SynthesisError> {
+        let mut value_fp = F::one();
+        if !value {
+            // using the opposite value if we are counting 0s
+            value_fp = value_fp.neg();
+        }
+        // If we're in setup mode, we skip the bit counting part since the bitmap
+        // will be empty
+        // TODO: Change to new setup flag in ConstraintSystem
+        let is_setup = is_setup(self);
+
+        let mut occurrences = 0;
+        let mut occurrences_lc = LinearCombination::zero();
+        // For each bit, increment the number of occurences if the bit matched `value`
+        // We calculate both the number of occurrences
+        // and a linear combination over it, in order to do 2 things:
+        // 1. enforce that occurrences < maximum_occurences
+        // 2. enforce that occurrences was calculated correctly from the bitmap
+        for bit in self {
+            // Update the constraints
+            if !value {
+                // add 1 here only for zeros
+                occurrences_lc += (F::one(), Variable::One);
+            }
+            occurrences_lc = occurrences_lc + bit.lc() * value_fp;
+
+            // Update our count
+            if !is_setup {
+                let got_value = bit.value()?;
+                occurrences += (got_value == value) as u8;
+            }
+        }
+
+        // Rebind `occurrences` to a constraint
+        let occurrences = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
+            || { Ok(F::from(occurrences)) }
+        )?;
+
+        // Enforce `occurences <= max_occurences`
+        occurrences.enforce_cmp(
+            &max_occurrences,
+            std::cmp::Ordering::Less,
+            true,
+        )?;
+
+        let occurrences_var = match occurrences {
+            FpVar::Var(v) => v,
+            _ => unreachable!(),
+        };
+        // Enforce that we have correctly counted the number of occurrences
+        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+            occurrences_lc,
+            lc!() + (F::one(), Variable::One),
+            lc!() + occurrences_var.variable,
+        )?;
+
+        Ok(())
+    }
+}
+
 
 /*#[cfg(test)]
 mod tests {

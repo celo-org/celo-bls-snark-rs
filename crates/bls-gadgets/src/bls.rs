@@ -1,4 +1,4 @@
-use crate::enforce_maximum_occurrences_in_bitmap;
+use crate::Bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
@@ -179,7 +179,7 @@ where
         maximum_non_signers: &FpVar<F>,
     ) -> Result<(P::G1Var, P::G2Var), SynthesisError> {
         trace!("enforcing bitmap");
-        enforce_maximum_occurrences_in_bitmap(signed_bitmap, maximum_non_signers, false)?;
+        signed_bitmap.enforce_maximum_occurrences_in_bitmap(maximum_non_signers, false)?;
 
         let aggregated_pk = Self::enforce_aggregated_pubkeys(pub_keys, signed_bitmap)?;
 
