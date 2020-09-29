@@ -305,14 +305,12 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
-        compressed_point
-            .iter()
+        for (_i, (a,b)) in compressed_point.iter()
             .zip(x_bits.iter())
-            .enumerate()
-            .for_each(|(_i, (a, b))| {
-                a.enforce_equal(&b);
-            });
-        compressed_sign_bit.enforce_equal(&sign_bit);
+            .enumerate() {
+                a.enforce_equal(&b)?;
+            }
+        compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
 

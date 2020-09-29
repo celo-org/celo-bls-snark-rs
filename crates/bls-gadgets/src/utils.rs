@@ -1,8 +1,7 @@
 use algebra::{ 
-    Field, PrimeField
+    PrimeField
 };
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
-use r1cs_std::{boolean::Boolean, alloc::AllocVar};
+use r1cs_std::boolean::Boolean;
 use r1cs_std::R1CSVar;
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup

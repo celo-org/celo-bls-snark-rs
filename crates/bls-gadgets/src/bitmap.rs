@@ -70,7 +70,7 @@ pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField>(
         occurrences_lc,
         lc!() + (F::one(), Variable::One),
         lc!() + occurrences_var.variable,
-    );
+    )?;
 
     Ok(())
 }

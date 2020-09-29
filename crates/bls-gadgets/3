@@ -159,7 +159,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 Self::Var(ref v) => LinearCombination::from(v.variable),
             } + (bit.lc() * half.neg()),
             LinearCombination::from(adjusted_var.variable)
-        )?;
+        );
 
         // Enforce `adjusted <= half`
         FpVar::enforce_smaller_or_equal_than_mod_minus_one_div_two(
