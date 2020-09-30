@@ -1,13 +1,14 @@
 use algebra::{
-    bls12_377::{Bls12_377, Parameters},
+    curves::bls12::Bls12Parameters,
+    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
     bw6_761::Fr,
     One, PairingEngine,
 };
 use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
-    bls12_377::{G1Gadget, G2Gadget},
-    fields::fp::FpGadget,
+    bls12_377::{G1Var, G2Var},
+    fields::fp::FpVar,
     prelude::*,
     Assignment,
 };
@@ -17,7 +18,8 @@ use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOM
 use super::{fr_to_bits, g2_to_bits, to_fr};
 use tracing::{span, trace, Level};
 
-type FrGadget = FpGadget<Fr>;
+type FrVar = FpVar<Fr>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 /// An epoch block using optional types so that it can be used to instantiate the
 /// trusted setup. Its non-gadget compatible equivalent is [`EpochBlock`]
@@ -39,19 +41,19 @@ pub struct EpochData<E: PairingEngine> {
 /// [`EpochData.constrain`]: struct.EpochData.html#method.constrain
 pub struct ConstrainedEpochData {
     /// The epoch's index
-    pub index: FrGadget,
+    pub index: FrVar,
     /// The new threshold needed for signatures
-    pub maximum_non_signers: FrGadget,
+    pub maximum_non_signers: FrVar,
     /// The epoch's G1 Hash
-    pub message_hash: G1Gadget,
+    pub message_hash: G1Var,
     /// The new validators for this epoch
-    pub pubkeys: Vec<G2Gadget>,
+    pub pubkeys: Vec<G2Var>,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
-    pub bits: Vec<Boolean>,
+    pub bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub crh_bits: Vec<Boolean>,
+    pub crh_bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub xof_bits: Vec<Boolean>,
+    pub xof_bits: Vec<Bool>,
 }
 
 impl<E: PairingEngine> EpochData<E> {
@@ -69,20 +71,18 @@ impl EpochData<Bls12_377> {
     /// Ensures that the epoch's index is equal to `previous_index + 1`. Enforces that
     /// the epoch's G1 hash is correctly calculated, and also provides auxiliary data for
     /// verifying the CRH->XOF hash outside of BW6_761.
-    pub fn constrain<CS: ConstraintSystem<Fr>>(
+    pub fn constrain(
         &self,
-        cs: &mut CS,
-        previous_index: &FrGadget,
+        previous_index: &FrVar,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(cs)?;
-        Self::enforce_next_epoch(&mut cs.ns(|| "enforce next epoch"), previous_index, &index)?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits()?;
+        Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
         let (message_hash, crh_bits, xof_bits) = Self::hash_bits_to_g1(
-            &mut cs.ns(|| "hash epoch to g1 bits"),
             &bits,
             generate_constraints_for_hash,
         )?;
@@ -99,31 +99,28 @@ impl EpochData<Bls12_377> {
     }
 
     /// Encodes the epoch to bits (index and non-signers encoded as LE)
-    pub fn to_bits<CS: ConstraintSystem<Fr>>(
+    pub fn to_bits(
         &self,
-        cs: &mut CS,
-    ) -> Result<(Vec<Boolean>, FrGadget, FrGadget, Vec<G2Gadget>), SynthesisError> {
-        let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
-        let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
+    ) -> Result<(Vec<Bool>, FrVar, FrVar, Vec<G2Var>), SynthesisError> {
+        let index = to_fr(self.index)?;
+        let index_bits = fr_to_bits(&index, 16)?;
 
         let maximum_non_signers = to_fr(
-            &mut cs.ns(|| "max non signers"),
             Some(self.maximum_non_signers),
         )?;
         let maximum_non_signers_bits = fr_to_bits(
-            &mut cs.ns(|| "max non signers bits"),
             &maximum_non_signers,
             32,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> = [index_bits, maximum_non_signers_bits].concat();
+        let mut epoch_bits: Vec<Bool> = [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
-            let pk_var = G2Gadget::alloc(cs.ns(|| format!("pub key {}", j)), || maybe_pk.get())?;
+            let pk_var = G2Var::new_witness(|| maybe_pk.get())?;
 
             // extend our epoch bits by the pubkeys
-            let pk_bits = g2_to_bits(&mut cs.ns(|| format!("pubkey to bits {}", j)), &pk_var)?;
+            let pk_bits = g2_to_bits(&pk_var)?;
             epoch_bits.extend_from_slice(&pk_bits);
 
             // save the allocated pubkeys
@@ -134,19 +131,17 @@ impl EpochData<Bls12_377> {
     }
 
     /// Enforces that `index = previous_index + 1`
-    fn enforce_next_epoch<CS: ConstraintSystem<Fr>>(
-        cs: &mut CS,
-        previous_index: &FrGadget,
-        index: &FrGadget,
+    fn enforce_next_epoch(
+        previous_index: &FrVar,
+        index: &FrVar,
     ) -> Result<(), SynthesisError> {
         trace!("enforcing next epoch");
         let previous_plus_one =
-            previous_index.add_constant(cs.ns(|| "previous plus_one"), &Fr::one())?;
+            previous_index.add_constant(&Fr::one())?;
 
         let index_bit =
-            YToBitGadget::<Parameters>::is_eq_zero(&mut cs.ns(|| "is index zero"), index)?.not();
+            YToBitGadget::<Bls12_377_Parameters>::is_eq_zero(index)?.not();
         index.conditional_enforce_equal(
-            cs.ns(|| "index enforce equal"),
             &previous_plus_one,
             &index_bit,
         )?;
@@ -155,11 +150,10 @@ impl EpochData<Bls12_377> {
 
     /// Packs the provided bits in U8s, and calculates the hash and the counter
     /// Also returns the auxiliary CRH and XOF bits for potential compression from consumers
-    fn hash_bits_to_g1<CS: ConstraintSystem<Fr>>(
-        cs: &mut CS,
-        epoch_bits: &[Boolean],
+    fn hash_bits_to_g1(
+        epoch_bits: &[Bool],
         generate_constraints_for_hash: bool,
-    ) -> Result<(G1Gadget, Vec<Boolean>, Vec<Boolean>), SynthesisError> {
+    ) -> Result<(G1Var, Vec<Bool>, Vec<Bool>), SynthesisError> {
         trace!("hashing epoch to g1");
         // Reverse to LE
         let mut epoch_bits = epoch_bits.to_vec();
@@ -173,7 +167,7 @@ impl EpochData<Bls12_377> {
             .map(|chunk| {
                 let mut chunk = chunk.to_vec();
                 if chunk.len() < 8 {
-                    chunk.resize(8, Boolean::constant(false));
+                    chunk.resize(8, Bool::constant(false));
                 }
                 UInt8::from_bits_le(&chunk)
             })
@@ -195,9 +189,8 @@ impl EpochData<Bls12_377> {
             counter
         };
 
-        let counter_var = UInt8::alloc(&mut cs.ns(|| "alloc counter"), || Ok(counter as u8))?;
-        HashToGroupGadget::<Parameters>::enforce_hash_to_group(
-            &mut cs.ns(|| "hash to group"),
+        let counter_var = UInt8::alloc(|| Ok(counter as u8))?;
+        HashToGroupGadget::<Bls12_377_Parameters>::enforce_hash_to_group(
             counter_var,
             &input_bytes_var,
             generate_constraints_for_hash,

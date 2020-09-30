@@ -1,9 +1,14 @@
-use algebra::{bls12_377::Bls12_377, bw6_761::Fr, PairingEngine};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use algebra::{
+    curves::bls12::Bls12Parameters,
+    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters}, 
+    bw6_761::Fr, 
+    PairingEngine
+};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
-    bls12_377::{G1Gadget, G2Gadget, PairingGadget},
+    bls12_377::{G1Var, G2Var, PairingVar},
     boolean::Boolean,
-    fields::fp::FpGadget,
+    fields::fp::FpVar,
 };
 
 use super::{constrain_bool, EpochData};
@@ -11,8 +16,9 @@ use bls_gadgets::BlsVerifyGadget;
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
-type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
-type FrGadget = FpGadget<Fr>;
+type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
+type FrVar = FpVar<Fr>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 #[derive(Clone, Debug)]
 /// An epoch block transition which includes the new epoch block's metadata, as well as
@@ -40,22 +46,22 @@ impl<E: PairingEngine> SingleUpdate<E> {
 /// [`SingleUpdate.constrain`]: struct.SingleUpdate.html#method.constrain
 pub struct ConstrainedEpoch {
     /// The new validators for this epoch
-    pub new_pubkeys: Vec<G2Gadget>,
+    pub new_pubkeys: Vec<G2Var>,
     /// The new threshold needed for signatures
-    pub new_max_non_signers: FrGadget,
+    pub new_max_non_signers: FrVar,
     /// The epoch's G1 Hash
-    pub message_hash: G1Gadget,
+    pub message_hash: G1Var,
     /// The aggregate pubkey based on the bitmap of the validators
     /// of the previous epoch
-    pub aggregate_pk: G2Gadget,
+    pub aggregate_pk: G2Var,
     /// The epoch's index
-    pub index: FrGadget,
+    pub index: FrVar,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
-    pub bits: Vec<Boolean>,
+    pub bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub xof_bits: Vec<Boolean>,
+    pub xof_bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub crh_bits: Vec<Boolean>,
+    pub crh_bits: Vec<Bool>,
 }
 
 impl SingleUpdate<Bls12_377> {
@@ -65,12 +71,11 @@ impl SingleUpdate<Bls12_377> {
     /// # Panics
     ///
     /// - If `num_validators != self.epoch_data.public_keys.len()`
-    pub fn constrain<CS: ConstraintSystem<Fr>>(
+    pub fn constrain(
         &self,
-        cs: &mut CS,
-        previous_pubkeys: &[G2Gadget],
-        previous_epoch_index: &FrGadget,
-        previous_max_non_signers: &FrGadget,
+        previous_pubkeys: &[G2Var],
+        previous_epoch_index: &FrVar,
+        previous_max_non_signers: &FrVar,
         num_validators: u32,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
@@ -81,18 +86,16 @@ impl SingleUpdate<Bls12_377> {
 
         // Get the constrained epoch data
         let epoch_data = self.epoch_data.constrain(
-            &mut cs.ns(|| "constrain"),
             previous_epoch_index,
             generate_constraints_for_hash,
         )?;
 
         // convert the bitmap to constraints
-        let signed_bitmap = constrain_bool(&mut cs.ns(|| "signed bitmap"), &self.signed_bitmap)?;
+        let signed_bitmap = constrain_bool(&self.signed_bitmap)?;
 
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
-            cs.ns(|| "verify signature partial"),
             previous_pubkeys,
             &signed_bitmap,
             &epoch_data.message_hash,

@@ -8,11 +8,11 @@ edition = "2018"
 bls-crypto = { path = "../bls-crypto", default-features = false }
 bls-gadgets = { path = "../bls-gadgets", default-features = false }
 
-algebra = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-r1cs-core = { git = "https://github.com/scipr-lab/zexe" }
-r1cs-std = { git = "https://github.com/scipr-lab/zexe", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["r1cs", "groth16", "parallel"] }
-groth16 = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
+algebra = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
+r1cs-core = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs" }
+r1cs-std = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
+crypto-primitives = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["r1cs", "groth16", "parallel"] }
+groth16 = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["parallel"] }
 
 rand = "0.7" 
 byteorder = "1.3.2"

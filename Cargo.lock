@@ -180,7 +180,7 @@ dependencies = [
  "byteorder",
  "clap",
  "criterion",
- "crypto-primitives 0.1.1-alpha.0",
+ "crypto-primitives",
  "csv",
  "env_logger",
  "hex 0.3.2",
@@ -200,10 +200,10 @@ dependencies = [
  "algebra 0.1.1-alpha.0",
  "algebra-core 0.1.1-alpha.0",
  "bls-crypto",
- "crypto-primitives 0.1.1-alpha.0",
+ "crypto-primitives",
  "groth16 0.1.0",
  "r1cs-core 0.1.1-alpha.0",
- "r1cs-std 0.1.1-alpha.0",
+ "r1cs-std",
  "rand",
  "rand_xorshift",
  "tracing",
@@ -427,25 +427,6 @@ dependencies = [
 
 [[package]]
 name = "crypto-primitives"
-version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
-dependencies = [
- "algebra-core 0.1.0",
- "bench-utils 0.1.0",
- "blake2",
- "derivative",
- "digest",
- "ff-fft 0.1.0",
- "gm17 0.1.0",
- "groth16 0.1.0",
- "r1cs-core 0.1.0",
- "r1cs-std 0.1.0",
- "rand",
- "rayon",
-]
-
-[[package]]
-name = "crypto-primitives"
 version = "0.1.1-alpha.0"
 source = "git+https://github.com/scipr-lab/zexe?branch=better-r1cs-docs#982aaf9baa2538e9c742949c281124bd39a20a5a"
 dependencies = [
@@ -455,10 +436,10 @@ dependencies = [
  "derivative",
  "digest",
  "ff-fft 0.1.1-alpha.0",
- "gm17 0.1.1-alpha.0",
+ "gm17",
  "groth16 0.1.1-alpha.0",
  "r1cs-core 0.1.1-alpha.0",
- "r1cs-std 0.1.1-alpha.0",
+ "r1cs-std",
  "rand",
  "rayon",
  "tracing",
@@ -529,17 +510,17 @@ dependencies = [
 name = "epoch-snark"
 version = "0.1.4"
 dependencies = [
- "algebra 0.1.0",
+ "algebra 0.1.1-alpha.0",
  "bench-utils 0.1.0",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
  "byteorder",
- "crypto-primitives 0.1.0",
- "groth16 0.1.0",
+ "crypto-primitives",
+ "groth16 0.1.1-alpha.0",
  "hex 0.4.2",
- "r1cs-core 0.1.0",
- "r1cs-std 0.1.0",
+ "r1cs-core 0.1.1-alpha.0",
+ "r1cs-std",
  "rand",
  "rand_xorshift",
  "thiserror",
@@ -601,20 +582,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "gm17"
-version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
-dependencies = [
- "algebra-core 0.1.0",
- "bench-utils 0.1.0",
- "ff-fft 0.1.0",
- "r1cs-core 0.1.0",
- "rand",
- "rayon",
- "smallvec",
 ]
 
 [[package]]
@@ -928,16 +895,6 @@ dependencies = [
  "algebra-core 0.1.1-alpha.0",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "r1cs-std"
-version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
-dependencies = [
- "algebra 0.1.0",
- "derivative",
- "r1cs-core 0.1.0",
 ]
 
 [[package]]

@@ -17,14 +17,19 @@ mod epochs;
 pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
-use algebra::{bls12_377::Parameters, bw6_761::Fr, BigInteger, Field, FpParameters, PrimeField};
+use algebra::{
+    curves::bls12::Bls12Parameters,
+    bls12_377::Parameters as Bls12_377_Parameters, 
+    bw6_761::Fr, 
+    BigInteger, Field, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
-use r1cs_std::{bls12_377::G2Gadget, fields::fp::FpGadget, Assignment};
+use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, Assignment};
 
-type FrGadget = FpGadget<Fr>;
+type FrVar = FpVar<Fr>;
+pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 use bls_gadgets::YToBitGadget;
 
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use r1cs_core::SynthesisError;
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -69,31 +74,28 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn to_fr<T: Into<u64>, CS: ConstraintSystem<Fr>>(
-    cs: &mut CS,
+fn to_fr<T: Into<u64>>(
     num: Option<T>,
-) -> Result<FrGadget, SynthesisError> {
-    FrGadget::alloc(cs, || Ok(Fr::from(num.get()?.into())))
+) -> Result<FrVar, SynthesisError> {
+    FrVar::alloc(|| Ok(Fr::from(num.get()?.into())))
 }
 
-fn fr_to_bits<CS: ConstraintSystem<Fr>>(
-    cs: &mut CS,
-    input: &FrGadget,
+fn fr_to_bits(
+    input: &FrVar,
     length: usize,
-) -> Result<Vec<Boolean>, SynthesisError> {
-    let mut input = input.to_bits(cs.ns(|| "input to bits"))?;
+) -> Result<Vec<Bool>, SynthesisError> {
+    let mut input = input.to_bits()?;
     input.reverse();
     Ok(input[0..length].to_vec())
 }
 
-fn g2_to_bits<CS: ConstraintSystem<Fr>>(
-    cs: &mut CS,
-    input: &G2Gadget,
-) -> Result<Vec<Boolean>, SynthesisError> {
-    let x_0 = input.x.c0.to_bits(cs.ns(|| "aggregated pub key c0 bits"))?;
-    let x_1 = input.x.c1.to_bits(cs.ns(|| "aggregated pub key c1 bits"))?;
+fn g2_to_bits(
+    input: &G2Var,
+) -> Result<Vec<Bool>, SynthesisError> {
+    let x_0 = input.x.c0.to_bits()?;
+    let x_1 = input.x.c1.to_bits()?;
     let y_bit =
-        YToBitGadget::<Parameters>::y_to_bit_g2(cs.ns(|| "aggregated pub key y bit"), &input)?;
+        YToBitGadget::y_to_bit_g2(&input)?;
     let mut output = Vec::new();
     output.extend_from_slice(&x_0);
     output.extend_from_slice(&x_1);
@@ -101,13 +103,12 @@ fn g2_to_bits<CS: ConstraintSystem<Fr>>(
     Ok(output)
 }
 
-fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
-    cs: &mut CS,
+fn constrain_bool<F: Field>(
     input: &[Option<bool>],
-) -> Result<Vec<Boolean>, SynthesisError> {
+) -> Result<Vec<Bool>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Boolean::alloc(cs.ns(|| format!("{}", j)), || b.get()))
+        .map(|(j, b)| Bool::alloc(|| b.get()))
         .collect::<Result<Vec<_>, _>>()
 }

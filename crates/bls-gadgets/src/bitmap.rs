@@ -93,7 +93,7 @@ mod tests {
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use r1cs_core::ConstraintSynthesizer;
-//    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     #[test]
     // "I know of a bitmap that has at most 2 zeros"
@@ -108,23 +108,23 @@ mod tests {
         }
 
         impl ConstraintSynthesizer<Fr> for BitmapGadget {
-            fn generate_constraints<CS: ConstraintSystem<Fr>>(
+            fn generate_constraints(
                 self,
-                cs: &mut CS,
+                cs: ConstraintSystemRef<F>,
             ) -> Result<(), SynthesisError> {
                 let bitmap = self
                     .bitmap
                     .iter()
                     .enumerate()
                     .map(|(i, b)| {
-                        Boolean::alloc(cs.ns(|| i.to_string()), || Ok(b.unwrap())).unwrap()
+                        Boolean::new_witness(&cs, || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
-                let max_occurrences = FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || {
+                let max_occurrences = FpVar::<Fr>::new_witness(&cs, || {
                     Ok(Fr::from(self.max_occurrences))
                 })
                 .unwrap();
-                enforce_maximum_occurrences_in_bitmap(cs, &bitmap, &max_occurrences, self.value)
+                bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, self.value)
             }
         }
 
@@ -186,6 +186,7 @@ mod tests {
         }
 
         #[test]
+
         fn three_zeros_allowed() {
             assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied());
         }

@@ -1,9 +1,16 @@
-use algebra::{BigInteger, FpParameters, PrimeField};
+use algebra::{
+    curves::bls12::Bls12Parameters,
+    bls12_377::Parameters as Bls12_377_Parameters,
+    BigInteger, 
+    FpParameters, 
+    PrimeField
+};
 use bls_gadgets::utils::is_setup;
 use r1cs_core::SynthesisError;
-use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
+use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
 use tracing::{span, trace, Level};
 
+pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
 pub struct MultipackGadget;
 
@@ -11,12 +18,11 @@ impl MultipackGadget {
     /// Packs the provided boolean constraints to a vector of field element gadgets of
     /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
     /// will be made as public inputs.
-    pub fn pack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
-        mut cs: CS,
-        bits: &[Boolean],
+    pub fn pack<F: PrimeField>(
+        bits: &[Bool],
         element_size: usize,
         should_alloc_input: bool,
-    ) -> Result<Vec<FpGadget<F>>, SynthesisError> {
+    ) -> Result<Vec<FpVar<Bls12_377_Parameters>>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
@@ -24,27 +30,27 @@ impl MultipackGadget {
         for (i, chunk) in fp_chunks.enumerate() {
             trace!(iteration = i);
             let alloc = if should_alloc_input {
-                FpGadget::<F>::alloc_input
+                FpVar::alloc_input
             } else {
-                FpGadget::<F>::alloc
+                FpVar::alloc
             };
-            let fp = alloc(cs.ns(|| format!("chunk {}", i)), || {
+            let fp = alloc(|| {
                 if is_setup(&chunk) {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-                let fp_val = F::BigInt::from_bits(
+                let fp_val = Bls12_377_Parameters::BigInt::from_bits(
                     &chunk
                         .iter()
                         .map(|x| x.get_value().get())
                         .collect::<Result<Vec<bool>, _>>()?,
                 );
-                Ok(F::from_repr(fp_val).get()?)
+                Ok(Bls12_377_Parameters::from_repr(fp_val).get()?)
             })?;
-            let fp_bits = fp.to_bits(cs.ns(|| format!("chunk bits {}", i)))?;
+            let fp_bits = fp.to_bits()?;
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[F::Params::MODULUS_BITS as usize - chunk_len + j]
-                    .enforce_equal(cs.ns(|| format!("fp bit {} for chunk {}", j, i)), &chunk[j])?;
+                fp_bits[Bls12_377_Parameters::Params::MODULUS_BITS as usize - chunk_len + j]
+                    .enforce_equal(&chunk[j])?;
             }
 
             packed.push(fp);
@@ -54,16 +60,15 @@ impl MultipackGadget {
 
     /// Unpacks the provided field element gadget to a vector of boolean constraints
     #[allow(unused)]
-    pub fn unpack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
-        mut cs: CS,
-        packed: &[FpGadget<F>],
+    pub fn unpack(
+        packed: &[FpVar<Bls12_377_Parameters>],
         target_bits: usize,
         source_capacity: usize,
-    ) -> Result<Vec<Boolean>, SynthesisError> {
+    ) -> Result<Vec<Bool>, SynthesisError> {
         let bits_vecs = packed
             .iter()
             .enumerate()
-            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))))
+            .map(|(i, x)| x.to_bits())
             .collect::<Result<Vec<_>, _>>()?;
         let mut bits = vec![];
         let mut chunk = 0;
@@ -75,7 +80,7 @@ impl MultipackGadget {
                 source_capacity as usize
             };
             bits.extend_from_slice(
-                &bits_vecs[chunk][<F::Params as FpParameters>::MODULUS_BITS as usize - diff..],
+                &bits_vecs[chunk][<Bls12_377_Parameters::Params as FpParameters>::MODULUS_BITS as usize - diff..],
             );
             current_index += diff;
             chunk += 1;

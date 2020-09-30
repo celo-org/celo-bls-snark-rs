@@ -2,7 +2,7 @@ use algebra::{
     bls12_377::{Fr, FrParameters},
     FpParameters,
 };
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
+use r1cs_core::{ConstraintSynthesizer, SynthesisError};
 use tracing::{debug, info, span, trace, Level};
 
 use bls_crypto::SIG_DOMAIN;
@@ -34,9 +34,8 @@ impl HashToBits {
 
 impl ConstraintSynthesizer<Fr> for HashToBits {
     #[allow(clippy::cognitive_complexity)] // false positive triggered by the info!("generating constraints") log
-    fn generate_constraints<CS: ConstraintSystem<Fr>>(
+    fn generate_constraints(
         self,
-        cs: &mut CS,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "HashToBits");
         info!("generating constraints");
@@ -48,9 +47,8 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
-            let bits = constrain_bool(&mut cs.ns(|| i.to_string()), &message_bits)?;
+            let bits = constrain_bool(&message_bits)?;
             let hash = hash_to_bits(
-                cs.ns(|| format!("{}: hash to bits", i)),
                 &bits,
                 512,
                 personalization,
@@ -63,14 +61,12 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         // Pack them as public inputs
         debug!(capacity = FrParameters::CAPACITY, "packing CRH bits");
         MultipackGadget::pack(
-            cs.ns(|| "pack messages"),
             &all_bits,
             FrParameters::CAPACITY as usize,
             true,
         )?;
         debug!(capacity = FrParameters::CAPACITY, "packing XOF bits");
         MultipackGadget::pack(
-            cs.ns(|| "pack xof bits"),
             &xof_bits,
             FrParameters::CAPACITY as usize,
             true,
