@@ -10,7 +10,8 @@ use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
 use tracing::{span, trace, Level};
 
-pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
+type Fp = FpVar<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
 pub struct MultipackGadget;
 
@@ -22,7 +23,7 @@ impl MultipackGadget {
         bits: &[Bool],
         element_size: usize,
         should_alloc_input: bool,
-    ) -> Result<Vec<FpVar<Bls12_377_Parameters>>, SynthesisError> {
+    ) -> Result<Vec<Fp>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
@@ -61,7 +62,7 @@ impl MultipackGadget {
     /// Unpacks the provided field element gadget to a vector of boolean constraints
     #[allow(unused)]
     pub fn unpack(
-        packed: &[FpVar<Bls12_377_Parameters>],
+        packed: &[Fp],
         target_bits: usize,
         source_capacity: usize,
     ) -> Result<Vec<Bool>, SynthesisError> {

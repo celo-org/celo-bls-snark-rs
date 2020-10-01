@@ -26,6 +26,7 @@ use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochDa
 use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 #[derive(Clone)]
 /// Contains the initial epoch block, followed by a list of epoch block transitions. The
@@ -147,9 +148,9 @@ impl ValidatorSetUpdate<Bls12_377> {
         initial_max_non_signers: FrVar,
     ) -> Result<
         (
-            Vec<Boolean<Bls12_377_Parameters>>,
-            Vec<Boolean<Bls12_377_Parameters>>,
-            Vec<Boolean<Bls12_377_Parameters>>,
+            Vec<Bool>,
+            Vec<Bool>,
+            Vec<Bool>,
             Vec<G2PreparedVar>,
             Vec<G1PreparedVar>,
         ),
