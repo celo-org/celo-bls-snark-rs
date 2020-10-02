@@ -3,6 +3,7 @@
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
 use algebra::{
+    curves::bls12::Bls12Parameters,
     bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
     bw6_761::Fr,
     PairingEngine, ProjectiveCurve,
@@ -17,7 +18,7 @@ use r1cs_std::{
 };
 use tracing::{debug, info, span, Level};
 
-use r1cs_core::{ConstraintSynthesizer, SynthesisError};
+use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
 
 use groth16::{Proof, VerifyingKey};
 
@@ -84,6 +85,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     // correctly, and then compress the public inputs
     fn generate_constraints(
         self,
+        cs: ConstraintSystemRef<Fr>,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();

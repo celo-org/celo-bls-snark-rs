@@ -1,21 +1,22 @@
 use algebra::{
+    PrimeField,
     curves::bls12::Bls12Parameters,
-    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
+    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters, Fq as Bls12_377_Fq},
     bw6_761::Fr,
     One, PairingEngine,
 };
 use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
-use r1cs_core::SynthesisError;
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Var, G2Var},
     fields::fp::FpVar,
     prelude::*,
     Assignment,
+    bits::ToBitsGadget,
 };
-
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
-use super::{fr_to_bits, g2_to_bits, to_fr};
+use super::{fr_to_bits, g2_to_bits};
 use tracing::{span, trace, Level};
 
 type FrVar = FpVar<Fr>;
@@ -78,7 +79,7 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits()?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(previous_index.cs().unwrap_or(ConstraintSystemRef::None))?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
@@ -101,13 +102,13 @@ impl EpochData<Bls12_377> {
     /// Encodes the epoch to bits (index and non-signers encoded as LE)
     pub fn to_bits(
         &self,
+        cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<(Vec<Bool>, FrVar, FrVar, Vec<G2Var>), SynthesisError> {
-        let index = to_fr(self.index)?;
+        let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)));
         let index_bits = fr_to_bits(&index, 16)?;
 
-        let maximum_non_signers = to_fr(
-            Some(self.maximum_non_signers),
-        )?;
+        let maximum_non_signers = FpVar::new_witness(cs, || Ok(Fr::from(self.maximum_non_signers)));
+
         let maximum_non_signers_bits = fr_to_bits(
             &maximum_non_signers,
             32,

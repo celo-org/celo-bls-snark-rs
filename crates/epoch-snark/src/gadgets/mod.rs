@@ -19,9 +19,9 @@ pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 // some helpers
 use algebra::{
     curves::bls12::Bls12Parameters,
-    bls12_377::Parameters as Bls12_377_Parameters, 
+    bls12_377::{Parameters as Bls12_377_Parameters, Fq as Bls12_377_Fq},
     bw6_761::Fr, 
-    BigInteger, Field, FpParameters, PrimeField};
+    BigInteger, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
 use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, Assignment};
 
@@ -29,7 +29,7 @@ type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 use bls_gadgets::YToBitGadget;
 
-use r1cs_core::SynthesisError;
+use r1cs_core::{SynthesisError, ConstraintSystemRef};
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -74,17 +74,18 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn to_fr<T: Into<u64>>(
+/*fn to_fr<T: Into<u64>>(
     num: Option<T>,
+    cs: ConstraintSystemRef,
 ) -> Result<FrVar, SynthesisError> {
-    FrVar::alloc(|| Ok(Fr::from(num.get()?.into())))
-}
+    FrVar::new_witness(cs, || Ok(Fr::from(num.get()?.into())))
+}*/
 
 fn fr_to_bits(
     input: &FrVar,
     length: usize,
 ) -> Result<Vec<Bool>, SynthesisError> {
-    let mut input = input.to_bits()?;
+    let mut input = input.to_bits_le()?;
     input.reverse();
     Ok(input[0..length].to_vec())
 }
@@ -92,10 +93,9 @@ fn fr_to_bits(
 fn g2_to_bits(
     input: &G2Var,
 ) -> Result<Vec<Bool>, SynthesisError> {
-    let x_0 = input.x.c0.to_bits()?;
-    let x_1 = input.x.c1.to_bits()?;
-    let y_bit =
-        YToBitGadget::y_to_bit_g2(&input)?;
+    let x_0 = input.x.c0.to_bits_le()?;
+    let x_1 = input.x.c1.to_bits_le()?;
+    let y_bit = input.y_to_bit()?;
     let mut output = Vec::new();
     output.extend_from_slice(&x_0);
     output.extend_from_slice(&x_1);
@@ -103,12 +103,13 @@ fn g2_to_bits(
     Ok(output)
 }
 
-fn constrain_bool<F: Field>(
+fn constrain_bool(
     input: &[Option<bool>],
+    cs: ConstraintSystemRef<Bls12_377_Fq>,
 ) -> Result<Vec<Bool>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Bool::alloc(|| b.get()))
+        .map(|(j, b)| Bool::new_witness(cs, || b.get()))
         .collect::<Result<Vec<_>, _>>()
 }

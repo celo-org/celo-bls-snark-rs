@@ -2,7 +2,7 @@ use algebra::{
     bls12_377::{Fr, FrParameters},
     FpParameters,
 };
-use r1cs_core::{ConstraintSynthesizer, SynthesisError};
+use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
 use tracing::{debug, info, span, trace, Level};
 
 use bls_crypto::SIG_DOMAIN;
@@ -36,6 +36,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
     #[allow(clippy::cognitive_complexity)] // false positive triggered by the info!("generating constraints") log
     fn generate_constraints(
         self,
+        cs: ConstraintSystemRef<Fr>,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "HashToBits");
         info!("generating constraints");
