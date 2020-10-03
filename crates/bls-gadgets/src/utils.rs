@@ -51,7 +51,7 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
-/*pub(crate) fn constrain_bool<F: Field>(
+/*pub(crate) fn constrain_bool<F: PrimeField>(
     cs: ConstraintSystemRef<F>,
     input: &[bool],
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {

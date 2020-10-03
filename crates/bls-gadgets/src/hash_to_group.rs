@@ -177,12 +177,12 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
-pub fn hash_to_bits(
-    message: &[Boolean<Bls12_377_Fq>],
+pub fn hash_to_bits<F: PrimeField>(
+    message: &[Boolean<F>],
     hash_length: u16,
     personalization: [u8; 8],
     generate_constraints_for_hash: bool,
-) -> Result<Vec<Boolean<Bls12_377_Fq>>, SynthesisError> {
+) -> Result<Vec<Boolean<F>>, SynthesisError> {
     let span = span!(
         Level::TRACE,
         "hash_to_bits",
@@ -215,7 +215,7 @@ pub fn hash_to_bits(
                 .into_iter()
                 .map(|n| n.to_bits_le())
                 .flatten()
-                .collect::<Vec<Boolean<Bls12_377_Fq>>>();
+                .collect::<Vec<Boolean<F>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
         xof_bits

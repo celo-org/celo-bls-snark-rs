@@ -1,18 +1,19 @@
 use algebra::{
-    PrimeField,
     curves::bls12::Bls12Parameters,
     bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters, Fq as Bls12_377_Fq},
     bw6_761::Fr,
     One, PairingEngine,
 };
-use bls_gadgets::{utils::is_setup, HashToGroupGadget, YToBitGadget};
+use bls_gadgets::{utils::is_setup, 
+    FpUtils, 
+    HashToGroupGadget, 
+};
 use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     bls12_377::{G1Var, G2Var},
     fields::fp::FpVar,
     prelude::*,
     Assignment,
-    bits::ToBitsGadget,
 };
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
@@ -21,6 +22,7 @@ use tracing::{span, trace, Level};
 
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
+type U8 = UInt8<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 /// An epoch block using optional types so that it can be used to instantiate the
 /// trusted setup. Its non-gadget compatible equivalent is [`EpochBlock`]
@@ -104,10 +106,10 @@ impl EpochData<Bls12_377> {
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<(Vec<Bool>, FrVar, FrVar, Vec<G2Var>), SynthesisError> {
-        let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)));
+        let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)))?;
         let index_bits = fr_to_bits(&index, 16)?;
 
-        let maximum_non_signers = FpVar::new_witness(cs, || Ok(Fr::from(self.maximum_non_signers)));
+        let maximum_non_signers = FpVar::new_witness(cs, || Ok(Fr::from(self.maximum_non_signers)))?;
 
         let maximum_non_signers_bits = fr_to_bits(
             &maximum_non_signers,
@@ -118,7 +120,7 @@ impl EpochData<Bls12_377> {
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (j, maybe_pk) in self.public_keys.iter().enumerate() {
-            let pk_var = G2Var::new_witness(|| maybe_pk.get())?;
+            let pk_var = G2Var::new_witness(cs, || maybe_pk.get())?;
 
             // extend our epoch bits by the pubkeys
             let pk_bits = g2_to_bits(&pk_var)?;
@@ -138,10 +140,12 @@ impl EpochData<Bls12_377> {
     ) -> Result<(), SynthesisError> {
         trace!("enforcing next epoch");
         let previous_plus_one =
-            previous_index.add_constant(&Fr::one())?;
+            previous_index + Fr::one();
+//            previous_index.add_constant(&Fr::one())?;
 
         let index_bit =
-            YToBitGadget::<Bls12_377_Parameters>::is_eq_zero(index)?.not();
+            index.is_eq_zero()?.not();
+
         index.conditional_enforce_equal(
             &previous_plus_one,
             &index_bit,
@@ -163,7 +167,7 @@ impl EpochData<Bls12_377> {
         let is_setup = is_setup(&epoch_bits);
 
         // Pack them to Uint8s
-        let input_bytes_var: Vec<UInt8> = epoch_bits
+        let input_bytes_var: Vec<U8> = epoch_bits
             .chunks(8)
             .map(|chunk| {
                 let mut chunk = chunk.to_vec();
@@ -181,7 +185,7 @@ impl EpochData<Bls12_377> {
             // find the counter value for the hash
             let input_bytes = input_bytes_var
                 .iter()
-                .map(|b| b.get_value().get())
+                .map(|b| b.value())
                 .collect::<Result<Vec<_>, _>>()?;
 
             let (_, counter) = COMPOSITE_HASH_TO_G1
@@ -190,8 +194,9 @@ impl EpochData<Bls12_377> {
             counter
         };
 
-        let counter_var = UInt8::alloc(|| Ok(counter as u8))?;
-        HashToGroupGadget::<Bls12_377_Parameters>::enforce_hash_to_group(
+        let counter_var = UInt8::new_witness(epoch_bits.cs().unwrap_or(ConstraintSystemRef::None),
+        || Ok(counter as u8))?;
+        HashToGroupGadget::enforce_hash_to_group(
             counter_var,
             &input_bytes_var,
             generate_constraints_for_hash,

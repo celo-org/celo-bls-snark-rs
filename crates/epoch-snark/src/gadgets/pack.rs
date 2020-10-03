@@ -1,13 +1,13 @@
 use algebra::{
     curves::bls12::Bls12Parameters,
     bls12_377::Parameters as Bls12_377_Parameters,
-    BigInteger, 
     FpParameters, 
     PrimeField
 };
+use algebra_core::biginteger::BigInteger;
 use bls_gadgets::utils::is_setup;
-use r1cs_core::SynthesisError;
-use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
+use r1cs_std::{Assignment, fields::fp::FpVar, prelude::*};
 use tracing::{span, trace, Level};
 
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -19,11 +19,12 @@ impl MultipackGadget {
     /// Packs the provided boolean constraints to a vector of field element gadgets of
     /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
     /// will be made as public inputs.
+    // TODO: In principle F should be more restricted here since pack specifically uses Bls12_377_Parameters
     pub fn pack<F: PrimeField>(
-        bits: &[Bool],
+        bits: &[Boolean<F>],
         element_size: usize,
         should_alloc_input: bool,
-    ) -> Result<Vec<Fp>, SynthesisError> {
+    ) -> Result<Vec<F>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
@@ -31,26 +32,27 @@ impl MultipackGadget {
         for (i, chunk) in fp_chunks.enumerate() {
             trace!(iteration = i);
             let alloc = if should_alloc_input {
-                FpVar::alloc_input
+                FpVar::<F>::new_input
             } else {
-                FpVar::alloc
+                FpVar::<F>::new_witness
             };
-            let fp = alloc(|| {
+            let fp = alloc(bits.cs().unwrap_or(ConstraintSystemRef::None),
+            || {
                 if is_setup(&chunk) {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-                let fp_val = Bls12_377_Parameters::BigInt::from_bits(
+                let fp_val = F::BigInt::from_bits(
                     &chunk
                         .iter()
-                        .map(|x| x.get_value().get())
+                        .map(|x| x.value())
                         .collect::<Result<Vec<bool>, _>>()?,
                 );
-                Ok(Bls12_377_Parameters::from_repr(fp_val).get()?)
+                Ok(F::from_repr(fp_val).get()?)
             })?;
-            let fp_bits = fp.to_bits()?;
+            let fp_bits = fp.to_bits_le()?;
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[Bls12_377_Parameters::Params::MODULUS_BITS as usize - chunk_len + j]
+                fp_bits[<Bls12_377_Parameters as FqParameters>::Params::MODULUS_BITS as usize - chunk_len + j]
                     .enforce_equal(&chunk[j])?;
             }
 

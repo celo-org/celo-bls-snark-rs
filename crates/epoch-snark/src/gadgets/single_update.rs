@@ -4,8 +4,9 @@ use algebra::{
     bw6_761::Fr, 
     PairingEngine
 };
-use r1cs_core::SynthesisError;
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
+    R1CSVar,
     bls12_377::{G1Var, G2Var, PairingVar},
     boolean::Boolean,
     fields::fp::FpVar,
@@ -91,7 +92,7 @@ impl SingleUpdate<Bls12_377> {
         )?;
 
         // convert the bitmap to constraints
-        let signed_bitmap = constrain_bool(&self.signed_bitmap)?;
+        let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs().unwrap_or(ConstraintSystemRef::None))?;
 
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk

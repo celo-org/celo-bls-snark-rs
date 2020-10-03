@@ -7,8 +7,9 @@ use tracing::{debug, info, span, trace, Level};
 
 use bls_crypto::SIG_DOMAIN;
 use bls_gadgets::hash_to_bits;
+use crate::gadgets::constrain_bool;
 
-use super::{constrain_bool, MultipackGadget};
+use super::MultipackGadget;
 
 #[derive(Clone)]
 /// Gadget which converts its inputs to Boolean constraints, applies blake2x to them
@@ -48,9 +49,10 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
-            let bits = constrain_bool(&message_bits)?;
+            let bits = constrain_bool(&message_bits, cs)?;/*message_bits.iter().enumerate()
+                .map(|(_j, b)| Boolean::new_witness(cs, || Ok(b.unwrap())));*/
             let hash = hash_to_bits(
-                &bits,
+                &bits[..],
                 512,
                 personalization,
                 true,
@@ -62,7 +64,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         // Pack them as public inputs
         debug!(capacity = FrParameters::CAPACITY, "packing CRH bits");
         MultipackGadget::pack(
-            &all_bits,
+            &all_bits[..],
             FrParameters::CAPACITY as usize,
             true,
         )?;

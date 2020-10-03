@@ -19,7 +19,7 @@ pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 // some helpers
 use algebra::{
     curves::bls12::Bls12Parameters,
-    bls12_377::{Parameters as Bls12_377_Parameters, Fq as Bls12_377_Fq},
+    bls12_377::{Parameters as Bls12_377_Parameters},
     bw6_761::Fr, 
     BigInteger, FpParameters, PrimeField};
 use r1cs_std::prelude::*;
@@ -103,13 +103,13 @@ fn g2_to_bits(
     Ok(output)
 }
 
-fn constrain_bool(
+fn constrain_bool<F: PrimeField>(
     input: &[Option<bool>],
-    cs: ConstraintSystemRef<Bls12_377_Fq>,
-) -> Result<Vec<Bool>, SynthesisError> {
+    cs: ConstraintSystemRef<F>,
+) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Bool::new_witness(cs, || b.get()))
+        .map(|(j, b)| Boolean::new_witness(cs, || b.get()))
         .collect::<Result<Vec<_>, _>>()
 }
