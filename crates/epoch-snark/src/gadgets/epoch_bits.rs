@@ -7,7 +7,7 @@ use algebra::{
 use r1cs_std::bls12_377::PairingVar;
 use r1cs_std::prelude::*;
 
-use r1cs_core::SynthesisError;
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 
 // Groth16 Specific imports
 use crypto_primitives::{
@@ -46,10 +46,11 @@ impl EpochBits {
     pub fn verify(
         &self,
         helper: Option<HashToBitsHelper<Bls12_377>>,
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
     ) -> Result<(), SynthesisError> {
         // Only verify the proof if it was provided
         if let Some(helper) = helper {
-            self.verify_proof(&helper)?;
+            self.verify_proof(&helper, cs)?;
         }
         self.verify_edges()?;
         Ok(())
@@ -110,14 +111,17 @@ impl EpochBits {
     fn verify_proof(
         &self,
         helper: &HashToBitsHelper<Bls12_377>,
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
     ) -> Result<(), SynthesisError> {
         // Verify the proof
-        let proof = ProofVar::<_, PairingVar>::new_witness(|| {
+        let proof = ProofVar::<_, PairingVar>::new_witness(cs, 
+        || {
             Ok(helper.proof.clone())
         })?;
 
         // Allocate the VK
-        let verifying_key = VerifyingKeyVar::<_, PairingVar>::alloc_constant(
+        let verifying_key = VerifyingKeyVar::<_, PairingVar>::new_constant(
+            cs,
             helper.verifying_key.clone(),
         )?;
 
@@ -128,7 +132,7 @@ impl EpochBits {
 
         let public_inputs: Vec<Vec<Bool>> = [packed_crh_bits, packed_xof_bits].concat();
 
-        <Groth16VerifierGadget<_, _, PairingVar> as NIZKVerifierGadget<
+        <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
             Groth16<Bls12_377, HashToBits, BlsFr>,
             Fr,
         >>::verify(
