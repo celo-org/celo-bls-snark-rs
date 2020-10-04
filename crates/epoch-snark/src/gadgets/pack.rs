@@ -1,6 +1,6 @@
 use algebra::{
     curves::bls12::Bls12Parameters,
-    bls12_377::Parameters as Bls12_377_Parameters,
+    bls12_377::{Parameters as Bls12_377_Parameters, FqParameters},
     FpParameters, 
     PrimeField
 };
@@ -24,7 +24,7 @@ impl MultipackGadget {
         bits: &[Boolean<F>],
         element_size: usize,
         should_alloc_input: bool,
-    ) -> Result<Vec<F>, SynthesisError> {
+    ) -> Result<Vec<FpVar<F>>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
@@ -52,7 +52,7 @@ impl MultipackGadget {
             let fp_bits = fp.to_bits_le()?;
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[<Bls12_377_Parameters as FqParameters>::Params::MODULUS_BITS as usize - chunk_len + j]
+                fp_bits[<FqParameters as FpParameters>::MODULUS_BITS as usize - chunk_len + j]
                     .enforce_equal(&chunk[j])?;
             }
 
@@ -71,7 +71,7 @@ impl MultipackGadget {
         let bits_vecs = packed
             .iter()
             .enumerate()
-            .map(|(i, x)| x.to_bits())
+            .map(|(i, x)| x.to_bits_le())
             .collect::<Result<Vec<_>, _>>()?;
         let mut bits = vec![];
         let mut chunk = 0;
@@ -83,7 +83,7 @@ impl MultipackGadget {
                 source_capacity as usize
             };
             bits.extend_from_slice(
-                &bits_vecs[chunk][<Bls12_377_Parameters::Params as FpParameters>::MODULUS_BITS as usize - diff..],
+                &bits_vecs[chunk][<FqParameters as FpParameters>::MODULUS_BITS as usize - diff..],
             );
             current_index += diff;
             chunk += 1;

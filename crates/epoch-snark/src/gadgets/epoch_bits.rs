@@ -112,12 +112,12 @@ impl EpochBits {
         helper: &HashToBitsHelper<Bls12_377>,
     ) -> Result<(), SynthesisError> {
         // Verify the proof
-        let proof = ProofVar::<_, _, PairingVar>::alloc(|| {
+        let proof = ProofVar::<_, PairingVar>::new_witness(|| {
             Ok(helper.proof.clone())
         })?;
 
         // Allocate the VK
-        let verifying_key = VerifyingKeyVar::<_, _, PairingVar>::alloc_constant(
+        let verifying_key = VerifyingKeyVar::<_, PairingVar>::alloc_constant(
             helper.verifying_key.clone(),
         )?;
 
