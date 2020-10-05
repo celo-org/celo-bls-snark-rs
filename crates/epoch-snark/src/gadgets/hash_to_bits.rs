@@ -49,8 +49,10 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
-            let bits = constrain_bool(&message_bits, cs)?;/*message_bits.iter().enumerate()
-                .map(|(_j, b)| Boolean::new_witness(cs, || Ok(b.unwrap())));*/
+            let bits = constrain_bool(&message_bits, cs.clone())?;
+            /*let bits = message_bits.iter().enumerate()
+                .map(|(j,b)| Boolean::new_witness(cs, || b.get()))
+                .collect::<Result<Vec<_>, _>>();*/
             let hash = hash_to_bits(
                 &bits[..],
                 512,

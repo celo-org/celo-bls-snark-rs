@@ -109,7 +109,7 @@ impl EpochData<Bls12_377> {
         let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)))?;
         let index_bits = fr_to_bits(&index, 16)?;
 
-        let maximum_non_signers = FpVar::new_witness(cs, || Ok(Fr::from(self.maximum_non_signers)))?;
+        let maximum_non_signers = FpVar::new_witness(index.cs().unwrap_or(ConstraintSystemRef::None), || Ok(Fr::from(self.maximum_non_signers)))?;
 
         let maximum_non_signers_bits = fr_to_bits(
             &maximum_non_signers,
@@ -119,8 +119,8 @@ impl EpochData<Bls12_377> {
         let mut epoch_bits: Vec<Bool> = [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
-        for (j, maybe_pk) in self.public_keys.iter().enumerate() {
-            let pk_var = G2Var::new_witness(cs, || maybe_pk.get())?;
+        for (_j, maybe_pk) in self.public_keys.iter().enumerate() {
+            let pk_var = G2Var::new_witness(index.cs().unwrap_or(ConstraintSystemRef::None), || maybe_pk.get())?;
 
             // extend our epoch bits by the pubkeys
             let pk_bits = g2_to_bits(&pk_var)?;

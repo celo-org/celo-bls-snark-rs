@@ -62,7 +62,7 @@ impl EpochBits {
         // Verify the edges
         let mut xof_bits = vec![];
         let first_and_last_bits = [self.first_epoch_bits.clone(), self.last_epoch_bits.clone()];
-        for (i, bits) in first_and_last_bits.iter().enumerate() {
+        for (_i, bits) in first_and_last_bits.iter().enumerate() {
             let mut message = bits.to_owned();
             message.reverse();
             let message_rounded_len = 8 * ((message.len() + 7) / 8);
@@ -121,7 +121,7 @@ impl EpochBits {
 
         // Allocate the VK
         let verifying_key = VerifyingKeyVar::<_, PairingVar>::new_constant(
-            cs,
+            proof.a.cs().unwrap_or(ConstraintSystemRef::None),
             helper.verifying_key.clone(),
         )?;
 

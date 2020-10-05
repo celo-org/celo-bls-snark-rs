@@ -24,7 +24,7 @@ use groth16::{Proof, VerifyingKey};
 
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 
-use bls_gadgets::{BlsVerifyGadget, YToBitGadget, FpUtils};
+use bls_gadgets::{BlsVerifyGadget, FpUtils};
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -91,7 +91,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let epoch_bits = self.enforce(cs)?;
-        epoch_bits.verify(self.hash_helper, cs)?;
+        epoch_bits.verify(self.hash_helper, epoch_bits.first_epoch_bits[0].cs().unwrap_or(ConstraintSystemRef::None))?;
 
         info!("constraints generated");
 
@@ -129,7 +129,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         self.verify_signature(
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
-            cs
+            first_epoch_bits.cs().unwrap_or(ConstraintSystemRef::None)
         )?;
 
         Ok(EpochBits {
@@ -203,7 +203,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 .iter()
                 .zip(previous_pubkey_vars.iter())
                 .enumerate()
-                .map(|(j, (new_pk, old_pk))| {
+                .map(|(_j, (new_pk, old_pk))| {
                     G2Var::conditionally_select(
                         &index_bit,
                         new_pk,

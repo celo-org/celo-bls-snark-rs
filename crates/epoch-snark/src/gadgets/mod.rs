@@ -110,6 +110,6 @@ fn constrain_bool<F: PrimeField>(
     input
         .iter()
         .enumerate()
-        .map(|(j, b)| Boolean::new_witness(cs, || b.get()))
+        .map(|(_j, b)| Boolean::new_witness(cs.clone(), || b.get()))
         .collect::<Result<Vec<_>, _>>()
 }
