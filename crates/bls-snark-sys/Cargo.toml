@@ -8,7 +8,7 @@ edition = "2018"
 bls-crypto = { path = "../bls-crypto", features = ["compat"] }
 epoch-snark = { path = "../epoch-snark", features = ["compat"] }
 
-algebra = { git = "https://github.com/scipr-lab/zexe", default-features = false, features = ["bls12_377", "parallel"] }
+algebra = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", default-features = false, features = ["bls12_377", "parallel"] }
 once_cell = "1.4.0"
 rand = "0.7.3"
 log = "0.4.8"

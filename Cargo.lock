@@ -20,14 +20,6 @@ dependencies = [
 
 [[package]]
 name = "algebra"
-version = "0.1.0"
-source = "git+https://github.com/scipr-lab/zexe#48aab0ddfb8a29941e07a732a6cdd008a7ef3467"
-dependencies = [
- "algebra-core 0.1.0",
-]
-
-[[package]]
-name = "algebra"
 version = "0.1.1-alpha.0"
 source = "git+https://github.com/scipr-lab/zexe?branch=better-r1cs-docs#982aaf9baa2538e9c742949c281124bd39a20a5a"
 dependencies = [
@@ -174,7 +166,7 @@ dependencies = [
 name = "bls-crypto"
 version = "0.1.4"
 dependencies = [
- "algebra 0.1.1-alpha.0",
+ "algebra",
  "bench-utils 0.1.1-alpha.0",
  "blake2s_simd",
  "byteorder",
@@ -197,7 +189,7 @@ dependencies = [
 name = "bls-gadgets"
 version = "0.1.4"
 dependencies = [
- "algebra 0.1.1-alpha.0",
+ "algebra",
  "algebra-core 0.1.1-alpha.0",
  "bls-crypto",
  "crypto-primitives",
@@ -213,7 +205,7 @@ dependencies = [
 name = "bls-snark-sys"
 version = "0.1.4"
 dependencies = [
- "algebra 0.1.0",
+ "algebra",
  "bls-crypto",
  "epoch-snark",
  "groth16 0.1.0",
@@ -510,7 +502,7 @@ dependencies = [
 name = "epoch-snark"
 version = "0.1.4"
 dependencies = [
- "algebra 0.1.1-alpha.0",
+ "algebra",
  "algebra-core 0.1.1-alpha.0",
  "bench-utils 0.1.0",
  "blake2s_simd",
@@ -903,7 +895,7 @@ name = "r1cs-std"
 version = "0.1.1-alpha.0"
 source = "git+https://github.com/scipr-lab/zexe?branch=better-r1cs-docs#982aaf9baa2538e9c742949c281124bd39a20a5a"
 dependencies = [
- "algebra 0.1.1-alpha.0",
+ "algebra",
  "derivative",
  "r1cs-core 0.1.1-alpha.0",
  "tracing",
