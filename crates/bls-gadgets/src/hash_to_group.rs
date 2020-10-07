@@ -9,19 +9,19 @@ use bls_crypto::{
     },
     SIG_DOMAIN,
 };
-use r1cs_std::alloc::AllocVar;
-use std::ops::Sub;
 // Imported for the BLS12-377 API
 use algebra::{
-    bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-};
-use algebra::{
+    bls12_377::{
+        Fq as Bls12_377_Fq,
+        Parameters as Bls12_377_Parameters,
+    },
     curves::{
         bls12::G1Projective,
         models::bls12::Bls12Parameters,
         short_weierstrass_jacobian::{GroupAffine, GroupProjective},
         SWModelParameters,
     },
+    ed_on_bw6_761::EdwardsParameters,
     AffineCurve, BigInteger, BitIteratorBE, PrimeField, ProjectiveCurve,
 };
 use crypto_primitives::{
@@ -32,12 +32,11 @@ use crypto_primitives::{
 };
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
-    bits::ToBitsGadget, boolean::Boolean,
+    alloc::AllocVar, bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
 };
-use std::{borrow::Borrow, marker::PhantomData};
+use std::{borrow::Borrow, ops::Sub, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
-use algebra::ed_on_bw6_761::EdwardsParameters;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]

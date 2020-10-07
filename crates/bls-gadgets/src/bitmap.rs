@@ -29,7 +29,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
         // If we're in setup mode, we skip the bit counting part since the bitmap
         // will be empty
-        // TODO: Change to new setup flag in ConstraintSystem
+        // TODO: Consider checking setup flag in ConstraintSystem instead
         let is_setup = is_setup(self);
 
         let mut occurrences = 0;
@@ -70,6 +70,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
             FpVar::Var(v) => v,
             _ => unreachable!(),
         };
+
         // Enforce that we have correctly counted the number of occurrences
         self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
             occurrences_lc,
