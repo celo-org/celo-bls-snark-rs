@@ -5,7 +5,7 @@ use r1cs_std::{
     boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
     groups::CurveVar, pairing::PairingVar, alloc::AllocVar,
 };
-use std::marker::{PhantomData, Sized};
+use std::marker::PhantomData;
 use std::ops::AddAssign;
 use tracing::{debug, span, trace, Level};
 
@@ -13,110 +13,6 @@ use tracing::{debug, span, trace, Level};
 ///
 /// Implements BLS Verification as written in [BDN18](https://eprint.iacr.org/2018/483.pdf)
 /// in a Pairing-based SNARK.
-
-pub trait BlsSignatureGadget<E: PairingEngine, F: PrimeField, P: PairingVar<E, F>> {
-    fn verify(
-        &self,
-        pub_keys: &[P::G2Var],
-        signed_bitmap: &[Boolean<F>],
-        message_hash: &Self,
-        maximum_non_signers: &FpVar<F>,
-    ) -> Result<(), SynthesisError>;
-
-    fn batch_verify(
-        &self,
-        aggregated_pub_keys: &[P::G2Var],
-        message_hashes: &[P::G1Var],
-    ) -> Result<(), SynthesisError>; 
-
-    fn batch_verify_prepared(
-        &self,
-        prepared_aggregated_pub_keys: &[P::G2PreparedVar],
-        prepared_message_hashes: &[P::G1PreparedVar],
-    ) -> Result<(), SynthesisError>;
-
-    fn prepare_signature_neg_generator(
-        &self
-    ) -> Result<(P::G1PreparedVar, P::G2PreparedVar), SynthesisError>; 
-}
-
-
-impl<E: PairingEngine, F: PrimeField, P: PairingVar<E,F>> BlsSignatureGadget<E,F,P> for P::G1Var {
-    fn verify(
-        &self,
-        pub_keys: &[P::G2Var],
-        signed_bitmap: &[Boolean<F>],
-        message_hash: &Self,
-        maximum_non_signers: &FpVar<F>,
-    ) -> Result<(), SynthesisError> {
-        Ok(())
-    }
-
-    fn batch_verify(
-        &self,
-        aggregated_pub_keys: &[P::G2Var],
-        message_hashes: &[P::G1Var],
-    ) -> Result<(), SynthesisError> {
-        Ok(())
-    }
-
-    fn batch_verify_prepared(
-        &self,
-        prepared_aggregated_pub_keys: &[P::G2PreparedVar],
-        prepared_message_hashes: &[P::G1PreparedVar],
-    ) -> Result<(), SynthesisError> {
-        Ok(())
-    }
-
-    fn prepare_signature_neg_generator(
-        &self
-    ) -> Result<(P::G1PreparedVar, P::G2PreparedVar), SynthesisError> {
-        Err(SynthesisError::MissingCS)
-    }
-}
-
-pub trait BlsPubkeyGadget<E: PairingEngine, F: PrimeField, P: PairingVar<E, F>>  where Self: Sized {
-    fn enforce_aggregated_pubkeys(
-        pub_keys: &[Self],
-        signed_bitmap: &[Boolean<F>],
-    ) -> Result<Self, SynthesisError>;
-
-    fn enforce_aggregated_all_pubkeys(
-        pub_keys: &[Self],
-    ) -> Result<Self, SynthesisError>;
-
-    fn enforce_bitmap(
-        pub_keys: &[Self],
-        signed_bitmap: &[Boolean<F>],
-        message_hash: &P::G1Var,
-        maximum_non_signers: &FpVar<F>,
-    ) -> Result<(P::G1Var, Self), SynthesisError>; 
-}
-
-impl<E: PairingEngine, F: PrimeField, P: PairingVar<E,F>> BlsPubkeyGadget<E,F,P> for P::G2Var {
-    fn enforce_aggregated_pubkeys(
-        pub_keys: &[Self],
-        signed_bitmap: &[Boolean<F>],
-    ) -> Result<Self, SynthesisError> {
-        Err(SynthesisError::MissingCS)
-    }
-
-    fn enforce_aggregated_all_pubkeys(
-        pub_keys: &[Self],
-    ) -> Result<Self, SynthesisError> {
-        Err(SynthesisError::MissingCS)
-    }
-
-    fn enforce_bitmap(
-        pub_keys: &[Self],
-        signed_bitmap: &[Boolean<F>],
-        message_hash: &P::G1Var,
-        maximum_non_signers: &FpVar<F>,
-    ) -> Result<(P::G1Var, Self), SynthesisError> {
-        Err(SynthesisError::MissingCS)
-    }
-}
-
 pub struct BlsVerifyGadget<E, F, P> {
     /// The curve being used
     pairing_engine_type: PhantomData<E>,
