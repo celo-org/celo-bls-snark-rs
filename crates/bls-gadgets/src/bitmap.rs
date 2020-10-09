@@ -17,6 +17,7 @@ pub trait Bitmap<F: PrimeField> {
 impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
     /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
     /// present in the provided bitmap
+    // TODO: Handle constant Boolean values in bitmap
     fn enforce_maximum_occurrences_in_bitmap(
         &self,
         max_occurrences: &FpVar<F>,
@@ -29,7 +30,6 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
         // If we're in setup mode, we skip the bit counting part since the bitmap
         // will be empty
-        // TODO: Change to new setup flag in ConstraintSystem
         let is_setup = is_setup(self);
 
         let mut occurrences = 0;
@@ -164,11 +164,11 @@ mod tests {
         let mut cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap
             .iter()
-            .map(|b| Boolean::constant(*b))
+            .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)).unwrap())
             .collect::<Vec<_>>();
         let max_occurrences =
             FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(max_number))).unwrap();
-        bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one).unwrap();
+        bitmap[..].enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one).unwrap();
         cs
     }
 
