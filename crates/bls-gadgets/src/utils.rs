@@ -62,21 +62,22 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect::<Result<Vec<_>, _>>()
 }*/
 
-/*#[cfg(any(test, feature = "test-helpers"))]
+#[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     use algebra::{Field, Group};
-    use r1cs_core::ConstraintSystem;
-    use r1cs_std::groups::GroupGadget;
+    use r1cs_core::ConstraintSystemRef;
+    use r1cs_std::groups::CurveVar;
+    use algebra::ProjectiveCurve;
 
     /// Allocates an array of group elements to a group gadget
-    pub fn alloc_vec<F: Field, G: Group, GG: GroupGadget<G, F>, CS: ConstraintSystem<F>>(
-        cs: &mut CS,
+    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
+        cs: ConstraintSystemRef<F>,
         elements: &[G],
     ) -> Vec<GG> {
         elements
             .iter()
             .enumerate()
-            .map(|(i, element)| GG::alloc(&mut cs.ns(|| format!("{}", i)), || Ok(element)).unwrap())
+            .map(|(i, element)| GG::new_witness(cs.clone(), || Ok(element)).unwrap())
             .collect::<Vec<_>>()
     }
-}*/
+}

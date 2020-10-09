@@ -224,14 +224,14 @@ where
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod verify_one_message {
     use super::*;
     use crate::utils::test_helpers::alloc_vec;
     use bls_crypto::test_helpers::*;
 
     use algebra::{
-        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
+        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
         bw6_761::Fr as BW6_761Fr,
         ProjectiveCurve, UniformRand, Zero,
     };
@@ -244,36 +244,35 @@ mod verify_one_message {
     };
 
     // converts the arguments to constraints and checks them against the `verify` function
-    fn cs_verify<E: PairingEngine, F: PrimeField, P: PairingGadget<E, F>>(
+    fn cs_verify<E: PairingEngine, F: PrimeField, P: PairingVar<E, F>>(
         message_hash: E::G1Projective,
         pub_keys: &[E::G2Projective],
         signature: E::G1Projective,
         bitmap: &[bool],
         num_non_signers: u64,
-    ) -> TestConstraintSystem<F> {
-        let mut cs = TestConstraintSystem::<F>::new();
+    ) -> ConstraintSystemRef<F> {
+        let mut cs = ConstraintSystem::<F>::new_ref();
 
         let message_hash_var =
-            P::G1Gadget::alloc(cs.ns(|| "message_hash"), || Ok(message_hash)).unwrap();
-        let signature_var = P::G1Gadget::alloc(cs.ns(|| "signature"), || Ok(signature)).unwrap();
+            P::G1Var::new_witness(cs.clone(), || Ok(message_hash)).unwrap();
+        let signature_var = P::G1Var::new_witness(cs.clone(), || Ok(signature)).unwrap();
 
         let pub_keys = pub_keys
             .iter()
             .enumerate()
             .map(|(i, pub_key)| {
-                P::G2Gadget::alloc(cs.ns(|| format!("pub_key_{}", i)), || Ok(pub_key)).unwrap()
+                P::G2Var::new_witness(cs.clone(), || Ok(pub_key)).unwrap()
             })
             .collect::<Vec<_>>();
         let bitmap = bitmap
             .iter()
-            .map(|b| Boolean::constant(*b))
+            .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)))
             .collect::<Vec<_>>();
 
         let max_occurrences =
-            &FpGadget::<F>::alloc(cs.ns(|| "num non signers"), || Ok(F::from(num_non_signers)))
+            &FpVar::<F>::new_witness(cs.clone(), || Ok(F::from(num_non_signers)))
                 .unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
-            cs.ns(|| "verify sig"),
             &pub_keys,
             &bitmap,
             &message_hash_var,
@@ -310,14 +309,13 @@ mod verify_one_message {
         let asig = sum(&asigs);
 
         // allocate the constraints
-        let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
+        let mut cs = ConstraintSystemRef::<BW6_761Fr>::new_ref();
         let messages = alloc_vec(&mut cs.ns(|| "messages"), &messages);
         let aggregate_pubkeys = alloc_vec(&mut cs.ns(|| "aggregate pubkeys"), &aggregate_pubkeys);
-        let asig = G1Gadget::alloc(&mut cs.ns(|| "asig"), || Ok(asig)).unwrap();
+        let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
 
         // check that verification is correct
         BlsVerifyGadget::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>::batch_verify(
-            &mut cs,
             &aggregate_pubkeys,
             &messages,
             &asig,
@@ -429,4 +427,4 @@ mod verify_one_message {
         );
         assert!(!cs.is_satisfied());
     }
-}*/
+}
