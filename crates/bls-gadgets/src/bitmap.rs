@@ -1,6 +1,6 @@
 use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef};
+use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef, ConstraintSystem};
 use r1cs_std::{
     fields::{fp::FpVar},
     prelude::*,
@@ -82,7 +82,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
 }
 
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use algebra::{
@@ -93,7 +93,7 @@ mod tests {
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use r1cs_core::ConstraintSynthesizer;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use std::assert;
 
     #[test]
     // "I know of a bitmap that has at most 2 zeros"
@@ -110,17 +110,17 @@ mod tests {
         impl ConstraintSynthesizer<Fr> for BitmapGadget {
             fn generate_constraints(
                 self,
-                cs: ConstraintSystemRef<F>,
+                cs: ConstraintSystemRef<Fr>,
             ) -> Result<(), SynthesisError> {
                 let bitmap = self
                     .bitmap
                     .iter()
                     .enumerate()
                     .map(|(i, b)| {
-                        Boolean::new_witness(&cs, || Ok(b.unwrap())).unwrap()
+                        Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
-                let max_occurrences = FpVar::<Fr>::new_witness(&cs, || {
+                let max_occurrences = FpVar::<Fr>::new_witness(cs.clone(), || {
                     Ok(Fr::from(self.max_occurrences))
                 })
                 .unwrap();
@@ -147,9 +147,9 @@ mod tests {
 
         // since our Test constraint system is satisfied, the groth16 proof
         // should also work
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        circuit.clone().generate_constraints(&mut cs).unwrap();
-        assert!(cs.is_satisfied());
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.clone().generate_constraints(cs.clone()).unwrap();
+        assert!(cs.is_satisfied().unwrap());
         let proof = create_random_proof(circuit, &params, rng).unwrap();
 
         let pvk = prepare_verifying_key(&params.vk);
@@ -160,15 +160,15 @@ mod tests {
         bitmap: &[bool],
         max_number: u64,
         is_one: bool,
-    ) -> TestConstraintSystem<Fq> {
-        let mut cs = TestConstraintSystem::<Fq>::new();
+    ) -> ConstraintSystemRef<Fq> {
+        let mut cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap
             .iter()
             .map(|b| Boolean::constant(*b))
             .collect::<Vec<_>>();
         let max_occurrences =
-            FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number))).unwrap();
-        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, &max_occurrences, is_one).unwrap();
+            FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(max_number))).unwrap();
+        bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one).unwrap();
         cs
     }
 
@@ -177,24 +177,24 @@ mod tests {
 
         #[test]
         fn one_zero_allowed() {
-            assert!(cs_enforce_value(&[false], 1, false).is_satisfied());
+            assert!(cs_enforce_value(&[false], 1, false).is_satisfied().unwrap());
         }
 
         #[test]
         fn no_zeros_allowed() {
-            assert!(!cs_enforce_value(&[false], 0, false).is_satisfied());
+            assert!(!cs_enforce_value(&[false], 0, false).is_satisfied().unwrap());
         }
 
         #[test]
 
         fn three_zeros_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied());
+            assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied().unwrap());
         }
 
         #[test]
         fn four_zeros_not_allowed() {
             assert!(
-                !cs_enforce_value(&[false, false, true, false, false], 3, false).is_satisfied()
+                !cs_enforce_value(&[false, false, true, false, false], 3, false).is_satisfied().unwrap()
             );
         }
     }
@@ -204,22 +204,22 @@ mod tests {
 
         #[test]
         fn one_one_allowed() {
-            assert!(cs_enforce_value(&[true], 1, true).is_satisfied());
+            assert!(cs_enforce_value(&[true], 1, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn no_ones_allowed() {
-            assert!(!cs_enforce_value(&[true], 0, true).is_satisfied());
+            assert!(!cs_enforce_value(&[true], 0, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn three_ones_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true).is_satisfied());
+            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn four_ones_not_allowed() {
-            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied());
+            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied().unwrap());
         }
     }
-}*/
+}

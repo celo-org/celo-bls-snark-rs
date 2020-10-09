@@ -17,7 +17,7 @@ log = "0.4.8"
 crate-type = ["lib", "staticlib"]
 
 [dev-dependencies]
-groth16 = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"] }
-r1cs-core = { git = "https://github.com/scipr-lab/zexe" }
+groth16 = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["parallel"] }
+r1cs-core = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs" }
 hex = "0.4.2"
 
