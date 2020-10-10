@@ -254,19 +254,19 @@ mod verify_one_message {
         let mut cs = ConstraintSystem::<F>::new_ref();
 
         let message_hash_var =
-            P::G1Var::new_witness(cs.clone(), || Ok(message_hash)).unwrap();
-        let signature_var = P::G1Var::new_witness(cs.clone(), || Ok(signature)).unwrap();
+            <P::G1Var as AllocVar<E::G1Projective, _>>::new_witness(cs.clone(), || Ok(message_hash)).unwrap();
+        let signature_var = <P::G1Var as AllocVar<E::G1Projective, _>>::new_witness(cs.clone(), || Ok(signature)).unwrap();
 
         let pub_keys = pub_keys
             .iter()
             .enumerate()
             .map(|(i, pub_key)| {
-                P::G2Var::new_witness(cs.clone(), || Ok(pub_key)).unwrap()
+                <P::G2Var as AllocVar<E::G2Projective, _>>::new_witness(cs.clone(), || Ok(pub_key)).unwrap()
             })
             .collect::<Vec<_>>();
         let bitmap = bitmap
             .iter()
-            .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)))
+            .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)).unwrap())
             .collect::<Vec<_>>();
 
         let max_occurrences =
@@ -274,7 +274,7 @@ mod verify_one_message {
                 .unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
             &pub_keys,
-            &bitmap,
+            &bitmap[..],
             &message_hash_var,
             &signature_var,
             &max_occurrences,
@@ -309,9 +309,9 @@ mod verify_one_message {
         let asig = sum(&asigs);
 
         // allocate the constraints
-        let mut cs = ConstraintSystemRef::<BW6_761Fr>::new_ref();
-        let messages = alloc_vec(&mut cs.ns(|| "messages"), &messages);
-        let aggregate_pubkeys = alloc_vec(&mut cs.ns(|| "aggregate pubkeys"), &aggregate_pubkeys);
+        let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
+        let messages = alloc_vec(cs.clone(), &messages);
+        let aggregate_pubkeys = alloc_vec(cs.clone(), &aggregate_pubkeys);
         let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
 
         // check that verification is correct
@@ -321,7 +321,7 @@ mod verify_one_message {
             &asig,
         )
         .unwrap();
-        assert!(cs.is_satisfied());
+        assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
@@ -341,7 +341,7 @@ mod verify_one_message {
             &[true],
             0,
         );
-        assert!(cs.is_satisfied());
+        assert!(cs.is_satisfied().unwrap());
         assert_eq!(cs.num_constraints(), 21184);
 
         // random sig fails
@@ -352,7 +352,7 @@ mod verify_one_message {
             &[true],
             0,
         );
-        assert!(!cs.is_satisfied());
+        assert!(!cs.is_satisfied().unwrap());
     }
 
     #[test]
@@ -371,7 +371,7 @@ mod verify_one_message {
             &[true, true],
             1,
         );
-        assert!(cs.is_satisfied());
+        assert!(cs.is_satisfied().unwrap());
 
         // using the single sig if second guy is OK as long as
         // we tolerate 1 non-signers
@@ -382,7 +382,7 @@ mod verify_one_message {
             &[true, false],
             1,
         );
-        assert!(cs.is_satisfied());
+        assert!(cs.is_satisfied().unwrap());
 
         // bitmap set to false on the second one fails since we don't tolerate
         // >0 failures
@@ -393,7 +393,7 @@ mod verify_one_message {
             &[true, false],
             0,
         );
-        assert!(!cs.is_satisfied());
+        assert!(!cs.is_satisfied().unwrap());
         let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(
             message_hash,
             &[pk, pk2],
@@ -401,7 +401,7 @@ mod verify_one_message {
             &[true, false],
             0,
         );
-        assert!(!cs.is_satisfied());
+        assert!(!cs.is_satisfied().unwrap());
     }
 
     #[test]
@@ -425,6 +425,6 @@ mod verify_one_message {
             &[false, true],
             3,
         );
-        assert!(!cs.is_satisfied());
+        assert!(!cs.is_satisfied().unwrap());
     }
 }
