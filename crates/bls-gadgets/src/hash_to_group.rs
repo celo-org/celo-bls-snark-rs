@@ -234,9 +234,10 @@ pub fn hash_to_bits<F: PrimeField>(
             bits.reverse();
             bits
         };
+
         bits.iter()
         .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(message[0].cs().unwrap_or(ConstraintSystemRef::None), || Ok(b)))
+        .map(|(_j, b)| Boolean::new_witness(message[..].cs().unwrap_or(ConstraintSystemRef::None), || Ok(b)))
         .collect::<Result<Vec<_>, _>>()?
 //        constrain_bool(message[0].cs().unwrap_or(ConstraintSystemRef::None), &bits)?
     };
@@ -348,12 +349,13 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod test {
     use super::*;
 
     use algebra::bls12_377;
-    use r1cs_std::{groups::GroupVar, test_constraint_system::TestConstraintSystem};
+    use r1cs_std::groups::CurveVar;
+    use r1cs_core::ConstraintSystem;
 
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
     use r1cs_std::bits::uint8::UInt8;
@@ -379,19 +381,18 @@ mod test {
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
 
-        let mut cs = TestConstraintSystem::<bls12_377::Fq>::new();
+        let mut cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
 
-        let counter = UInt8::alloc(&mut cs.ns(|| "alloc counter"), || Ok(attempt as u8)).unwrap();
+        let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
             .enumerate()
             .map(|(i, num)| {
-                UInt8::alloc(&mut cs.ns(|| format!("input {}", i)), || Ok(num)).unwrap()
+                UInt8::new_witness(cs.clone(), || Ok(num)).unwrap()
             })
             .collect::<Vec<_>>();
 
-        let hash = HashToGroupGadget::<bls12_377::Parameters>::enforce_hash_to_group(
-            &mut cs.ns(|| "hash to group"),
+        let hash = HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
             counter,
             &input,
             false,
@@ -399,7 +400,7 @@ mod test {
         .unwrap()
         .0;
 
-        assert!(cs.is_satisfied());
-        assert_eq!(expected_hash, hash.get_value().unwrap());
+        assert!(cs.is_satisfied().unwrap());
+        assert_eq!(expected_hash, hash.value().unwrap());
     }
-}*/
+}

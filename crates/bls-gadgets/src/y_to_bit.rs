@@ -170,7 +170,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -328,4 +328,4 @@ mod test {
         half_plus_one.add_nocarry(&one);
         test_y_to_bit_g2_edge(half_plus_one);
     }
-}*/
+}
