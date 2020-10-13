@@ -181,6 +181,7 @@ mod test {
         fields::Fp2,
         AffineCurve, BigInteger, PrimeField, UniformRand, Zero,
     };
+    use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocVar,
         fields::FieldVar,
@@ -199,24 +200,23 @@ mod test {
         for _ in 0..10 {
             let element = G1Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
+            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
-                G1Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
+                G1Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
 
-            let y_bit =
-                YToBitGadget::<Parameters>::y_to_bit_g1(cs.ns(|| "y to bit"), &allocated).unwrap();
+            let y_bit = allocated.y_to_bit().unwrap();
 
             assert_eq!(
-                allocated.y.get_value().get().unwrap() > half,
-                y_bit.get_value().get().unwrap()
+                allocated.y.value().unwrap() > half,
+                y_bit.value().unwrap()
             );
 
             assert_eq!(cs.num_constraints(), 1621);
-            if !cs.is_satisfied() {
-                println!("{}", cs.which_is_unsatisfied().unwrap());
+            if !cs.is_satisfied().unwrap() {
+                println!("{:?}", cs.which_is_unsatisfied().unwrap());
             }
-            assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied().unwrap());
         }
     }
 
@@ -230,28 +230,27 @@ mod test {
         for _ in 0..10 {
             let element = G2Projective::rand(rng);
 
-            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
+            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
-                G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
+                G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
 
-            let y_bit =
-                YToBitGadget::<Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &allocated).unwrap();
+            let y_bit = allocated.y_to_bit().unwrap();
 
-            let c1 = allocated.y.c1.get_value().unwrap();
-            let c0 = allocated.y.c0.get_value().unwrap();
+            let c1 = allocated.y.c1.value().unwrap();
+            let c0 = allocated.y.c0.value().unwrap();
 
             if c1 > half || (c1 == zero && c0 > half) {
-                assert_eq!(true, y_bit.get_value().unwrap());
+                assert_eq!(true, y_bit.value().unwrap());
             } else {
-                assert_eq!(false, y_bit.get_value().unwrap());
+                assert_eq!(false, y_bit.value().unwrap());
             }
 
             assert_eq!(cs.num_constraints(), 3248);
-            if !cs.is_satisfied() {
-                println!("{}", cs.which_is_unsatisfied().unwrap());
+            if !cs.is_satisfied().unwrap() {
+                println!("{:?}", cs.which_is_unsatisfied().unwrap());
             }
-            assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied().unwrap());
         }
     }
 
@@ -267,21 +266,20 @@ mod test {
                 Fp2::<<Parameters as Bls12Parameters>::Fp2Params>::new(element.y.c0, edge.into());
             let element = G2Affine::new(element.x, new_y, false).into_projective();
 
-            let mut cs = TestConstraintSystem::<BW6_761Fr>::new();
+            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
-                G2Gadget::<Parameters>::alloc(&mut cs.ns(|| "alloc"), || Ok(element)).unwrap();
+                G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
 
-            let y_bit =
-                YToBitGadget::<Parameters>::y_to_bit_g2(cs.ns(|| "y to bit"), &allocated).unwrap();
+            let y_bit = allocated.y_to_bit().unwrap();
 
-            let c1 = allocated.y.c1.get_value().unwrap();
-            let c0 = allocated.y.c0.get_value().unwrap();
+            let c1 = allocated.y.c1.value().unwrap();
+            let c0 = allocated.y.c0.value().unwrap();
 
             if c1 > half || (c1 == zero && c0 > half) {
-                assert_eq!(true, y_bit.get_value().unwrap());
+                assert_eq!(true, y_bit.value().unwrap());
             } else {
-                assert_eq!(false, y_bit.get_value().unwrap());
+                assert_eq!(false, y_bit.value().unwrap());
             }
 
             assert_eq!(cs.num_constraints(), 3248);
