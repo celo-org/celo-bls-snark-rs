@@ -69,8 +69,8 @@ pub mod test_helpers {
     use r1cs_std::groups::CurveVar;
     use algebra::ProjectiveCurve;
 
-    /// Allocates an array of group elements to a group gadget
-    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
+   // /// Allocates an array of group elements to a group gadget
+/*    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
         cs: ConstraintSystemRef<F>,
         elements: &[G],
     ) -> Vec<GG> {
@@ -79,5 +79,5 @@ pub mod test_helpers {
             .enumerate()
             .map(|(i, element)| GG::new_witness(cs.clone(), || Ok(element)).unwrap())
             .collect::<Vec<_>>()
-    }
+    }*/
 }

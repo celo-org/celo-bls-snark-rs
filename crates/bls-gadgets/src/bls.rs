@@ -227,7 +227,7 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use crate::utils::test_helpers::alloc_vec;
+//    use crate::utils::test_helpers::alloc_vec;
     use bls_crypto::test_helpers::*;
 
     use algebra::{
@@ -238,7 +238,7 @@ mod verify_one_message {
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocVar,
-        bls12_377::{G1Var, PairingVar as Bls12_377PairingGadget},
+        bls12_377::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
         boolean::Boolean,
 //        test_constraint_system::TestConstraintSystem,
     };
@@ -310,8 +310,8 @@ mod verify_one_message {
 
         // allocate the constraints
         let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
-        let messages = alloc_vec(cs.clone(), &messages);
-        let aggregate_pubkeys = alloc_vec(cs.clone(), &aggregate_pubkeys);
+        let messages = messages.iter().enumerate().map(|(i, element)| <G1Var as AllocVar<G1Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
+        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(i, element)| <G2Var as AllocVar<G2Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
         let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
 
         // check that verification is correct
