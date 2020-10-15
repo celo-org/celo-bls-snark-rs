@@ -255,14 +255,15 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
+//        println!("{:?}", xof_bits.value());
 //        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
         let x_bits = &xof_bits[..X_BITS];
-        let greatest = &xof_bits[X_BITS];
+//        let greatest = &x_bits[X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             <G1Var::<Bls12_377_Parameters> as AllocVar<G1Projective<Bls12_377_Parameters>, _>>::new_witness(
-                xof_bits.cs().unwrap_or(ConstraintSystemRef::None),
+                x_bits.cs().unwrap_or(ConstraintSystemRef::None),
                 || {
                 // if we're in setup mode, just return an error
                 // TODO: setup should also be checked on sign bit
@@ -281,12 +282,14 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 // reverse them since they are read in LE
                 bits.reverse();
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
+
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
-                let greatest = greatest.value()?;
+
+                let sign_bit_value = sign_bit.value()?;
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
-                let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, greatest)
+                let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, sign_bit_value)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
                 Ok(p.into_projective())
@@ -353,6 +356,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 mod test {
     use super::*;
 
+    use bls_crypto::hashers::composite::COMPOSITE_HASHER;
+    use bls_crypto::hash_to_curve::HashToCurve;
     use algebra::bls12_377;
     use r1cs_std::groups::CurveVar;
     use r1cs_core::ConstraintSystem;
@@ -380,6 +385,10 @@ mod test {
         let (expected_hash, attempt) = try_and_increment
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
+        let hasher = &*COMPOSITE_HASHER;
+
+        let bits = hasher.hash(SIG_DOMAIN, input, 64);
+        println!("{:?}", bits);
 
         let mut cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
 
@@ -400,7 +409,7 @@ mod test {
         .unwrap()
         .0;
 
-//        assert!(cs.is_satisfied().unwrap());
+        assert!(cs.is_satisfied().unwrap());
         assert_eq!(expected_hash, hash.value().unwrap());
     }
 }
