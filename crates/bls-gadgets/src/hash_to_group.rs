@@ -262,7 +262,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             <G1Var::<Bls12_377_Parameters> as AllocVar<G1Projective<Bls12_377_Parameters>, _>>::new_witness(
-                xof_bits[0].cs().unwrap_or(ConstraintSystemRef::None),
+                xof_bits.cs().unwrap_or(ConstraintSystemRef::None),
                 || {
                 // if we're in setup mode, just return an error
                 // TODO: setup should also be checked on sign bit
