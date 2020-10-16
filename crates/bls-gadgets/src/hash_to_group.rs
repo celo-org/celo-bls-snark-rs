@@ -15,6 +15,8 @@ use std::ops::Sub;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
 };
+use tracing_subscriber::layer::SubscriberExt;
+
 use algebra::{
     curves::{
         bls12::G1Projective,
@@ -30,7 +32,7 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
+use r1cs_core::{SynthesisError, ConstraintSystemRef, ConstraintLayer};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
@@ -177,6 +179,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
+#[tracing::instrument(target = "r1cs")]
 pub fn hash_to_bits<F: PrimeField>(
     message: &[Boolean<F>],
     hash_length: u16,
@@ -249,6 +252,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
     // get the hash
+    //#[tracing::instrument(target = "r1cs")]
     fn hash_to_group(
         xof_bits: &[Boolean<Bls12_377_Fq>],
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
@@ -271,6 +275,9 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                     return Err(SynthesisError::AssignmentMissing);
                 }
 
+//                let x_bits = &xof_bits[..X_BITS];
+//                let greatest = xof_bits[X_BITS];
+
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
                 let mut bits = x_bits
@@ -280,9 +287,10 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
-                bits.reverse();
+ //               bits.reverse();
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
+                //TODO: Fix AssignmentMissing error coming occasionally from this line during tests
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
 
                 let sign_bit_value = sign_bit.value()?;
@@ -310,11 +318,15 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         };
 
         for (_i, (a,b)) in compressed_point.iter()
-            .zip(x_bits.iter())
+            .zip(xof_bits.iter())
             .enumerate() 
         {
+            println!("a: {:?}, b: {:?}", a.value()?, b.value()?);
+//            println!("b: {:?}", b.value()?);
             a.enforce_equal(&b)?;
         }
+        println!("a: {:?}", compressed_sign_bit.value()?);
+        println!("b: {:?}", compressed_sign_bit.value()?);
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
@@ -368,12 +380,17 @@ mod test {
 
     #[test]
     fn test_hash_to_group() {
+        let mut layer = ConstraintLayer::default();
+        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+        let subscriber = tracing_subscriber::Registry::default().with(layer);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
         let mut rng = thread_rng();
         // test for various input sizes
         for length in &[10] {//, 25, 50, 100, 200, 300] {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
-            rng.fill_bytes(&mut input);
+  //          rng.fill_bytes(&mut input);
             // check that they get hashed properly
             dbg!(length);
             hash_to_group(&input);
@@ -408,6 +425,13 @@ mod test {
         )
         .unwrap()
         .0;
+
+        if !cs.is_satisfied().unwrap() {
+            println!("=========================================================");
+            println!("Unsatisfied constraints:");
+            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
+            println!("=========================================================");
+        }
 
         assert!(cs.is_satisfied().unwrap());
         assert_eq!(expected_hash, hash.value().unwrap());
