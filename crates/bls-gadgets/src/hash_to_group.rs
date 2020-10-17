@@ -287,12 +287,10 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
- //               bits.reverse();
+//                bits.reverse();
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
-                //TODO: Fix AssignmentMissing error coming occasionally from this line during tests
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
-
                 let sign_bit_value = sign_bit.value()?;
 
                 // Converts the point read from the xof bits to a G1 element
@@ -309,7 +307,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             // Convert x to LE
             let mut bits: Vec<Boolean<Bls12_377_Fq>> =
                 expected_point_before_cofactor.x.to_bits_le()?;
-            bits.reverse();
+ //           bits.reverse();
 
             // Get a constraint about the y point's sign
             let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
