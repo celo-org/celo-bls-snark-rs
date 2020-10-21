@@ -119,7 +119,9 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         let mut input = vec![counter];
         input.extend_from_slice(message);
         // compress the input
+//        println!("gadget pedersen input: {:?}", message);
         let crh_bits = Self::pedersen_hash(&input)?;
+        println!("crh_bits gadget: {:?}", crh_bits.value()?);
 
         // Hash to bits
         let mut personalization = [0; 8];
@@ -132,6 +134,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             personalization,
             generate_constraints_for_hash,
         )?;
+        println!("xof_bits gadget: {:?}", xof_bits.value()?); 
 
         let hash = Self::hash_to_group(&xof_bits)?;
 
@@ -158,6 +161,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             )?;
 
         let mut crh_bits = pedersen_hash.x.to_bits_le().unwrap();
+        crh_bits.reverse();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
         loop {
             if crh_bits.len() % 8 == 0 {
@@ -198,7 +202,7 @@ pub fn hash_to_bits<F: PrimeField>(
         trace!("generating hash with constraints");
         // Reverse the message to LE
         let mut message = message.to_vec();
-    //    message.reverse();
+        message.reverse();
         // Blake2s outputs 256 bit hashes so the desired output hash length
         // must be a multiple of that.
         assert_eq!(hash_length % 256, 0, "invalid hash length size");
@@ -325,11 +329,11 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             .zip(x_bits.iter())
             .enumerate() 
         {
-            println!("a: {:?}, b: {:?}", a.value()?, b.value()?);
+      //      println!("a: {:?}, b: {:?}", a.value()?, b.value()?);
             a.enforce_equal(&b)?;
         }
-        println!("a: {:?}", compressed_sign_bit.value()?);
-        println!("b: {:?}", sign_bit.value()?);
+     //   println!("a: {:?}", compressed_sign_bit.value()?);
+     //   println!("b: {:?}", sign_bit.value()?);
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
@@ -390,10 +394,10 @@ mod test {
 
         let mut rng = thread_rng();
         // test for various input sizes
-        for length in &[10, 25, 50, 100, 200, 300] {
+        for length in &[10] /*, 25, 50, 100, 200, 300]*/ {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
-//            rng.fill_bytes(&mut input);
+            rng.fill_bytes(&mut input);
             // check that they get hashed properly
             dbg!(length);
             hash_to_group(&input);
@@ -406,9 +410,8 @@ mod test {
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
         let hasher = &*COMPOSITE_HASHER;
-
-        let bits = hasher.hash(SIG_DOMAIN, input, 64);
-        println!("{:?}", bits);
+//        let bits = hasher.hash(SIG_DOMAIN, input, 64);
+//        println!("gadget hash: {:?}", bits);
 
         let mut cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
 
@@ -437,6 +440,6 @@ mod test {
         }
 
         assert!(cs.is_satisfied().unwrap());
-   //     assert_eq!(expected_hash, hash.value().unwrap());
+        assert_eq!(expected_hash, hash.value().unwrap());
     }
 }
