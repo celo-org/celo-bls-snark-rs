@@ -121,7 +121,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         // compress the input
 //        println!("gadget pedersen input: {:?}", message);
         let crh_bits = Self::pedersen_hash(&input)?;
-        println!("crh_bits gadget: {:?}", crh_bits.value()?);
+//        println!("crh_bits gadget: {:?}", crh_bits.value()?);
 
         // Hash to bits
         let mut personalization = [0; 8];
@@ -135,6 +135,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             generate_constraints_for_hash,
         )?;
         println!("xof_bits gadget: {:?}", xof_bits.value()?); 
+//        println!("xof_bits len: {:?}", xof_bits.value()?.len());
 
         let hash = Self::hash_to_group(&xof_bits)?;
 
@@ -237,9 +238,9 @@ pub fn hash_to_bits<F: PrimeField>(
                 .map(|m| m.value())
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
-            let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
+            let mut hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
+            hash_result.reverse();
             let mut bits = bytes_to_bits(&hash_result, 512);
-            bits.reverse();
             bits
         };
 
@@ -397,7 +398,7 @@ mod test {
         for length in &[10] /*, 25, 50, 100, 200, 300]*/ {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
-            rng.fill_bytes(&mut input);
+ //           rng.fill_bytes(&mut input);
             // check that they get hashed properly
             dbg!(length);
             hash_to_group(&input);
