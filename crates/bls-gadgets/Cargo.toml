@@ -26,6 +26,6 @@ bls-crypto = { path = "../bls-crypto", default-features = false, features = ["te
 tracing-subscriber = { version = "0.2" }
 
 [features]
-default = ["compat"]
+default = []
 test-helpers = ["rand", "rand_xorshift"]
 compat = ["bls-crypto/compat"]

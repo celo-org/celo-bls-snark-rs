@@ -37,6 +37,10 @@ pub trait Hasher {
         output_size_in_bytes: usize,
     ) -> Result<Vec<u8>, Self::Error> {
         let prepared_message = self.crh(domain, message, output_size_in_bytes)?;
+//        println!("pedersen output normal: {:?}", prepared_message);
+//        println!("pedersen output len: {:?}", prepared_message.len());
         self.xof(domain, &prepared_message, output_size_in_bytes)
+//        println!("blake2 output normal: {:?}", result);
+//        println!("blake2 output len: {:?}", result.len());
     }
 }

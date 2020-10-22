@@ -169,6 +169,7 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

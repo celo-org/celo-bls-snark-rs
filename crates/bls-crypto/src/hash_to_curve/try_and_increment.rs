@@ -98,6 +98,8 @@ where
 
             // produce a hash with sufficient length
             let candidate_hash = self.hasher.hash(domain, msg, hash_bytes)?;
+//            println!("candidate_hash normal: {:?}", candidate_hash);
+//            println!("candidate_hash_len before flag: {:?}", candidate_hash.len());
 
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
@@ -113,6 +115,8 @@ where
                 }
                 candidate_hash
             };
+ //           println!("candidate_hash after flag: {:?}", candidate_hash);
+//            println!("candidate_hash_len after flag: {:?}", candidate_hash.len());
 
             if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
@@ -122,6 +126,7 @@ where
                 );
                 end_timer!(hash_loop_time);
 
+                println!("point normal before cofactor: {:?}", p);
                 let scaled = p.scale_by_cofactor();
                 if scaled.is_zero() {
                     continue;
