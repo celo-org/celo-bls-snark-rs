@@ -134,7 +134,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             personalization,
             generate_constraints_for_hash,
         )?;
-        println!("xof_bits gadget: {:?}", xof_bits.value()?); 
+//        println!("xof_bits gadget: {:?}", xof_bits.value()?); 
 //        println!("xof_bits len: {:?}", xof_bits.value()?.len());
 
         let hash = Self::hash_to_group(&xof_bits)?;
@@ -265,14 +265,14 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
-//        println!("{:?}", xof_bits.value());
+ //       println!("hash to group gadget input: {:?}", xof_bits.value());
 //        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
         let x_bits = &xof_bits[..X_BITS];
 //        let greatest = &x_bits[X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
-            <G1Var::<Bls12_377_Parameters>>::new_variable_omit_prime_order_check(
+            <G1Var::<Bls12_377_Parameters> /*as CurveVar<GroupAffine<_>, _>*/>::new_variable_omit_prime_order_check(
                 x_bits.cs().unwrap_or(ConstraintSystemRef::None),
                 || {
                 // if we're in setup mode, just return an error
@@ -294,24 +294,30 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
  //               bits.reverse();
+//                println!("bits in gadget: {:?}", bits);
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
                 let sign_bit_value = sign_bit.value()?;
-                println!("before getting point: {}", x);
+//                println!("before getting point: {:?}", x);
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
                 let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, sign_bit_value)
                     .ok_or(SynthesisError::AssignmentMissing)?;
-                println!("after getting point: {}", p.x);
+//                println!("after getting point, affine: {:?}", p);
 //                println!("bitmap: {}", p.x.to_bits_le()?);
 
+//                let proj = p.into_projective();
+//                println!("affine->projective: {:?}", proj);
+
+//                let after = proj.into_affine();
+//                println!("affine->projective->affine: {:?}", after);
                 Ok(p.into_projective())
             }, AllocationMode::Witness)?;
 
         trace!("compressing y");
-        println!("after converting to var: {}", expected_point_before_cofactor.x.value()?);
+        println!("point gadget after converting to var: {:?}", expected_point_before_cofactor.value()?.into_affine());
         // Point compression on the G1 Gadget
         let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
             // Convert x to LE
@@ -325,7 +331,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
-        println!("{}    {}", compressed_point.len(), x_bits.len());
+ //       println!("{}    {}", compressed_point.len(), x_bits.len());
         for (_i, (a,b)) in compressed_point.iter()
             .zip(x_bits.iter())
             .enumerate() 
@@ -338,6 +344,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
+
+        println!("point gadget before cofactor: {:?}", expected_point_before_cofactor.value()?.into_affine());
 
         let scaled_point = Self::scale_by_cofactor_g1(
             &expected_point_before_cofactor,
@@ -398,7 +406,7 @@ mod test {
         for length in &[10] /*, 25, 50, 100, 200, 300]*/ {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
- //           rng.fill_bytes(&mut input);
+           rng.fill_bytes(&mut input);
             // check that they get hashed properly
             dbg!(length);
             hash_to_group(&input);
