@@ -74,11 +74,11 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-/*fn to_fr<T: Into<u64>>(
+/*fn to_fr<T: Into<u64>, F: PrimeField>(
+    cs: ConstraintSystemRef<F>,
     num: Option<T>,
-    cs: ConstraintSystemRef,
 ) -> Result<FrVar, SynthesisError> {
-    FrVar::new_witness(cs, || Ok(Fr::from(num.get()?.into())))
+    FrVar::new_witness(cs.clone(), || Ok(Fr::from(num.get()?.into())))
 }*/
 
 fn fr_to_bits(

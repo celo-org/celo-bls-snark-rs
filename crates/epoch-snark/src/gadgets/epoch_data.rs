@@ -204,7 +204,7 @@ impl EpochData<Bls12_377> {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use algebra::{
@@ -212,7 +212,6 @@ mod tests {
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
 
     use crate::epoch_block::EpochBlock;
     use bls_crypto::PublicKey;
@@ -232,12 +231,12 @@ mod tests {
     #[test]
     fn test_enforce() {
         let epoch = test_epoch(10);
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let index = to_fr(&mut cs.ns(|| "index"), Some(9u32)).unwrap();
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(9u32))).unwrap();//to_fr(Some(9u32)).unwrap();
         epoch
-            .constrain(&mut cs.ns(|| "constraint"), &index, false)
+            .constrain(&index, false)
             .unwrap();
-        assert!(cs.is_satisfied());
+        assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
@@ -257,11 +256,11 @@ mod tests {
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let bits = epoch.to_bits(&mut cs.ns(|| "epoch2bits")).unwrap().0;
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let bits = epoch.to_bits(cs.clone()).unwrap().0;
         let ret =
-            EpochData::hash_bits_to_g1(&mut cs.ns(|| "hash epoch bits"), &bits, false).unwrap();
-        assert_eq!(ret.0.get_value().unwrap(), hash);
+            EpochData::hash_bits_to_g1(&bits, false).unwrap();
+        assert_eq!(ret.0.value().unwrap(), hash);
     }
 
     #[test]
@@ -274,11 +273,11 @@ mod tests {
             (1, 0, true),
             (5, 0, true),
         ] {
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            let epoch1 = to_fr(&mut cs.ns(|| "1"), Some(*index1)).unwrap();
-            let epoch2 = to_fr(&mut cs.ns(|| "2"), Some(*index2)).unwrap();
-            EpochData::enforce_next_epoch(&mut cs, &epoch1, &epoch2).unwrap();
-            assert_eq!(cs.is_satisfied(), *expected);
+            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            let epoch1 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index1))).unwrap();//to_fr(Some(*index1)).unwrap();
+            let epoch2 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index2))).unwrap();//to_fr(Some(*index2)).unwrap();
+            EpochData::enforce_next_epoch(&epoch1, &epoch2).unwrap();
+            assert_eq!(cs.is_satisfied().unwrap(), *expected);
         }
     }
 
@@ -305,16 +304,16 @@ mod tests {
             .unwrap();
 
         // calculate the bits from the epoch
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let ret = epoch.to_bits(&mut cs).unwrap();
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let ret = epoch.to_bits(cs.clone()).unwrap();
 
         // compare with the result
         let bits_inner = ret
             .0
             .iter()
-            .map(|x| x.get_value().unwrap())
+            .map(|x| x.value().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(bits_inner, bits);
         assert_ne!(bits_inner, bits_wrong);
     }
-}*/
+}

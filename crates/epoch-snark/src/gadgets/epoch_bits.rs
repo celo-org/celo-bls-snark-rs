@@ -88,7 +88,7 @@ impl EpochBits {
                 &message,
                 &blake2s_parameters.parameters(),
             )?;
-            let xof_bits_i = xof_result
+            let mut xof_bits_i = xof_result
                 .into_iter()
                 .map(|n| n.to_bits_le())
                 .flatten()
@@ -177,6 +177,7 @@ mod tests {
         layer.mode = r1cs_core::TracingMode::OnlyConstraints;
         let subscriber = tracing_subscriber::Registry::default().with(layer);
         tracing::subscriber::set_global_default(subscriber).unwrap();
+
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];
         rng.fill_bytes(&mut first_bytes);
@@ -190,7 +191,7 @@ mod tests {
             .collect::<Vec<bool>>();
 
         let mut cs = ConstraintSystem::<Fr>::new_ref();
-        // encode each epoch's bytes to LE and pas them to the constraint system
+        // encode each epoch's bytes to LE and pass them to the constraint system
         let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
         let last_epoch_bits = bytes_to_bits(&last_bytes, 256);
         let bits = EpochBits {
