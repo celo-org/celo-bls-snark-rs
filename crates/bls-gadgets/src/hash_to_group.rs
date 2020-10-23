@@ -265,7 +265,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
 
- //       println!("hash to group gadget input: {:?}", xof_bits.value());
+        println!("hash to group gadget input: {:?}", xof_bits.value());
 //        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
         let x_bits = &xof_bits[..X_BITS];
 //        let greatest = &x_bits[X_BITS];
@@ -345,7 +345,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
         trace!("scaling by G1 cofactor");
 
-        println!("point gadget before cofactor: {:?}", expected_point_before_cofactor.value()?.into_affine());
+ //       println!("point gadget before cofactor: {:?}", expected_point_before_cofactor.value()?.into_affine());
 
         let scaled_point = Self::scale_by_cofactor_g1(
             &expected_point_before_cofactor,
