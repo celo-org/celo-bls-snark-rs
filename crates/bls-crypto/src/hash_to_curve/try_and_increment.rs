@@ -126,7 +126,7 @@ where
                 );
                 end_timer!(hash_loop_time);
 
-                println!("point normal before cofactor: {:?}", p);
+                println!("point normal before cofactor: {}", p);
                 let scaled = p.scale_by_cofactor();
                 if scaled.is_zero() {
                     continue;

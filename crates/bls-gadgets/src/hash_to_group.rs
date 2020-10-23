@@ -16,7 +16,7 @@ use std::ops::Sub;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
 };
-use tracing_subscriber::layer::SubscriberExt;
+//use tracing_subscriber::layer::SubscriberExt;
 
 use algebra::{
     curves::{
@@ -222,11 +222,12 @@ pub fn hash_to_bits<F: PrimeField>(
             // convert hash result to LE bits
             let xof_bits_i = xof_result
                 .into_iter()
-                .map(|n| n.to_bits_le())
+                .map(|n| n.to_bits_le()/*.into_iter().rev().collect::<Vec<_>>()*/)
                 .flatten()
                 .collect::<Vec<Boolean<F>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
+        xof_bits.reverse();
         xof_bits
     } else {
         trace!("generating hash without constraints");
@@ -239,7 +240,7 @@ pub fn hash_to_bits<F: PrimeField>(
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
             let mut hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-            hash_result.reverse();
+//            hash_result.reverse();
             let mut bits = bytes_to_bits(&hash_result, 512);
             bits
         };
@@ -254,6 +255,24 @@ pub fn hash_to_bits<F: PrimeField>(
     Ok(xof_bits)
 }
 
+fn from_bits(bits: &[bool]) -> bool {
+    //let mut res = Self::default();
+    let mut acc: u64 = 0;
+
+    let mut bits = bits.to_vec();
+    bits.reverse();
+    for (i, bits64) in bits.chunks(8).enumerate() {
+        for bit in bits64.iter() {
+            acc <<= 1;
+            acc += *bit as u64;
+        }
+        println!("chunk {}: {}", i, acc);
+      //  res.0[i] = acc;
+        acc = 0;
+    }
+    true
+}
+
 impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
@@ -264,9 +283,11 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
+        let mut xof_bits = xof_bits.to_vec().clone();
 
         println!("hash to group gadget input: {:?}", xof_bits.value());
 //        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
+        xof_bits.reverse();
         let x_bits = &xof_bits[..X_BITS];
 //        let greatest = &x_bits[X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
@@ -293,10 +314,14 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
- //               bits.reverse();
+                let big_no_reverse = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits); 
+                bits.reverse();
+
 //                println!("bits in gadget: {:?}", bits);
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
+                println!("bigint no reverse: {}", big_no_reverse);
+                println!("bigint after reverse: {}", big);
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
                 let sign_bit_value = sign_bit.value()?;
 //                println!("before getting point: {:?}", x);
@@ -317,13 +342,13 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             }, AllocationMode::Witness)?;
 
         trace!("compressing y");
-        println!("point gadget after converting to var: {:?}", expected_point_before_cofactor.value()?.into_affine());
+        println!("point gadget after converting to var: {}", expected_point_before_cofactor.value()?.into_affine());
         // Point compression on the G1 Gadget
         let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
             // Convert x to LE
             let mut bits: Vec<Boolean<Bls12_377_Fq>> =
                 expected_point_before_cofactor.x.to_bits_le()?;
-           bits.reverse();
+     //      bits.reverse();
 
             // Get a constraint about the y point's sign
             let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
@@ -339,7 +364,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
       //      println!("a: {:?}, b: {:?}", a.value()?, b.value()?);
             a.enforce_equal(&b)?;
         }
-     //   println!("a: {:?}", compressed_sign_bit.value()?);
+      //  println!("a: {:?}", compressed_sign_bit.value()?);
      //   println!("b: {:?}", sign_bit.value()?);
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
@@ -374,8 +399,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             G1Projective::<Bls12_377_Parameters>::prime_subgroup_generator(),
         )?;
         let scaled = p
-            .scalar_mul_le(x_bits.iter())?
-            .sub(&generator);
+            .scalar_mul_le(x_bits.iter())?;
+//            .sub(&generator);
         Ok(scaled)
     }
 }
@@ -396,17 +421,17 @@ mod test {
 
     #[test]
     fn test_hash_to_group() {
-        let mut layer = ConstraintLayer::default();
+/*        let mut layer = ConstraintLayer::default();
         layer.mode = r1cs_core::TracingMode::OnlyConstraints;
         let subscriber = tracing_subscriber::Registry::default().with(layer);
-        tracing::subscriber::set_global_default(subscriber).unwrap();
+        tracing::subscriber::set_global_default(subscriber).unwrap();*/
 
         let mut rng = thread_rng();
         // test for various input sizes
-        for length in &[10] /*, 25, 50, 100, 200, 300]*/ {
+        for length in &[10, 25, 50, 100, 200, 300] {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
-           rng.fill_bytes(&mut input);
+            rng.fill_bytes(&mut input);
             // check that they get hashed properly
             dbg!(length);
             hash_to_group(&input);
@@ -436,7 +461,7 @@ mod test {
         let hash = HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
             counter,
             &input,
-            false,
+            true,
         )
         .unwrap()
         .0;
