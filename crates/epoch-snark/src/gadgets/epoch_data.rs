@@ -204,7 +204,7 @@ impl EpochData<Bls12_377> {
     }
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use super::*;
     use algebra::{
@@ -317,4 +317,4 @@ mod tests {
         assert_eq!(bits_inner, bits);
         assert_ne!(bits_inner, bits_wrong);
     }
-}
+}*/

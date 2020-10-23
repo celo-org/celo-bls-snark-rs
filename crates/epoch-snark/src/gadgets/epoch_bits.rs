@@ -155,7 +155,7 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
         .collect::<Vec<_>>()
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use bls_gadgets::utils::bytes_to_bits;
@@ -163,14 +163,20 @@ mod tests {
 
     use crate::epoch_block::hash_to_bits;
     use crate::gadgets::pack;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_core::{ConstraintSystem, ConstraintLayer};
+    use algebra::PrimeField;
+    use tracing_subscriber::layer::SubscriberExt;
 
-    fn to_bool(iter: &[bool]) -> Vec<Bool> {
-        iter.iter().map(|b| Bool::constant(*b)).collect()
-    }
+/*    fn to_bool<F: PrimeField>(cs: ConstraintSystemRef<F>, iter: &[bool]) -> Result<Vec<Boolean<F>>, SynthesisError> {
+        iter.iter().map(|b| Bool::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>()
+    }*/
 
     #[test]
     fn correct_blake2_hash() {
+        let mut layer = ConstraintLayer::default();
+        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+        let subscriber = tracing_subscriber::Registry::default().with(layer);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];
         rng.fill_bytes(&mut first_bytes);
@@ -183,27 +189,33 @@ mod tests {
             .flatten()
             .collect::<Vec<bool>>();
 
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
         // encode each epoch's bytes to LE and pas them to the constraint system
         let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
         let last_epoch_bits = bytes_to_bits(&last_bytes, 256);
         let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],
-            first_epoch_bits: to_bool(&first_epoch_bits),
-            last_epoch_bits: to_bool(&last_epoch_bits),
+            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), //to_bool(&first_epoch_bits),
+            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),//to_bool(&last_epoch_bits),
         };
 
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let packed = bits.verify_edges(&mut cs).unwrap();
-        assert!(cs.is_satisfied());
+        let packed = bits.verify_edges().unwrap();
+        if !cs.is_satisfied().unwrap() {
+            println!("=========================================================");
+            println!("Unsatisfied constraints:");
+            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
+            println!("=========================================================");
+        }
+        assert!(cs.is_satisfied().unwrap());
 
         // get the inner packed value
         let inner = packed
             .into_iter()
-            .map(|i| i.get_value().unwrap())
+            .map(|i| i.value().unwrap())
             .collect::<Vec<_>>();
         // pack our bits to Fr as well, and see if they match
         let public_inputs = pack::<Fr, FrParameters>(&both_blake_bits).unwrap();
         assert_eq!(inner, public_inputs);
     }
-}*/
+}

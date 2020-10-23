@@ -158,7 +158,7 @@ pub mod test_helpers {
     }
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use super::test_helpers::generate_single_update;
     use super::*;
@@ -236,4 +236,4 @@ mod tests {
             )
             .unwrap()
     }
-}
+}*/

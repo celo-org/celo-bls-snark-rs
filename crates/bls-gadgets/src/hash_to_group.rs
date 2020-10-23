@@ -185,7 +185,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
-#[tracing::instrument(target = "r1cs")]
+//#[tracing::instrument(target = "r1cs")]
 pub fn hash_to_bits<F: PrimeField>(
     message: &[Boolean<F>],
     hash_length: u16,
