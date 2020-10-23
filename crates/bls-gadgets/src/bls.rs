@@ -405,7 +405,7 @@ mod verify_one_message {
     }
 
     #[test]
-    fn zero_fails() {
+    fn zero_succeeds() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
         let generator = G2Projective::prime_subgroup_generator();
@@ -425,6 +425,28 @@ mod verify_one_message {
             &[false, true],
             3,
         );
-        assert!(!cs.is_satisfied().unwrap());
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn doubling_succeeds() {
+        let rng = &mut rng();
+        let message_hash = G1Projective::rand(rng);
+        let generator = G2Projective::prime_subgroup_generator();
+
+        // if the first key is a bad one, it should fail, since the pubkey
+        // won't be on the curve
+        let (sk, pk) = keygen::<Bls12_377>();
+
+        let (sigs, _) = sign::<Bls12_377>(message_hash, &[sk, sk]);
+
+        let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(
+            message_hash,
+            &[pk, pk],
+            sigs[0] + sigs[1],
+            &[true, true],
+            3,
+        );
+        assert!(cs.is_satisfied().unwrap());
     }
 }

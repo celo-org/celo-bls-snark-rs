@@ -255,24 +255,6 @@ pub fn hash_to_bits<F: PrimeField>(
     Ok(xof_bits)
 }
 
-fn from_bits(bits: &[bool]) -> bool {
-    //let mut res = Self::default();
-    let mut acc: u64 = 0;
-
-    let mut bits = bits.to_vec();
-    bits.reverse();
-    for (i, bits64) in bits.chunks(8).enumerate() {
-        for bit in bits64.iter() {
-            acc <<= 1;
-            acc += *bit as u64;
-        }
-        println!("chunk {}: {}", i, acc);
-      //  res.0[i] = acc;
-        acc = 0;
-    }
-    true
-}
-
 impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
