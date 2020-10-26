@@ -292,14 +292,14 @@ impl ValidatorSetUpdate<Bls12_377> {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::gadgets::single_update::test_helpers::generate_single_update;
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_core::ConstraintSystem;
 
     type Curve = Bls12_377;
 
@@ -378,9 +378,9 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            assert!(cs.is_satisfied());
+            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+            assert!(cs.is_satisfied().unwrap());
         }
 
         #[test]
@@ -468,12 +468,12 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
+            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+            if !cs.is_satisfied().unwrap() {
+                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());
             }
-            assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied().unwrap());
         }
 
         #[test]
@@ -561,12 +561,12 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
+            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+            if !cs.is_satisfied().unwrap() {
+                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());
             }
-            assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied().unwrap());
         }
     }
-}*/
+}
