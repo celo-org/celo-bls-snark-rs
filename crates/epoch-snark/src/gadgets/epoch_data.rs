@@ -167,7 +167,7 @@ impl EpochData<Bls12_377> {
         let is_setup = is_setup(&epoch_bits);
 
         // Pack them to Uint8s
-        let input_bytes_var: Vec<U8> = epoch_bits
+        let mut input_bytes_var: Vec<U8> = epoch_bits
             .chunks(8)
             .map(|chunk| {
                 let mut chunk = chunk.to_vec();

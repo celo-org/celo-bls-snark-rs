@@ -86,15 +86,17 @@ fn fr_to_bits(
     length: usize,
 ) -> Result<Vec<Bool>, SynthesisError> {
     let mut input = input.to_bits_le()?;
-    input.reverse();
+//    input.reverse();
     Ok(input[0..length].to_vec())
 }
 
 fn g2_to_bits(
     input: &G2Var,
 ) -> Result<Vec<Bool>, SynthesisError> {
-    let x_0 = input.x.c0.to_bits_le()?;
-    let x_1 = input.x.c1.to_bits_le()?;
+    let mut x_0 = input.x.c0.to_bits_le()?;
+    let mut x_1 = input.x.c1.to_bits_le()?;
+    x_0.reverse();
+    x_1.reverse();
     let y_bit = input.y_to_bit()?;
     let mut output = Vec::new();
     output.extend_from_slice(&x_0);
