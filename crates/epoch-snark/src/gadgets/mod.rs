@@ -86,7 +86,6 @@ fn fr_to_bits(
     length: usize,
 ) -> Result<Vec<Bool>, SynthesisError> {
     let mut input = input.to_bits_le()?;
-//    input.reverse();
     Ok(input[0..length].to_vec())
 }
 

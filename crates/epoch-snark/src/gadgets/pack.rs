@@ -50,6 +50,7 @@ impl MultipackGadget {
                 Ok(F::from_repr(fp_val).get()?)
             })?;
             let mut fp_bits = fp.to_bits_le()?;
+            println!("fp_bits len: {}", fp_bits.len());
             fp_bits.reverse();
             let chunk_len = chunk.len();
             for j in 0..chunk_len {

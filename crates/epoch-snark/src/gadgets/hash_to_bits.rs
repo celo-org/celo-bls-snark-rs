@@ -82,7 +82,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::gadgets::pack;
@@ -160,4 +160,4 @@ mod tests {
         let pvk = prepare_verifying_key(&params.vk);
         assert!(verify_proof(&pvk, &proof, &public_inputs).unwrap());
     }
-}*/
+}
