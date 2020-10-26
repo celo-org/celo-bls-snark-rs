@@ -119,9 +119,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         let mut input = vec![counter];
         input.extend_from_slice(message);
         // compress the input
-//        println!("gadget pedersen input: {:?}", message);
         let crh_bits = Self::pedersen_hash(&input)?;
-//        println!("crh_bits gadget: {:?}", crh_bits.value()?);
 
         // Hash to bits
         let mut personalization = [0; 8];
@@ -134,8 +132,6 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             personalization,
             generate_constraints_for_hash,
         )?;
-//        println!("xof_bits gadget: {:?}", xof_bits.value()?); 
-//        println!("xof_bits len: {:?}", xof_bits.value()?.len());
 
         let hash = Self::hash_to_group(&xof_bits)?;
 
@@ -222,7 +218,7 @@ pub fn hash_to_bits<F: PrimeField>(
             // convert hash result to LE bits
             let xof_bits_i = xof_result
                 .into_iter()
-                .map(|n| n.to_bits_le()/*.into_iter().rev().collect::<Vec<_>>()*/)
+                .map(|n| n.to_bits_le())
                 .flatten()
                 .collect::<Vec<Boolean<F>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
@@ -240,7 +236,6 @@ pub fn hash_to_bits<F: PrimeField>(
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
             let mut hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-//            hash_result.reverse();
             let mut bits = bytes_to_bits(&hash_result, 512);
             bits
         };
@@ -267,15 +262,12 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         let _enter = span.enter();
         let mut xof_bits = xof_bits.to_vec().clone();
 
-        println!("hash to group gadget input: {:?}", xof_bits.value());
-//        let xof_bits = [&xof_bits[..X_BITS], &[xof_bits[SIGN_BIT_POSITION]]].concat();
         xof_bits.reverse();
         let x_bits = &xof_bits[..X_BITS];
-//        let greatest = &x_bits[X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
-            <G1Var::<Bls12_377_Parameters> /*as CurveVar<GroupAffine<_>, _>*/>::new_variable_omit_prime_order_check(
+            <G1Var::<Bls12_377_Parameters>>::new_variable_omit_prime_order_check(
                 x_bits.cs().unwrap_or(ConstraintSystemRef::None),
                 || {
                 // if we're in setup mode, just return an error
@@ -283,9 +275,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 if is_setup(&x_bits) {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-
-//                let x_bits = &xof_bits[..X_BITS];
-//                let greatest = xof_bits[X_BITS];
 
                 // get the bits from the Boolean constraints
                 // we assume that these are already encoded as LE
@@ -299,38 +288,25 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 let big_no_reverse = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits); 
                 bits.reverse();
 
-//                println!("bits in gadget: {:?}", bits);
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
-                println!("bigint no reverse: {}", big_no_reverse);
-                println!("bigint after reverse: {}", big);
                 let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
                 let sign_bit_value = sign_bit.value()?;
-//                println!("before getting point: {:?}", x);
 
                 // Converts the point read from the xof bits to a G1 element
                 // with point decompression
                 let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, sign_bit_value)
                     .ok_or(SynthesisError::AssignmentMissing)?;
-//                println!("after getting point, affine: {:?}", p);
-//                println!("bitmap: {}", p.x.to_bits_le()?);
 
-//                let proj = p.into_projective();
-//                println!("affine->projective: {:?}", proj);
-
-//                let after = proj.into_affine();
-//                println!("affine->projective->affine: {:?}", after);
                 Ok(p.into_projective())
             }, AllocationMode::Witness)?;
 
         trace!("compressing y");
-        println!("point gadget after converting to var: {}", expected_point_before_cofactor.value()?.into_affine());
         // Point compression on the G1 Gadget
         let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
             // Convert x to LE
             let mut bits: Vec<Boolean<Bls12_377_Fq>> =
                 expected_point_before_cofactor.x.to_bits_le()?;
-     //      bits.reverse();
 
             // Get a constraint about the y point's sign
             let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
@@ -338,22 +314,15 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
- //       println!("{}    {}", compressed_point.len(), x_bits.len());
         for (_i, (a,b)) in compressed_point.iter()
             .zip(x_bits.iter())
             .enumerate() 
         {
-      //      println!("a: {:?}, b: {:?}", a.value()?, b.value()?);
             a.enforce_equal(&b)?;
         }
-      //  println!("a: {:?}", compressed_sign_bit.value()?);
-     //   println!("b: {:?}", sign_bit.value()?);
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
-
- //       println!("point gadget before cofactor: {:?}", expected_point_before_cofactor.value()?.into_affine());
-
         let scaled_point = Self::scale_by_cofactor_g1(
             &expected_point_before_cofactor,
         )?;
@@ -382,7 +351,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         )?;
         let scaled = p
             .scalar_mul_le(x_bits.iter())?;
-//            .sub(&generator);
         Ok(scaled)
     }
 }
@@ -426,11 +394,8 @@ mod test {
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
         let hasher = &*COMPOSITE_HASHER;
-//        let bits = hasher.hash(SIG_DOMAIN, input, 64);
-//        println!("gadget hash: {:?}", bits);
 
         let mut cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
-
         let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
