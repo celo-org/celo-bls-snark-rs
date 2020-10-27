@@ -98,7 +98,7 @@ impl EpochBits {
 
         // Make the edges public inputs
         // packed over BW6_761 Fr.
-        let packed = MultipackGadget::pack(
+        let packed = MultipackGadget::pack::<_, FrParameters>(
             &xof_bits,
             FrParameters::CAPACITY as usize,
             true,

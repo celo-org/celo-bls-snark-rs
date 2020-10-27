@@ -19,8 +19,7 @@ impl MultipackGadget {
     /// Packs the provided boolean constraints to a vector of field element gadgets of
     /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
     /// will be made as public inputs.
-    // TODO: In principle F should be more restricted here since pack specifically uses Bls12_377_Parameters
-    pub fn pack<F: PrimeField>(
+    pub fn pack<F: PrimeField, Fp: FpParameters>(
         bits: &[Boolean<F>],
         element_size: usize,
         should_alloc_input: bool,
@@ -50,11 +49,10 @@ impl MultipackGadget {
                 Ok(F::from_repr(fp_val).get()?)
             })?;
             let mut fp_bits = fp.to_bits_le()?;
-            println!("fp_bits len: {}", fp_bits.len());
             fp_bits.reverse();
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[<FqParameters as FpParameters>::MODULUS_BITS as usize - chunk_len + j]
+                fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j]
                     .enforce_equal(&chunk[j])?;
             }
 
@@ -63,7 +61,7 @@ impl MultipackGadget {
         Ok(packed)
     }
 
-    /// Unpacks the provided field element gadget to a vector of boolean constraints
+/*    /// Unpacks the provided field element gadget to a vector of boolean constraints
     #[allow(unused)]
     pub fn unpack(
         packed: &[Fp],
@@ -91,5 +89,5 @@ impl MultipackGadget {
             chunk += 1;
         }
         Ok(bits)
-    }
+    }*/
 }

@@ -65,13 +65,13 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 
         // Pack them as public inputs
         debug!(capacity = FrParameters::CAPACITY, "packing CRH bits");
-        MultipackGadget::pack(
+        MultipackGadget::pack::<Fr, FrParameters>(
             &all_bits[..],
             FrParameters::CAPACITY as usize,
             true,
         )?;
         debug!(capacity = FrParameters::CAPACITY, "packing XOF bits");
-        MultipackGadget::pack(
+        MultipackGadget::pack::<Fr, FrParameters>(
             &xof_bits,
             FrParameters::CAPACITY as usize,
             true,
@@ -101,7 +101,6 @@ mod tests {
         let message = bits_to_bytes(&message);
         let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
         let mut bits = bytes_to_bits(&hash_result, 512);
-        bits.reverse();
         bits
     }
 
