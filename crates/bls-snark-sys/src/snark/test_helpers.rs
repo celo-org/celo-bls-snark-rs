@@ -6,9 +6,8 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 #[derive(Clone, Debug)]
 pub struct TestCircuit<E: PairingEngine>(pub Option<E::Fr>);
 impl<E: PairingEngine> ConstraintSynthesizer<E::Fr> for TestCircuit<E> {
-    fn generate_constraints<CS: ConstraintSystem<E::Fr>>(
+    fn generate_constraints(
         self,
-        cs: &mut CS,
     ) -> std::result::Result<(), SynthesisError> {
         // allocate a private input `x`
         // this can be made public with `alloc_input`, which would then require

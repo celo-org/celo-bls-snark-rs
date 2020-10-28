@@ -310,8 +310,8 @@ mod verify_one_message {
 
         // allocate the constraints
         let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
-        let messages = messages.iter().enumerate().map(|(i, element)| <G1Var as AllocVar<G1Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
-        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(i, element)| <G2Var as AllocVar<G2Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
+        let messages = messages.iter().enumerate().map(|(i, element)| <G1Var as AllocVar<G1Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
+        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
         let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
 
         // check that verification is correct

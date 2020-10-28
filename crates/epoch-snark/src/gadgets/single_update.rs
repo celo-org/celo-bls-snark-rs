@@ -158,14 +158,16 @@ pub mod test_helpers {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::test_helpers::generate_single_update;
     use super::*;
-    use crate::gadgets::to_fr;
-    use algebra::UniformRand;
-    use bls_gadgets::utils::test_helpers::alloc_vec;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use algebra::{PrimeField, UniformRand};
+    use algebra::bls12_377::{G2Projective, G1Projective};
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
+    use r1cs_std::alloc::AllocVar;
+    use r1cs_std::bls12_377::G2Var;
+    use algebra::bw6_761::Fr as BW6_761Fr;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
@@ -174,32 +176,36 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
+/*    fn alloc_vec<E: PairingEngine, F: PrimeField, P: PairingVar<E,F>>(vec: Vec<E::G2Projective>) -> Vec<_> {
+        vec.iter().enumerate().map(|(i,element)| <P::G2Var as AllocVar<E::G2Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>()
+    }*/
+
     #[test]
     fn test_enough_pubkeys_for_update() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        single_update_enforce(&mut cs, 5, 5, 1, 2, 1, &[true, true, true, true, false]);
-        assert!(cs.is_satisfied());
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        single_update_enforce(cs.clone(), 5, 5, 1, 2, 1, &[true, true, true, true, false]);
+        assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
     fn not_enough_pubkeys_for_update() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
         // 2 false in the bitmap when only 1 allowed
-        single_update_enforce(&mut cs, 5, 5, 4, 5, 1, &[true, true, false, true, false]);
-        assert!(!cs.is_satisfied());
-        let not_satisfied = cs.which_is_unsatisfied();
+        single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
+        assert!(!cs.is_satisfied().unwrap());
+        let not_satisfied = cs.which_is_unsatisfied().unwrap();
         assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than/enforce smaller than/enforce smaller than");
     }
 
     #[test]
     #[should_panic]
     fn validator_number_cannot_change() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        single_update_enforce(&mut cs, 5, 6, 0, 0, 0, &[]);
+        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        single_update_enforce(cs.clone(), 5, 6, 0, 0, 0, &[]);
     }
 
-    fn single_update_enforce<CS: ConstraintSystem<Fr>>(
-        cs: &mut CS,
+    fn single_update_enforce(
+        cs: ConstraintSystemRef<Fr>,
         prev_n_validators: usize,
         n_validators: usize,
         prev_index: u16,
@@ -208,10 +214,14 @@ mod tests {
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
-        let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
-        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
+        let prev_validators = pubkeys::<Bls12_377>(n_validators);
+        let prev_validators = prev_validators
+            .iter()
+            .enumerate()
+            .map(|(i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap())
+            .collect::<Vec<_>>(); // alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
+        let prev_index = to_fr(Some(prev_index)).unwrap();
         let prev_max_non_signers = to_fr(
-            &mut cs.ns(|| "prev max non signers to fr"),
             Some(maximum_non_signers),
         )
         .unwrap();
@@ -227,7 +237,6 @@ mod tests {
         // enforce
         next_epoch
             .constrain(
-                &mut cs.ns(|| "constrain epoch 2"),
                 &prev_validators,
                 &prev_index,
                 &prev_max_non_signers,
@@ -236,4 +245,4 @@ mod tests {
             )
             .unwrap()
     }
-}*/
+}
