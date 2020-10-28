@@ -65,7 +65,7 @@ where
         let (prepared_signature, prepared_g2_neg_generator) =
             Self::prepare_signature_neg_generator(&mut cs, &signature)?;
 
-        // e(σ, g_2^-1) * e(H(m), apk) == 1_{G_T}
+        // e(σ, -g_2) * e(H(m), apk) == 1_{G_T}
         Self::enforce_bls_equation(
             &mut cs,
             &[prepared_signature, prepared_message_hash],
