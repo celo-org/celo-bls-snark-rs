@@ -100,7 +100,7 @@ mod tests {
         personalization.copy_from_slice(SIG_DOMAIN);
         let message = bits_to_bytes(&message);
         let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-        let mut bits = bytes_to_bits(&hash_result, 512);
+        let bits = bytes_to_bits(&hash_result, 512);
         bits
     }
 

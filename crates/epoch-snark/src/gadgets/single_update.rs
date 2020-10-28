@@ -162,8 +162,8 @@ pub mod test_helpers {
 mod tests {
     use super::test_helpers::generate_single_update;
     use super::*;
-    use algebra::{PrimeField, UniformRand};
-    use algebra::bls12_377::{G2Projective, G1Projective};
+    use algebra::UniformRand;
+    use algebra::bls12_377::G2Projective;
     use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::alloc::AllocVar;
     use r1cs_std::bls12_377::G2Var;
@@ -182,14 +182,14 @@ mod tests {
 
     #[test]
     fn test_enough_pubkeys_for_update() {
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         single_update_enforce(cs.clone(), 5, 5, 1, 2, 1, &[true, true, true, true, false]);
         assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
     fn not_enough_pubkeys_for_update() {
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         // 2 false in the bitmap when only 1 allowed
         single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
         assert!(!cs.is_satisfied().unwrap());
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn validator_number_cannot_change() {
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         single_update_enforce(cs.clone(), 5, 6, 0, 0, 0, &[]);
     }
 
@@ -219,7 +219,7 @@ mod tests {
         let prev_validators = prev_validators
             .iter()
             .enumerate()
-            .map(|(i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap())
+            .map(|(_i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap())
             .collect::<Vec<_>>(); // alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
         let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap(); //to_fr(Some(prev_index)).unwrap();
         let prev_max_non_signers = FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap(); /*to_fr(

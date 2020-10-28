@@ -1,6 +1,4 @@
 use algebra::{
-    curves::bls12::Bls12Parameters,
-    bls12_377::{Parameters as Bls12_377_Parameters, FqParameters},
     FpParameters, 
     PrimeField
 };
@@ -10,8 +8,6 @@ use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{Assignment, fields::fp::FpVar, prelude::*};
 use tracing::{span, trace, Level};
 
-type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
-type Fp = FpVar<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
 pub struct MultipackGadget;
 

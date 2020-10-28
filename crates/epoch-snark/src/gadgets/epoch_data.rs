@@ -167,7 +167,7 @@ impl EpochData<Bls12_377> {
         let is_setup = is_setup(&epoch_bits);
 
         // Pack them to Uint8s
-        let mut input_bytes_var: Vec<U8> = epoch_bits
+        let input_bytes_var: Vec<U8> = epoch_bits
             .chunks(8)
             .map(|chunk| {
                 let mut chunk = chunk.to_vec();
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_enforce() {
         let epoch = test_epoch(10);
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         let index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(9u32))).unwrap();//to_fr(Some(9u32)).unwrap();
         epoch
             .constrain(&index, false)
@@ -256,7 +256,7 @@ mod tests {
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         let bits = epoch.to_bits(cs.clone()).unwrap().0;
         let ret =
             EpochData::hash_bits_to_g1(&bits, false).unwrap();
@@ -273,7 +273,7 @@ mod tests {
             (1, 0, true),
             (5, 0, true),
         ] {
-            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            let cs = ConstraintSystem::<Fr>::new_ref();
             let epoch1 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index1))).unwrap();//to_fr(Some(*index1)).unwrap();
             let epoch2 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index2))).unwrap();//to_fr(Some(*index2)).unwrap();
             EpochData::enforce_next_epoch(&epoch1, &epoch2).unwrap();
@@ -304,7 +304,7 @@ mod tests {
             .unwrap();
 
         // calculate the bits from the epoch
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         let ret = epoch.to_bits(cs.clone()).unwrap();
 
         // compare with the result

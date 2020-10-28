@@ -1,5 +1,5 @@
 use algebra::{Field, PairingEngine};
-use r1cs_core::{ConstraintSynthesizer, lc, ConstraintSystem, ConstraintSystemRef, SynthesisError};
+use r1cs_core::{ConstraintSynthesizer, lc, ConstraintSystemRef, SynthesisError};
 use r1cs_std::fields::fp::FpVar;
 use r1cs_std::alloc::AllocVar;
 
@@ -36,7 +36,7 @@ impl<E: PairingEngine> ConstraintSynthesizer<E::Fr> for TestCircuit<E> {
             FpVar::Var(v) => v,
             _ => unreachable!(),
         };
-        cs.enforce_constraint(lc!() + x_var.variable, lc!() + x_var.variable, lc!() + out_var.variable);
+        cs.enforce_constraint(lc!() + x_var.variable, lc!() + x_var.variable, lc!() + out_var.variable)?;
 //        cs.enforce(|| "x * x = x^2", |lc| lc + x, |lc| lc + x, |lc| lc + out);
         // add some dummy constraints to make the circuit a bit bigger
         // we do this so that we can write a failing test for our MPC

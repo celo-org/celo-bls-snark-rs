@@ -88,7 +88,7 @@ impl EpochBits {
                 &message,
                 &blake2s_parameters.parameters(),
             )?;
-            let mut xof_bits_i = xof_result
+            let xof_bits_i = xof_result
                 .into_iter()
                 .map(|n| n.to_bits_le())
                 .flatten()
@@ -164,7 +164,6 @@ mod tests {
     use crate::epoch_block::hash_to_bits;
     use crate::gadgets::pack;
     use r1cs_core::{ConstraintSystem, ConstraintLayer};
-    use algebra::PrimeField;
     use tracing_subscriber::layer::SubscriberExt;
 
 /*    fn to_bool<F: PrimeField>(cs: ConstraintSystemRef<F>, iter: &[bool]) -> Result<Vec<Boolean<F>>, SynthesisError> {
@@ -190,7 +189,7 @@ mod tests {
             .flatten()
             .collect::<Vec<bool>>();
 
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         // encode each epoch's bytes to LE and pass them to the constraint system
         let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
         let last_epoch_bits = bytes_to_bits(&last_bytes, 256);

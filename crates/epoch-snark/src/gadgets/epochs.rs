@@ -378,7 +378,7 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
             assert!(cs.is_satisfied().unwrap());
         }
@@ -468,7 +468,7 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
             if !cs.is_satisfied().unwrap() {
                 println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());
@@ -561,7 +561,7 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = ConstraintSystem::<Fr>::new_ref();
+            let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
             if !cs.is_satisfied().unwrap() {
                 println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());

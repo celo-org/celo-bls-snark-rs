@@ -1,8 +1,7 @@
-use algebra::bls12_377::Bls12_377;
+/*use algebra::bls12_377::Bls12_377;
 use epoch_snark::ValidatorSetUpdate;
 use r1cs_core::ConstraintSynthesizer;
-//use r1cs_std::test_constraint_counter::ConstraintCounter;
-use std::env;
+use std::env;*/
 
 fn main() {
 /*    let mut args = env::args();
