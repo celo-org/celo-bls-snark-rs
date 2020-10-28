@@ -231,7 +231,7 @@ mod verify_one_message {
     use bls_crypto::test_helpers::*;
 
     use algebra::{
-        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
+        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
         bw6_761::Fr as BW6_761Fr,
         ProjectiveCurve, UniformRand, Zero,
     };
@@ -251,7 +251,7 @@ mod verify_one_message {
         bitmap: &[bool],
         num_non_signers: u64,
     ) -> ConstraintSystemRef<F> {
-        let mut cs = ConstraintSystem::<F>::new_ref();
+        let cs = ConstraintSystem::<F>::new_ref();
 
         let message_hash_var =
             <P::G1Var as AllocVar<E::G1Projective, _>>::new_witness(cs.clone(), || Ok(message_hash)).unwrap();
@@ -260,7 +260,7 @@ mod verify_one_message {
         let pub_keys = pub_keys
             .iter()
             .enumerate()
-            .map(|(i, pub_key)| {
+            .map(|(_i, pub_key)| {
                 <P::G2Var as AllocVar<E::G2Projective, _>>::new_witness(cs.clone(), || Ok(pub_key)).unwrap()
             })
             .collect::<Vec<_>>();
@@ -309,9 +309,9 @@ mod verify_one_message {
         let asig = sum(&asigs);
 
         // allocate the constraints
-        let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
-        let messages = messages.iter().enumerate().map(|(i, element)| <G1Var as AllocVar<G1Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
-        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
+        let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
+        let messages = messages.iter().enumerate().map(|(_i, element)| <G1Var as AllocVar<G1Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
+        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(_i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
         let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
 
         // check that verification is correct
@@ -432,7 +432,6 @@ mod verify_one_message {
     fn doubling_succeeds() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
-        let generator = G2Projective::prime_subgroup_generator();
 
         // if the first key is a bad one, it should fail, since the pubkey
         // won't be on the curve

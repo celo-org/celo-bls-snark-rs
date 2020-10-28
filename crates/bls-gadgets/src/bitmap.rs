@@ -1,6 +1,6 @@
 use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef, ConstraintSystem};
+use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef};
 use r1cs_std::{
     fields::{fp::FpVar},
     prelude::*,
@@ -92,7 +92,7 @@ mod tests {
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use r1cs_core::ConstraintSynthesizer;
+    use r1cs_core::{ConstraintSystem, ConstraintSynthesizer};
     use std::assert;
 
     #[test]
@@ -116,7 +116,7 @@ mod tests {
                     .bitmap
                     .iter()
                     .enumerate()
-                    .map(|(i, b)| {
+                    .map(|(_i, b)| {
                         Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
@@ -147,7 +147,7 @@ mod tests {
 
         // since our Test constraint system is satisfied, the groth16 proof
         // should also work
-        let mut cs = ConstraintSystem::<Fr>::new_ref();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         circuit.clone().generate_constraints(cs.clone()).unwrap();
         assert!(cs.is_satisfied().unwrap());
         let proof = create_random_proof(circuit, &params, rng).unwrap();
@@ -161,7 +161,7 @@ mod tests {
         max_number: u64,
         is_one: bool,
     ) -> ConstraintSystemRef<Fq> {
-        let mut cs = ConstraintSystem::<Fq>::new_ref();
+        let cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap
             .iter()
             .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)).unwrap())

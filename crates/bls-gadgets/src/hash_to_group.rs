@@ -11,7 +11,6 @@ use bls_crypto::{
 };
 use r1cs_std::alloc::AllocVar;
 use r1cs_std::alloc::AllocationMode;
-use std::ops::Sub;
 // Imported for the BLS12-377 API
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
@@ -20,12 +19,12 @@ use algebra::{
 
 use algebra::{
     curves::{
-        bls12::{G1Affine, G1Projective},
+        bls12::G1Projective,
         models::bls12::Bls12Parameters,
         short_weierstrass_jacobian::{GroupAffine, GroupProjective},
         SWModelParameters,
     },
-    AffineCurve, BigInteger, BitIteratorBE, PrimeField, ProjectiveCurve,
+    AffineCurve, BigInteger, BitIteratorBE, PrimeField,
 };
 use crypto_primitives::{
     crh::{
@@ -33,7 +32,7 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, ConstraintSystemRef, ConstraintLayer};
+use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
@@ -235,8 +234,8 @@ pub fn hash_to_bits<F: PrimeField>(
                 .map(|m| m.value())
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
-            let mut hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-            let mut bits = bytes_to_bits(&hash_result, 512);
+            let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
+            let bits = bytes_to_bits(&hash_result, 512);
             bits
         };
 
@@ -285,7 +284,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
                 // `BigInt::from_bits` takes BigEndian representations so we need to
                 // reverse them since they are read in LE
-                let big_no_reverse = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits); 
                 bits.reverse();
 
                 let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
@@ -305,7 +303,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         // Point compression on the G1 Gadget
         let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
             // Convert x to LE
-            let mut bits: Vec<Boolean<Bls12_377_Fq>> =
+            let bits: Vec<Boolean<Bls12_377_Fq>> =
                 expected_point_before_cofactor.x.to_bits_le()?;
 
             // Get a constraint about the y point's sign
@@ -344,11 +342,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         // Zexe's mul_bits requires that inputs _MUST_ be in LE form, so we have to reverse
         x_bits.reverse();
 
-        // return p * cofactor - [g]_1
-        let generator = G1Var::<Bls12_377_Parameters>::new_constant(
-            p.cs().unwrap_or(ConstraintSystemRef::None),
-            G1Projective::<Bls12_377_Parameters>::prime_subgroup_generator(),
-        )?;
+        // return p * cofactor
         let scaled = p
             .scalar_mul_le(x_bits.iter())?;
         Ok(scaled)
@@ -359,10 +353,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 mod test {
     use super::*;
 
-    use bls_crypto::hashers::composite::COMPOSITE_HASHER;
-    use bls_crypto::hash_to_curve::HashToCurve;
     use algebra::bls12_377;
-    use r1cs_std::groups::CurveVar;
     use r1cs_core::ConstraintSystem;
 
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
@@ -393,14 +384,13 @@ mod test {
         let (expected_hash, attempt) = try_and_increment
             .hash_with_attempt(SIG_DOMAIN, input, &[])
             .unwrap();
-        let hasher = &*COMPOSITE_HASHER;
 
-        let mut cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
+        let cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
         let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
             .enumerate()
-            .map(|(i, num)| {
+            .map(|(_i, num)| {
                 UInt8::new_witness(cs.clone(), || Ok(num)).unwrap()
             })
             .collect::<Vec<_>>();

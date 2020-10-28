@@ -186,10 +186,7 @@ mod test {
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocVar,
-        fields::FieldVar,
         groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
-//        test_constraint_system::TestConstraintSystem,
-        Assignment,
     };
 
     type Fp = <Parameters as Bls12Parameters>::Fp;
@@ -202,7 +199,7 @@ mod test {
         for _ in 0..10 {
             let element = G1Projective::rand(rng);
 
-            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
+            let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
                 G1Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
@@ -232,7 +229,7 @@ mod test {
         for _ in 0..10 {
             let element = G2Projective::rand(rng);
 
-            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
+            let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
                 G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
@@ -268,7 +265,7 @@ mod test {
                 Fp2::<<Parameters as Bls12Parameters>::Fp2Params>::new(element.y.c0, edge.into());
             let element = G2Affine::new(element.x, new_y, false).into_projective();
 
-            let mut cs = ConstraintSystem::<BW6_761Fr>::new_ref();
+            let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
                 G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();

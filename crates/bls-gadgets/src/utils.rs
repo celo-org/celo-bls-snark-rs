@@ -64,13 +64,13 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
-    use algebra::{Field, Group};
+/*    use algebra::{Field, Group};
     use r1cs_core::ConstraintSystemRef;
     use r1cs_std::groups::CurveVar;
     use algebra::ProjectiveCurve;
 
-   // /// Allocates an array of group elements to a group gadget
-/*    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
+    /// Allocates an array of group elements to a group gadget
+    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
         cs: ConstraintSystemRef<F>,
         elements: &[G],
     ) -> Vec<GG> {
