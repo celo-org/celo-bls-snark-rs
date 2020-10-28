@@ -20,4 +20,4 @@ crate-type = ["lib", "staticlib"]
 groth16 = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", features = ["parallel"] }
 r1cs-core = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs" }
 hex = "0.4.2"
-
+r1cs-std = { git = "https://github.com/scipr-lab/zexe", branch = "better-r1cs-docs", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }

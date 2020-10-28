@@ -184,6 +184,7 @@ dependencies = [
  "log",
  "once_cell",
  "r1cs-core",
+ "r1cs-std",
  "rand",
 ]
 
