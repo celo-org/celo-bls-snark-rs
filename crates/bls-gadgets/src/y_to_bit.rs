@@ -89,13 +89,14 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     fn is_eq_zero(
         &self,
     ) -> Result<Boolean<F>, SynthesisError> {
-        let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
-            || { Ok(self.value()? == F::zero())
-        })?;
-
         match self {
-            Self::Constant(_) => Ok(bit),
+            Self::Constant(_) => Ok(Boolean::constant(self.value()? == F::zero())),
             Self::Var(self_val) => {
+
+                let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
+                    || { Ok(self.value()? == F::zero())
+                })?;
+
                 // This enforces bit = 1 <=> el == 0.
                 // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
                 // forces result to be 1. If el is non-zero, then a constraint of the form
@@ -133,13 +134,13 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
         &self,
     ) -> Result<Boolean<F>, SynthesisError> {
         let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
-
-        let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
-            || Ok(self.value()? > half))?;
-
         match self {
-            Self::Constant(_) => Ok(bit),
+            Self::Constant(_) => Ok(Boolean::constant(self.value()? > half)),
             Self::Var(self_val) => {
+
+                let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+                    || Ok(self.value()? > half))?;
+
                 let adjusted = FpVar::new_witness(
                     self.cs().unwrap_or(ConstraintSystemRef::None),
                     || {
