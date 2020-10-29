@@ -1,6 +1,9 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
-use algebra::{curves::bls12::Bls12Parameters, PrimeField, Zero};
-use algebra::bls12_377::Parameters as Bls12_377_Parameters;
+use algebra::{
+    bls12_377::Parameters as Bls12_377_Parameters,
+    curves::bls12::Bls12Parameters, 
+    PrimeField, Zero
+};
 use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
     R1CSVar,
@@ -90,42 +93,39 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
             || { Ok(self.value()? == F::zero())
         })?;
 
-        // This enforces bit = 1 <=> el == 0.
-        // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
-        // forces result to be 1. If el is non-zero, then a constraint of the form
-        // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
-        // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
-        // witness calculation to pass.
-        let inv = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
-            || { Ok(self.value()?.inverse().unwrap_or(F::zero()))
-        })?;
+        match self {
+            Self::Constant(_) => Ok(bit),
+            Self::Var(self_val) => {
+                // This enforces bit = 1 <=> el == 0.
+                // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
+                // forces result to be 1. If el is non-zero, then a constraint of the form
+                // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
+                // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
+                // witness calculation to pass.
+                let inv = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+                    || { Ok(self.value()?.inverse().unwrap_or(F::zero()))
+                })?;
 
-        // (el * inv == 1 - bit)
-        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
-            // TODO: What to do with constant FpVars here? Should probably just not enforce
-            // constraints if both are constants
-            match self { 
-                Self::Constant(_) => lc!(),
-                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
-            },
-            match inv { 
-                Self::Constant(_) => lc!(),
-                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
-            },
-            LinearCombination::from(Variable::One) - bit.lc(),
-        )?;
+                // (el * inv == 1 - bit)
+                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                    LinearCombination::from(self_val.variable) + lc!(),
+                    match inv { 
+                        Self::Constant(_) => unreachable!(),
+                        Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
+                    },
+                    LinearCombination::from(Variable::One) - bit.lc(),
+                )?;
 
-        // (lhs * bit == 0)
-        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
-            match self {
-                Self::Constant(_) => lc!(),
-                Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
-            },
-            bit.lc(),
-            lc!(),
-        )?;
+                // (lhs * bit == 0)
+                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                    LinearCombination::from(self_val.variable),
+                    bit.lc(),
+                    lc!(),
+                )?;
 
-        Ok(bit)
+                Ok(bit)
+            }
+        }
     }
 
     // Returns 1 if el > half, else 0.

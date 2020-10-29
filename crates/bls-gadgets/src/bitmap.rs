@@ -67,14 +67,14 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         )?;
 
         let occurrences_var = match occurrences {
-            FpVar::Var(v) => v,
+            FpVar::Var(v) => v.variable,
             _ => unreachable!(),
         };
         // Enforce that we have correctly counted the number of occurrences
         self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
             occurrences_lc,
             lc!() + (F::one(), Variable::One),
-            lc!() + occurrences_var.variable,
+            lc!() + occurrences_var,
         )?;
 
         Ok(())

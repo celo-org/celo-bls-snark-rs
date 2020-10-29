@@ -1,6 +1,13 @@
-use crate::{
-    utils::{bits_to_bytes, bytes_to_bits, is_setup},
-    YToBitGadget,
+use algebra::{
+    bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
+    curves::{
+        bls12::G1Projective,
+        models::bls12::Bls12Parameters,
+        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
+        SWModelParameters,
+    },
+    ed_on_bw6_761::EdwardsParameters,
+    AffineCurve, BigInteger, BitIteratorBE, PrimeField,
 };
 use bls_crypto::{
     hashers::{
@@ -9,22 +16,9 @@ use bls_crypto::{
     },
     SIG_DOMAIN,
 };
-use r1cs_std::alloc::AllocVar;
-use r1cs_std::alloc::AllocationMode;
-// Imported for the BLS12-377 API
-use algebra::{
-    bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-};
-//use tracing_subscriber::layer::SubscriberExt;
-
-use algebra::{
-    curves::{
-        bls12::G1Projective,
-        models::bls12::Bls12Parameters,
-        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-        SWModelParameters,
-    },
-    AffineCurve, BigInteger, BitIteratorBE, PrimeField,
+use crate::{
+    utils::{bits_to_bytes, bytes_to_bits, is_setup},
+    YToBitGadget,
 };
 use crypto_primitives::{
     crh::{
@@ -34,12 +28,12 @@ use crypto_primitives::{
 };
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
+    alloc::{AllocVar, AllocationMode},
     bits::ToBitsGadget, boolean::Boolean,
     groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
-use algebra::ed_on_bw6_761::EdwardsParameters;
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]
@@ -180,7 +174,6 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
-//#[tracing::instrument(target = "r1cs")]
 pub fn hash_to_bits<F: PrimeField>(
     message: &[Boolean<F>],
     hash_length: u16,
@@ -362,10 +355,6 @@ mod test {
 
     #[test]
     fn test_hash_to_group() {
-/*        let mut layer = ConstraintLayer::default();
-        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
-        let subscriber = tracing_subscriber::Registry::default().with(layer);
-        tracing::subscriber::set_global_default(subscriber).unwrap();*/
 
         let mut rng = thread_rng();
         // test for various input sizes

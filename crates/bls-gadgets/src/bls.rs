@@ -240,7 +240,6 @@ mod verify_one_message {
         alloc::AllocVar,
         bls12_377::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
         boolean::Boolean,
-//        test_constraint_system::TestConstraintSystem,
     };
 
     // converts the arguments to constraints and checks them against the `verify` function
