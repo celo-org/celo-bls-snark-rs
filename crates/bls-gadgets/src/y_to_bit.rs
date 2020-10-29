@@ -49,7 +49,7 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
         &self,
     ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
-            let y_bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), || {
+        let y_bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), || {
             let half = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(<Bls12_377_Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two()).get()?;
             let c1 = self.y.c1.value()?;
             let c0 = self.y.c0.value()?;
@@ -137,36 +137,38 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
         let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
             || Ok(self.value()? > half))?;
 
-        let adjusted = FpVar::new_witness(
-            self.cs().unwrap_or(ConstraintSystemRef::None),
-            || {
-            let el = self.value()?;
+        match self {
+            Self::Constant(_) => Ok(bit),
+            Self::Var(self_val) => {
+                let adjusted = FpVar::new_witness(
+                    self.cs().unwrap_or(ConstraintSystemRef::None),
+                    || {
+                    let el = self.value()?;
 
-            let adjusted = if el > half { el - &half } else { el };
+                    let adjusted = if el > half { el - &half } else { el };
 
-            Ok(adjusted)
-        })?;
+                    Ok(adjusted)
+                })?;
 
-        let adjusted_var = match adjusted {
-            Self::Var(ref v) => v,
-            _ => panic!("adjusted wrong type"),
-        };
-        // TODO: Figure out what to do with constant FpVar
-        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
-            lc!() +  LinearCombination::from(Variable::One),
-            match self {
-                Self::Constant(_) => lc!(),
-                Self::Var(ref v) => LinearCombination::from(v.variable),
-            } + (bit.lc() * half.neg()),
-            LinearCombination::from(adjusted_var.variable)
-        )?;
+                let adjusted_var = match adjusted {
+                    Self::Var(ref v) => v.variable,
+                    _ => unreachable!(),
+                };
 
-        // Enforce `adjusted <= half`
-        FpVar::enforce_smaller_or_equal_than_mod_minus_one_div_two(
-            &adjusted,
-        )?;
+                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                    lc!() +  LinearCombination::from(Variable::One),
+                    LinearCombination::from(self_val.variable) + (bit.lc() * half.neg()),
+                    LinearCombination::from(adjusted_var)
+                )?;
 
-        Ok(bit)
+                // Enforce `adjusted <= half`
+                FpVar::enforce_smaller_or_equal_than_mod_minus_one_div_two(
+                    &adjusted,
+                )?;
+
+                Ok(bit)
+            }
+        }
     }
 }
 
