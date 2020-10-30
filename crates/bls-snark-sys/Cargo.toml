@@ -1,7 +1,7 @@
 [package]
 name = "bls-snark-sys"
 version = "0.1.4"
-authors = ["Georgios Konstantopoulos <me@gakonst.com>"]
+authors = ["Georgios Konstantopoulos <me@gakonst.com>", "Michael Straka <mstraka@clabs.co>"]
 edition = "2018"
 
 [dependencies]
