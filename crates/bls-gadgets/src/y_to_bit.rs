@@ -49,7 +49,7 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
         &self,
     ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
-        let y_bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), || {
+        let y_bit = Boolean::new_witness(self.cs(), || {
             let half = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(<Bls12_377_Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two()).get()?;
             let c1 = self.y.c1.value()?;
             let c0 = self.y.c0.value()?;
@@ -75,7 +75,7 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
         let y_eq_bit = self.y.c1.is_eq_zero()?;
         let bc = Boolean::and(&y_eq_bit, &y_c0_bit)?;
 
-        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+        self.cs().enforce_constraint(
             LinearCombination::from(Variable::One) - y_c1_bit.lc(),
             bc.lc(),
             y_bit.lc() - y_c1_bit.lc(),
@@ -93,7 +93,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
             Self::Constant(_) => Ok(Boolean::constant(self.value()? == F::zero())),
             Self::Var(self_val) => {
 
-                let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
+                let bit = Boolean::new_witness(self.cs(),
                     || { Ok(self.value()? == F::zero())
                 })?;
 
@@ -103,12 +103,12 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
                 // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
                 // witness calculation to pass.
-                let inv = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+                let inv = FpVar::new_witness(self.cs(),
                     || { Ok(self.value()?.inverse().unwrap_or(F::zero()))
                 })?;
 
                 // (el * inv == 1 - bit)
-                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                self.cs().enforce_constraint(
                     LinearCombination::from(self_val.variable) + lc!(),
                     match inv { 
                         Self::Constant(_) => unreachable!(),
@@ -118,7 +118,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 )?;
 
                 // (lhs * bit == 0)
-                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                self.cs().enforce_constraint(
                     LinearCombination::from(self_val.variable),
                     bit.lc(),
                     lc!(),
@@ -138,11 +138,11 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
             Self::Constant(_) => Ok(Boolean::constant(self.value()? > half)),
             Self::Var(self_val) => {
 
-                let bit = Boolean::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None), 
+                let bit = Boolean::new_witness(self.cs(),
                     || Ok(self.value()? > half))?;
 
                 let adjusted = FpVar::new_witness(
-                    self.cs().unwrap_or(ConstraintSystemRef::None),
+                    self.cs(),
                     || {
                     let el = self.value()?;
 
@@ -156,7 +156,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                     _ => unreachable!(),
                 };
 
-                self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+                self.cs().enforce_constraint(
                     lc!() +  LinearCombination::from(Variable::One),
                     LinearCombination::from(self_val.variable) + (bit.lc() * half.neg()),
                     LinearCombination::from(adjusted_var)

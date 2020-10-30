@@ -81,7 +81,7 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(previous_index.cs().unwrap_or(ConstraintSystemRef::None))?;
+        let (bits, index, maximum_non_signers, pubkeys) = self.to_bits(previous_index.cs())?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
@@ -109,7 +109,7 @@ impl EpochData<Bls12_377> {
         let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)))?;
         let index_bits = fr_to_bits(&index, 16)?;
 
-        let maximum_non_signers = FpVar::new_witness(index.cs().unwrap_or(ConstraintSystemRef::None), || Ok(Fr::from(self.maximum_non_signers)))?;
+        let maximum_non_signers = FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
 
         let maximum_non_signers_bits = fr_to_bits(
             &maximum_non_signers,
@@ -120,7 +120,7 @@ impl EpochData<Bls12_377> {
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (_j, maybe_pk) in self.public_keys.iter().enumerate() {
-            let pk_var = G2Var::new_witness(index.cs().unwrap_or(ConstraintSystemRef::None), || maybe_pk.get())?;
+            let pk_var = G2Var::new_witness(index.cs(), || maybe_pk.get())?;
 
             // extend our epoch bits by the pubkeys
             let pk_bits = g2_to_bits(&pk_var)?;
@@ -194,7 +194,7 @@ impl EpochData<Bls12_377> {
             counter
         };
 
-        let counter_var = UInt8::new_witness(epoch_bits.cs().unwrap_or(ConstraintSystemRef::None),
+        let counter_var = UInt8::new_witness(epoch_bits.cs(),
         || Ok(counter as u8))?;
         HashToGroupGadget::enforce_hash_to_group(
             counter_var,

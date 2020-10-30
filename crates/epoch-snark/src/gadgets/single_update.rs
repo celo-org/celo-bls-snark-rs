@@ -92,8 +92,9 @@ impl SingleUpdate<Bls12_377> {
         )?;
 
         // convert the bitmap to constraints
-        let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs().unwrap_or(ConstraintSystemRef::None))?;
+        let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
 
+        // convert the bitmap to constraints
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(

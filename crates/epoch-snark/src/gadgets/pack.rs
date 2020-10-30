@@ -31,7 +31,7 @@ impl MultipackGadget {
             } else {
                 FpVar::<F>::new_witness
             };
-            let fp = alloc(bits.cs().unwrap_or(ConstraintSystemRef::None),
+            let fp = alloc(bits.cs(),
             || {
                 if is_setup(&chunk) {
                     return Err(SynthesisError::AssignmentMissing);

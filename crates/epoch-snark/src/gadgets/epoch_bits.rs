@@ -121,7 +121,7 @@ impl EpochBits {
 
         // Allocate the VK
         let verifying_key = VerifyingKeyVar::<_, PairingVar>::new_constant(
-            proof.a.cs().unwrap_or(ConstraintSystemRef::None),
+            proof.a.cs(),
             helper.verifying_key.clone(),
         )?;
 

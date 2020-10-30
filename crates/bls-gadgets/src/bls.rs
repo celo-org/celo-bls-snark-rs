@@ -196,7 +196,7 @@ where
 
         // Allocate the generator on G2
         let g2_generator = <P::G2Var as AllocVar<E::G2Projective,F>>::new_constant(
-            signature.cs().unwrap_or(ConstraintSystemRef::None),
+            signature.cs(),
             E::G2Projective::prime_subgroup_generator(),
         )?;
         // and negate it for the purpose of verification

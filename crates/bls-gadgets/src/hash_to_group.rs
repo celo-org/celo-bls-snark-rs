@@ -139,7 +139,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
             <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
-                input.cs().unwrap_or(ConstraintSystemRef::None),
+                input.cs(),
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
@@ -234,9 +234,9 @@ pub fn hash_to_bits<F: PrimeField>(
 
         bits.iter()
         .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(message[..].cs().unwrap_or(ConstraintSystemRef::None), || Ok(b)))
+        .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
         .collect::<Result<Vec<_>, _>>()?
-//        constrain_bool(message[0].cs().unwrap_or(ConstraintSystemRef::None), &bits)?
+//        constrain_bool(message[0].cs(), &bits)?
     };
 
     Ok(xof_bits)
@@ -260,7 +260,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
             <G1Var::<Bls12_377_Parameters>>::new_variable_omit_prime_order_check(
-                x_bits.cs().unwrap_or(ConstraintSystemRef::None),
+                x_bits.cs(),
                 || {
                 // if we're in setup mode, just return an error
                 // TODO: setup should also be checked on sign bit

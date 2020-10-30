@@ -91,7 +91,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let epoch_bits = self.enforce(cs)?;
-        epoch_bits.verify(self.hash_helper, epoch_bits.first_epoch_bits[0].cs().unwrap_or(ConstraintSystemRef::None))?;
+        let x = epoch_bits.first_epoch_bits[0].cs();
+        epoch_bits.verify(self.hash_helper, x)?;
 
         info!("constraints generated");
 
@@ -129,7 +130,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         self.verify_signature(
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
-            first_epoch_bits.cs().unwrap_or(ConstraintSystemRef::None)
+            first_epoch_bits.cs()
         )?;
 
         Ok(EpochBits {
@@ -163,11 +164,11 @@ impl ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
 
         let dummy_pk = G2Var::new_constant(
-            first_epoch_index.cs().unwrap_or(ConstraintSystemRef::None),
+            first_epoch_index.cs(),
             G2Projective::prime_subgroup_generator(),
         )?;
         let dummy_message = G1Var::new_constant(
-            first_epoch_index.cs().unwrap_or(ConstraintSystemRef::None),
+            first_epoch_index.cs(),
             G1Projective::prime_subgroup_generator(),
         )?;
 

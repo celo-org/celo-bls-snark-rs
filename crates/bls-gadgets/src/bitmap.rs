@@ -54,7 +54,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
 
         // Rebind `occurrences` to a constraint
-        let occurrences = FpVar::new_witness(self.cs().unwrap_or(ConstraintSystemRef::None),
+        let occurrences = FpVar::new_witness(self.cs(),
             || { Ok(F::from(occurrences)) }
         )?;
 
@@ -70,7 +70,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
             _ => unreachable!(),
         };
         // Enforce that we have correctly counted the number of occurrences
-        self.cs().unwrap_or(ConstraintSystemRef::None).enforce_constraint(
+        self.cs().enforce_constraint(
             occurrences_lc,
             lc!() + (F::one(), Variable::One),
             lc!() + occurrences_var,
