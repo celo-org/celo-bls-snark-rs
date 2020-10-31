@@ -165,8 +165,9 @@ mod tests {
     use super::*;
     use algebra::UniformRand;
     use algebra::bls12_377::G2Projective;
+    use r1cs_std::groups::CurveVar;
     use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::alloc::AllocVar;
+    use r1cs_std::alloc::{AllocationMode, AllocVar};
     use r1cs_std::bls12_377::G2Var;
     use algebra::bw6_761::Fr as BW6_761Fr;
 
@@ -176,10 +177,6 @@ mod tests {
             .map(|_| E::G2Projective::rand(rng))
             .collect::<Vec<_>>()
     }
-
-/*    fn alloc_vec<E: PairingEngine, F: PrimeField, P: PairingVar<E,F>>(vec: Vec<E::G2Projective>) -> Vec<_> {
-        vec.iter().enumerate().map(|(i,element)| <P::G2Var as AllocVar<E::G2Projective, _>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>()
-    }*/
 
     #[test]
     fn test_enough_pubkeys_for_update() {
@@ -220,13 +217,10 @@ mod tests {
         let prev_validators = prev_validators
             .iter()
             .enumerate()
-            .map(|(_i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap())
-            .collect::<Vec<_>>(); // alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
-        let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap(); //to_fr(Some(prev_index)).unwrap();
-        let prev_max_non_signers = FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap(); /*to_fr(
-            Some(maximum_non_signers),
-        )
-        .unwrap();*/
+            .map(|(_i, element)| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap())
+            .collect::<Vec<_>>(); 
+        let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
+        let prev_max_non_signers = FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap(); 
 
         // generate the update via the helper
         let next_epoch = generate_single_update(

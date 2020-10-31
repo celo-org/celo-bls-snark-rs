@@ -263,7 +263,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 x_bits.cs(),
                 || {
                 // if we're in setup mode, just return an error
-                // TODO: setup should also be checked on sign bit
                 if is_setup(&x_bits) {
                     return Err(SynthesisError::AssignmentMissing);
                 }

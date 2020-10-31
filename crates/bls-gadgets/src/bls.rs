@@ -3,7 +3,7 @@ use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::{SynthesisError, ConstraintSystemRef};
 use r1cs_std::{
     boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
-    groups::CurveVar, pairing::PairingVar, alloc::AllocVar,
+    groups::CurveVar, pairing::PairingVar, alloc::{AllocationMode, AllocVar},
 };
 use std::marker::PhantomData;
 use std::ops::AddAssign;
@@ -195,9 +195,10 @@ where
         let prepared_signature = P::prepare_g1(signature)?;
 
         // Allocate the generator on G2
-        let g2_generator = <P::G2Var as AllocVar<E::G2Projective,F>>::new_constant(
+        let g2_generator = P::G2Var::new_variable_omit_prime_order_check(
             signature.cs(),
-            E::G2Projective::prime_subgroup_generator(),
+            || Ok(E::G2Projective::prime_subgroup_generator()),
+            AllocationMode::Constant,
         )?;
         // and negate it for the purpose of verification
         let g2_neg_generator = g2_generator.negate()?;
@@ -253,14 +254,14 @@ mod verify_one_message {
         let cs = ConstraintSystem::<F>::new_ref();
 
         let message_hash_var =
-            <P::G1Var as AllocVar<E::G1Projective, _>>::new_witness(cs.clone(), || Ok(message_hash)).unwrap();
-        let signature_var = <P::G1Var as AllocVar<E::G1Projective, _>>::new_witness(cs.clone(), || Ok(signature)).unwrap();
+            P::G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(message_hash), AllocationMode::Witness).unwrap();
+        let signature_var = P::G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(signature), AllocationMode::Witness).unwrap();
 
         let pub_keys = pub_keys
             .iter()
             .enumerate()
             .map(|(_i, pub_key)| {
-                <P::G2Var as AllocVar<E::G2Projective, _>>::new_witness(cs.clone(), || Ok(pub_key)).unwrap()
+                P::G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*pub_key), AllocationMode::Witness).unwrap()
             })
             .collect::<Vec<_>>();
         let bitmap = bitmap
@@ -309,9 +310,9 @@ mod verify_one_message {
 
         // allocate the constraints
         let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
-        let messages = messages.iter().enumerate().map(|(_i, element)| <G1Var as AllocVar<G1Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &messages);
-        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(_i, element)| <G2Var as AllocVar<G2Projective, BW6_761Fr>>::new_witness(cs.clone(), || Ok(element)).unwrap()).collect::<Vec<_>>(); //alloc_vec(cs.clone(), &aggregate_pubkeys);
-        let asig = G1Var::new_witness(cs.clone(), || Ok(asig)).unwrap();
+        let messages = messages.iter().enumerate().map(|(_i, element)| G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap()).collect::<Vec<_>>();
+        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(_i, element)| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap()).collect::<Vec<_>>();
+        let asig = G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(asig), AllocationMode::Witness).unwrap();
 
         // check that verification is correct
         BlsVerifyGadget::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>::batch_verify(

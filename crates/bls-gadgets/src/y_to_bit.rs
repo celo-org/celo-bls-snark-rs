@@ -7,7 +7,7 @@ use algebra::{
 use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
 use r1cs_std::{
     R1CSVar,
-    alloc::AllocVar,
+    alloc::{AllocVar, AllocationMode},
     boolean::Boolean,
     fields::{fp::FpVar},
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
@@ -235,7 +235,7 @@ mod test {
             let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
-                G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
+                G2Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
 
             let y_bit = allocated.y_to_bit().unwrap();
 
@@ -271,7 +271,7 @@ mod test {
             let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
             let allocated =
-                G2Var::<Parameters>::new_witness(cs.clone(), || Ok(element)).unwrap();
+                G2Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
 
             let y_bit = allocated.y_to_bit().unwrap();
 

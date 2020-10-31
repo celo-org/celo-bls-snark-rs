@@ -166,10 +166,6 @@ mod tests {
     use r1cs_core::{ConstraintSystem, ConstraintLayer};
     use tracing_subscriber::layer::SubscriberExt;
 
-/*    fn to_bool<F: PrimeField>(cs: ConstraintSystemRef<F>, iter: &[bool]) -> Result<Vec<Boolean<F>>, SynthesisError> {
-        iter.iter().map(|b| Bool::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>()
-    }*/
-
     #[test]
     fn correct_blake2_hash() {
         let mut layer = ConstraintLayer::default();

@@ -10,6 +10,7 @@ use algebra::{
 };
 use r1cs_std::prelude::*;
 use r1cs_std::{
+    alloc::AllocationMode,
     bls12_377::{G1Var, G2Var, PairingVar},
     bls12_377::{G1PreparedVar, G2PreparedVar},
     fields::fp::FpVar,
@@ -163,13 +164,15 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "verify_intermediate_epochs");
         let _enter = span.enter();
 
-        let dummy_pk = G2Var::new_constant(
+        let dummy_pk = G2Var::new_variable_omit_prime_order_check(
             first_epoch_index.cs(),
-            G2Projective::prime_subgroup_generator(),
+            || Ok(G2Projective::prime_subgroup_generator()),
+            AllocationMode::Constant,
         )?;
-        let dummy_message = G1Var::new_constant(
+        let dummy_message = G1Var::new_variable_omit_prime_order_check(
             first_epoch_index.cs(),
-            G1Projective::prime_subgroup_generator(),
+            || Ok(G1Projective::prime_subgroup_generator()),
+            AllocationMode::Constant,
         )?;
 
         let mut prepared_aggregated_public_keys = vec![];
@@ -280,9 +283,10 @@ impl ValidatorSetUpdate<Bls12_377> {
         messages: &[G1PreparedVar],
         cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
     ) -> Result<(), SynthesisError> {
-        let aggregated_signature = G1Var::new_witness(cs, || {
+        let aggregated_signature = G1Var::new_variable_omit_prime_order_check(cs, || {
             self.aggregated_signature.get()
-        })?;
+        },
+        AllocationMode::Witness)?;
         BlsGadget::batch_verify_prepared(
             &pubkeys,
             &messages,

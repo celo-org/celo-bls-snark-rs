@@ -10,6 +10,7 @@ use bls_gadgets::{utils::is_setup,
 };
 use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
+    alloc::AllocationMode,
     bls12_377::{G1Var, G2Var},
     fields::fp::FpVar,
     prelude::*,
@@ -120,7 +121,7 @@ impl EpochData<Bls12_377> {
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for (_j, maybe_pk) in self.public_keys.iter().enumerate() {
-            let pk_var = G2Var::new_witness(index.cs(), || maybe_pk.get())?;
+            let pk_var = G2Var::new_variable_omit_prime_order_check(index.cs(), || maybe_pk.get(), AllocationMode::Witness)?;
 
             // extend our epoch bits by the pubkeys
             let pk_bits = g2_to_bits(&pk_var)?;
