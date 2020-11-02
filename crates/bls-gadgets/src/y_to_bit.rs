@@ -186,7 +186,7 @@ mod test {
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocationMode,
-        groups::{CurveVar, curves::short_weierstrass::bls12::{G1Var, G2Var}, },
+        groups::{CurveVar, curves::short_weierstrass::bls12::{G1Var, G2Var}},
     };
 
     type Fp = <Parameters as Bls12Parameters>::Fp;
@@ -211,7 +211,7 @@ mod test {
                 y_bit.value().unwrap()
             );
 
-//            assert_eq!(cs.num_constraints(), 1621);
+            assert_eq!(cs.num_constraints(), 1003);
             if !cs.is_satisfied().unwrap() {
                 println!("{:?}", cs.which_is_unsatisfied().unwrap());
             }
@@ -245,7 +245,7 @@ mod test {
                 assert_eq!(false, y_bit.value().unwrap());
             }
 
-  //          assert_eq!(cs.num_constraints(), 3248);
+            assert_eq!(cs.num_constraints(), 2014);
             if !cs.is_satisfied().unwrap() {
                 println!("{:?}", cs.which_is_unsatisfied().unwrap());
             }
@@ -281,7 +281,8 @@ mod test {
                 assert_eq!(false, y_bit.value().unwrap());
             }
 
-    //        assert_eq!(cs.num_constraints(), 3248);
+            assert_eq!(cs.num_constraints(), 2014);
+
             // we're not checking this, because we couldn't find a matching point on BLS12-377,
             // and so we can't generate proper points on the curve
             /*
