@@ -191,9 +191,6 @@ mod tests {
         // 2 false in the bitmap when only 1 allowed
         single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
         assert!(!cs.is_satisfied().unwrap());
-/*        let not_satisfied = cs.which_is_unsatisfied().unwrap();
-        println!("not_satisfied: {}", not_satisfied.clone().unwrap());
-        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than/enforce smaller than/enforce smaller than");*/
     }
 
     #[test]

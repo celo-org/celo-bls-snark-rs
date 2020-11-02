@@ -233,7 +233,7 @@ mod tests {
     fn test_enforce() {
         let epoch = test_epoch(10);
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(9u32))).unwrap();//to_fr(Some(9u32)).unwrap();
+        let index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(9u32))).unwrap();
         epoch
             .constrain(&index, false)
             .unwrap();
@@ -275,8 +275,8 @@ mod tests {
             (5, 0, true),
         ] {
             let cs = ConstraintSystem::<Fr>::new_ref();
-            let epoch1 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index1))).unwrap();//to_fr(Some(*index1)).unwrap();
-            let epoch2 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index2))).unwrap();//to_fr(Some(*index2)).unwrap();
+            let epoch1 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index1))).unwrap();
+            let epoch2 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index2))).unwrap();
             EpochData::enforce_next_epoch(&epoch1, &epoch2).unwrap();
             assert_eq!(cs.is_satisfied().unwrap(), *expected);
         }

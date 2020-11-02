@@ -236,7 +236,6 @@ pub fn hash_to_bits<F: PrimeField>(
         .enumerate()
         .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
         .collect::<Result<Vec<_>, _>>()?
-//        constrain_bool(message[0].cs(), &bits)?
     };
 
     Ok(xof_bits)
@@ -246,7 +245,6 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
     // decodes the G1 point and then multiplies it by the curve's cofactor to
     // get the hash
-    //#[tracing::instrument(target = "r1cs")]
     fn hash_to_group(
         xof_bits: &[Boolean<Bls12_377_Fq>],
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
