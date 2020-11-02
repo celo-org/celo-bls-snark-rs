@@ -1,6 +1,6 @@
 use algebra::PrimeField;
 use crate::utils::is_setup;
-use r1cs_core::{LinearCombination, lc, SynthesisError, Variable, ConstraintSystemRef};
+use r1cs_core::{LinearCombination, lc, SynthesisError, Variable};
 use r1cs_std::{
     fields::{fp::FpVar},
     prelude::*,
@@ -91,7 +91,7 @@ mod tests {
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use r1cs_core::{ConstraintSystem, ConstraintSynthesizer};
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef, ConstraintSynthesizer};
     use std::assert;
 
     #[test]

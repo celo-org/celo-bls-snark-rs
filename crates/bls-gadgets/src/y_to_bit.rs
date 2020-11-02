@@ -4,14 +4,13 @@ use algebra::{
     curves::bls12::Bls12Parameters, 
     PrimeField, Zero
 };
-use r1cs_core::{SynthesisError, Variable, lc, ConstraintSystemRef, LinearCombination};
+use r1cs_core::{SynthesisError, Variable, lc, LinearCombination};
 use r1cs_std::{
-    R1CSVar,
-    alloc::{AllocVar, AllocationMode},
+    alloc::AllocVar,
     boolean::Boolean,
     fields::{fp::FpVar},
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
-    Assignment,
+    Assignment, R1CSVar 
 };
 
 /// The goal of the gadget is to provide the bit according to the value of y,
@@ -177,8 +176,6 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
 mod test {
     use super::*;
 
-    use r1cs_std::groups::CurveVar;
-    use r1cs_std::alloc::AllocationMode;
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
         bw6_761::Fr as BW6_761Fr,
@@ -188,8 +185,8 @@ mod test {
     };
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
-        alloc::AllocVar,
-        groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
+        alloc::AllocationMode,
+        groups::{CurveVar, curves::short_weierstrass::bls12::{G1Var, G2Var}, },
     };
 
     type Fp = <Parameters as Bls12Parameters>::Fp;

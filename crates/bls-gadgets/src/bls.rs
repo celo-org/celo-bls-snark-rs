@@ -1,9 +1,9 @@
 use crate::Bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
-    boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar, R1CSVar,
-    groups::CurveVar, pairing::PairingVar, alloc::{AllocationMode, AllocVar},
+    alloc::AllocationMode, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, 
+    fields::FieldVar, R1CSVar, groups::CurveVar, pairing::PairingVar,
 };
 use std::marker::PhantomData;
 use std::ops::AddAssign;
@@ -228,7 +228,6 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-//    use crate::utils::test_helpers::alloc_vec;
     use bls_crypto::test_helpers::*;
 
     use algebra::{
@@ -236,7 +235,7 @@ mod verify_one_message {
         bw6_761::Fr as BW6_761Fr,
         ProjectiveCurve, UniformRand, Zero,
     };
-    use r1cs_core::ConstraintSystem;
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::{
         alloc::AllocVar,
         bls12_377::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},

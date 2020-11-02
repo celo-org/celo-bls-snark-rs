@@ -26,7 +26,7 @@ use crypto_primitives::{
     },
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
     alloc::{AllocVar, AllocationMode},
     bits::ToBitsGadget, boolean::Boolean,
@@ -346,11 +346,10 @@ mod test {
     use super::*;
 
     use algebra::bls12_377;
-    use r1cs_core::ConstraintSystem;
-
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
+    use r1cs_core::ConstraintSystem;
+    use r1cs_std::bits::uint8::UInt8;
 
     #[test]
     fn test_hash_to_group() {

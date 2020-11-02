@@ -4,10 +4,6 @@ use algebra::{
     bw6_761::{Fr, FrParameters},
     FpParameters,
 };
-use r1cs_std::bls12_377::PairingVar;
-use r1cs_std::prelude::*;
-
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
 
 // Groth16 Specific imports
 use crypto_primitives::{
@@ -20,8 +16,9 @@ use crypto_primitives::{
     },
     prf::blake2s::{constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
+use r1cs_std::{bls12_377::PairingVar, fields::fp::FpVar, prelude::*};
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 
-use r1cs_std::fields::fp::FpVar;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
@@ -159,20 +156,13 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 mod tests {
     use super::*;
     use bls_gadgets::utils::bytes_to_bits;
-    use rand::RngCore;
+    use crate::{epoch_block::hash_to_bits, gadgets::pack};
 
-    use crate::epoch_block::hash_to_bits;
-    use crate::gadgets::pack;
-    use r1cs_core::{ConstraintSystem, ConstraintLayer};
-    use tracing_subscriber::layer::SubscriberExt;
+    use r1cs_core::ConstraintSystem;
+    use rand::RngCore;
 
     #[test]
     fn correct_blake2_hash() {
-        let mut layer = ConstraintLayer::default();
-        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
-        let subscriber = tracing_subscriber::Registry::default().with(layer);
-        tracing::subscriber::set_global_default(subscriber).unwrap();
-
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];
         rng.fill_bytes(&mut first_bytes);
@@ -192,8 +182,8 @@ mod tests {
         let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],
-            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), //to_bool(&first_epoch_bits),
-            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),//to_bool(&last_epoch_bits),
+            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), 
+            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),
         };
 
         let packed = bits.verify_edges().unwrap();

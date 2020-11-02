@@ -18,27 +18,26 @@ pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
 use algebra::{
-    curves::bls12::Bls12Parameters,
     bls12_377::{Parameters as Bls12_377_Parameters},
     bw6_761::Fr, 
+    curves::bls12::Bls12Parameters,
     BigInteger, FpParameters, PrimeField};
-use r1cs_std::prelude::*;
-use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, Assignment};
+use r1cs_core::{SynthesisError, ConstraintSystemRef};
+use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
 
 type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 use bls_gadgets::YToBitGadget;
 
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
-
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
     use crate::epoch_block::EpochBlock;
-    use algebra::{bls12_377::G1Projective, Bls12_377};
     use bls_crypto::{
         hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PublicKey, SIG_DOMAIN,
     };
+
+    use algebra::{bls12_377::G1Projective, Bls12_377};
 
     pub fn to_option_iter<T: Copy>(it: &[T]) -> Vec<Option<T>> {
         it.iter().map(|t| Some(*t)).collect()
@@ -73,13 +72,6 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         })
         .collect::<Result<Vec<_>, _>>()
 }
-
-/*fn to_fr<T: Into<u64>, F: PrimeField>(
-    cs: ConstraintSystemRef<F>,
-    num: Option<T>,
-) -> Result<FrVar, SynthesisError> {
-    FrVar::new_witness(cs.clone(), || Ok(Fr::from(num.get()?.into())))
-}*/
 
 fn fr_to_bits(
     input: &FrVar,

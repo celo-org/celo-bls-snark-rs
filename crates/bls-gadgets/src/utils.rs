@@ -1,8 +1,7 @@
 use algebra::{ 
     PrimeField
 };
-use r1cs_std::boolean::Boolean;
-use r1cs_std::R1CSVar;
+use r1cs_std::{boolean::Boolean, R1CSVar};
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup
 pub fn is_setup<F: PrimeField>(message: &[Boolean<F>]) -> bool {
@@ -49,35 +48,4 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .into_iter()
         .rev()
         .collect()
-}
-
-/*pub(crate) fn constrain_bool<F: PrimeField>(
-    cs: ConstraintSystemRef<F>,
-    input: &[bool],
-) -> Result<Vec<Boolean<F>>, SynthesisError> {
-    input
-        .iter()
-        .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(cs, || Ok(b)))
-        .collect::<Result<Vec<_>, _>>()
-}*/
-
-#[cfg(any(test, feature = "test-helpers"))]
-pub mod test_helpers {
-/*    use algebra::{Field, Group};
-    use r1cs_core::ConstraintSystemRef;
-    use r1cs_std::groups::CurveVar;
-    use algebra::ProjectiveCurve;
-
-    /// Allocates an array of group elements to a group gadget
-    pub fn alloc_vec<F: Field, G: ProjectiveCurve, GG: CurveVar<G, F>>(
-        cs: ConstraintSystemRef<F>,
-        elements: &[G],
-    ) -> Vec<GG> {
-        elements
-            .iter()
-            .enumerate()
-            .map(|(i, element)| GG::new_witness(cs.clone(), || Ok(element)).unwrap())
-            .collect::<Vec<_>>()
-    }*/
 }

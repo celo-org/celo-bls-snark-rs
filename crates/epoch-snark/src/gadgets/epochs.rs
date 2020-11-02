@@ -2,30 +2,28 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
+use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
+use bls_gadgets::{BlsVerifyGadget, FpUtils};
+
 use algebra::{
     curves::bls12::Bls12Parameters,
     bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
     bw6_761::Fr,
     PairingEngine, ProjectiveCurve,
 };
-use r1cs_std::prelude::*;
+use groth16::{Proof, VerifyingKey};
+use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
     bls12_377::{G1Var, G2Var, PairingVar},
     bls12_377::{G1PreparedVar, G2PreparedVar},
     fields::fp::FpVar,
     pairing::PairingVar as _,
+    prelude::*,
     Assignment,
 };
 use tracing::{debug, info, span, Level};
 
-use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
-
-use groth16::{Proof, VerifyingKey};
-
-use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
-
-use bls_gadgets::{BlsVerifyGadget, FpUtils};
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -300,8 +298,8 @@ impl ValidatorSetUpdate<Bls12_377> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::gadgets::single_update::test_helpers::generate_single_update;
+
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
     use r1cs_core::ConstraintSystem;

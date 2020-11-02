@@ -4,6 +4,7 @@ use algebra::{
     bw6_761::Fr,
     One, PairingEngine,
 };
+use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 use bls_gadgets::{utils::is_setup, 
     FpUtils, 
     HashToGroupGadget, 
@@ -16,7 +17,6 @@ use r1cs_std::{
     prelude::*,
     Assignment,
 };
-use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 
 use super::{fr_to_bits, g2_to_bits};
 use tracing::{span, trace, Level};
@@ -142,7 +142,6 @@ impl EpochData<Bls12_377> {
         trace!("enforcing next epoch");
         let previous_plus_one =
             previous_index + Fr::one();
-//            previous_index.add_constant(&Fr::one())?;
 
         let index_bit =
             index.is_eq_zero()?.not();
@@ -208,14 +207,15 @@ impl EpochData<Bls12_377> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bls_crypto::PublicKey;
+    use crate::epoch_block::EpochBlock;
+
     use algebra::{
         bls12_377::{Bls12_377, G2Projective as Bls12_377G2Projective},
         UniformRand,
     };
     use r1cs_core::ConstraintSystem;
 
-    use crate::epoch_block::EpochBlock;
-    use bls_crypto::PublicKey;
 
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
         let rng = &mut rand::thread_rng();

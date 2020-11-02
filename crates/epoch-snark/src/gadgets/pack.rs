@@ -4,7 +4,7 @@ use algebra::{
 };
 use algebra_core::biginteger::BigInteger;
 use bls_gadgets::utils::is_setup;
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
+use r1cs_core::SynthesisError;
 use r1cs_std::{Assignment, fields::fp::FpVar, prelude::*};
 use tracing::{span, trace, Level};
 

@@ -50,9 +50,6 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
             let bits = constrain_bool(&message_bits, cs.clone())?;
-            /*let bits = message_bits.iter().enumerate()
-                .map(|(j,b)| Boolean::new_witness(cs, || b.get()))
-                .collect::<Result<Vec<_>, _>>();*/
             let hash = hash_to_bits(
                 &bits[..],
                 512,
@@ -85,10 +82,11 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gadgets::pack;
-    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use bls_crypto::hashers::{DirectHasher, Hasher};
     use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
+    use crate::gadgets::pack;
+
+    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };

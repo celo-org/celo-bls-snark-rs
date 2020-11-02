@@ -1,15 +1,15 @@
 use algebra::{
-    curves::bls12::Bls12Parameters,
     bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters}, 
     bw6_761::Fr, 
+    curves::bls12::Bls12Parameters,
     PairingEngine
 };
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
-    R1CSVar,
     bls12_377::{G1Var, G2Var, PairingVar},
     boolean::Boolean,
     fields::fp::FpVar,
+    R1CSVar,
 };
 
 use super::{constrain_bool, EpochData};
@@ -121,6 +121,7 @@ impl SingleUpdate<Bls12_377> {
 pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
+
     use algebra::ProjectiveCurve;
 
     pub fn generate_single_update<E: PairingEngine>(
@@ -161,15 +162,14 @@ pub mod test_helpers {
 
 #[cfg(test)]
 mod tests {
-    use super::test_helpers::generate_single_update;
-    use super::*;
+    use super::{*, test_helpers::generate_single_update};
     use algebra::UniformRand;
-    use algebra::bls12_377::G2Projective;
-    use r1cs_std::groups::CurveVar;
     use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::alloc::{AllocationMode, AllocVar};
-    use r1cs_std::bls12_377::G2Var;
-    use algebra::bw6_761::Fr as BW6_761Fr;
+    use r1cs_std::{
+        alloc::{AllocationMode, AllocVar}, 
+        bls12_377::G2Var, 
+        groups::CurveVar
+    };
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
