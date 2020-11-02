@@ -208,6 +208,7 @@ impl EpochData<Bls12_377> {
 mod tests {
     use super::*;
     use bls_crypto::PublicKey;
+    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
     use crate::epoch_block::EpochBlock;
 
     use algebra::{
@@ -237,6 +238,7 @@ mod tests {
         epoch
             .constrain(&index, false)
             .unwrap();
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
     }
 
@@ -278,6 +280,7 @@ mod tests {
             let epoch1 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index1))).unwrap();
             let epoch2 = FrVar::new_witness(cs.clone(), || Ok(Fr::from(*index2))).unwrap();
             EpochData::enforce_next_epoch(&epoch1, &epoch2).unwrap();
+            print_unsatisfied_constraints(cs.clone());
             assert_eq!(cs.is_satisfied().unwrap(), *expected);
         }
     }

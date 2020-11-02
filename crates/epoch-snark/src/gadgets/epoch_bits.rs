@@ -155,7 +155,7 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bls_gadgets::utils::bytes_to_bits;
+    use bls_gadgets::utils::{bytes_to_bits, test_helpers::print_unsatisfied_constraints};
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
 
     use r1cs_core::ConstraintSystem;
@@ -187,12 +187,8 @@ mod tests {
         };
 
         let packed = bits.verify_edges().unwrap();
-        if !cs.is_satisfied().unwrap() {
-            println!("=========================================================");
-            println!("Unsatisfied constraints:");
-            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
-            println!("=========================================================");
-        }
+
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
 
         // get the inner packed value

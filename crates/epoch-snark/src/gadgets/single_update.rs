@@ -162,7 +162,9 @@ pub mod test_helpers {
 
 #[cfg(test)]
 mod tests {
+    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
     use super::{*, test_helpers::generate_single_update};
+
     use algebra::UniformRand;
     use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::{
@@ -182,6 +184,8 @@ mod tests {
     fn test_enough_pubkeys_for_update() {
         let cs = ConstraintSystem::<Fr>::new_ref();
         single_update_enforce(cs.clone(), 5, 5, 1, 2, 1, &[true, true, true, true, false]);
+
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
     }
 
@@ -190,6 +194,8 @@ mod tests {
         let cs = ConstraintSystem::<Fr>::new_ref();
         // 2 false in the bitmap when only 1 allowed
         single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
+
+        print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
     }
 

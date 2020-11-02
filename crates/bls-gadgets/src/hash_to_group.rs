@@ -342,6 +342,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::bls12_377;
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
@@ -388,13 +389,7 @@ mod test {
         .unwrap()
         .0;
 
-        if !cs.is_satisfied().unwrap() {
-            println!("=========================================================");
-            println!("Unsatisfied constraints:");
-            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
-            println!("=========================================================");
-        }
-
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
         assert_eq!(expected_hash, hash.value().unwrap());
     }

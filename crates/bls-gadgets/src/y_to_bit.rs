@@ -175,6 +175,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
@@ -212,9 +213,8 @@ mod test {
             );
 
             assert_eq!(cs.num_constraints(), 1003);
-            if !cs.is_satisfied().unwrap() {
-                println!("{:?}", cs.which_is_unsatisfied().unwrap());
-            }
+
+            print_unsatisfied_constraints(cs.clone());
             assert!(cs.is_satisfied().unwrap());
         }
     }
@@ -246,9 +246,8 @@ mod test {
             }
 
             assert_eq!(cs.num_constraints(), 2014);
-            if !cs.is_satisfied().unwrap() {
-                println!("{:?}", cs.which_is_unsatisfied().unwrap());
-            }
+
+            print_unsatisfied_constraints(cs.clone());
             assert!(cs.is_satisfied().unwrap());
         }
     }
@@ -285,12 +284,10 @@ mod test {
 
             // we're not checking this, because we couldn't find a matching point on BLS12-377,
             // and so we can't generate proper points on the curve
-            /*
-            if !cs.is_satisfied() {
-                println!("{}", cs.which_is_unsatisfied().unwrap());
-            }
-            assert!(cs.is_satisfied());
-            */
+            
+            print_unsatisfied_constraints(cs.clone());
+            assert!(cs.is_satisfied().unwrap());
+            
         }
     }
 

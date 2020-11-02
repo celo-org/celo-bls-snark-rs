@@ -49,3 +49,18 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .rev()
         .collect()
 }
+
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_helpers {
+    use algebra::PrimeField;
+    use r1cs_core::ConstraintSystemRef;
+
+    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) -> () {
+       if !cs.is_satisfied().unwrap() {
+            println!("=========================================================");
+            println!("Unsatisfied constraints:");
+            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
+            println!("=========================================================");
+        } 
+    }
+}

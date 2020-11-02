@@ -229,6 +229,7 @@ where
 mod verify_one_message {
     use super::*;
     use bls_crypto::test_helpers::*;
+    use crate::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::{
         bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
@@ -320,6 +321,7 @@ mod verify_one_message {
             &asig,
         )
         .unwrap();
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
     }
 
@@ -340,6 +342,7 @@ mod verify_one_message {
             &[true],
             0,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
         assert_eq!(cs.num_constraints(), 18678);
 
@@ -351,6 +354,7 @@ mod verify_one_message {
             &[true],
             0,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
     }
 
@@ -370,6 +374,7 @@ mod verify_one_message {
             &[true, true],
             1,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
 
         // using the single sig if second guy is OK as long as
@@ -381,6 +386,7 @@ mod verify_one_message {
             &[true, false],
             1,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
 
         // bitmap set to false on the second one fails since we don't tolerate
@@ -392,6 +398,7 @@ mod verify_one_message {
             &[true, false],
             0,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
         let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(
             message_hash,
@@ -400,6 +407,7 @@ mod verify_one_message {
             &[true, false],
             0,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
     }
 
@@ -424,6 +432,7 @@ mod verify_one_message {
             &[false, true],
             3,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
     }
 
@@ -445,6 +454,7 @@ mod verify_one_message {
             &[true, true],
             3,
         );
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
     }
 }

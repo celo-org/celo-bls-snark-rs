@@ -299,6 +299,7 @@ impl ValidatorSetUpdate<Bls12_377> {
 mod tests {
     use super::*;
     use crate::gadgets::single_update::test_helpers::generate_single_update;
+    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
@@ -383,6 +384,8 @@ mod tests {
 
             let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
+
+            print_unsatisfied_constraints(cs.clone());
             assert!(cs.is_satisfied().unwrap());
         }
 
@@ -473,9 +476,8 @@ mod tests {
 
             let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
-            if !cs.is_satisfied().unwrap() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());
-            }
+
+            print_unsatisfied_constraints(cs.clone());
             assert!(cs.is_satisfied().unwrap());
         }
 
@@ -566,9 +568,8 @@ mod tests {
 
             let cs = ConstraintSystem::<Fr>::new_ref();
             valset.enforce(cs.clone()).unwrap();
-            if !cs.is_satisfied().unwrap() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap().unwrap());
-            }
+
+            print_unsatisfied_constraints(cs.clone());
             assert!(cs.is_satisfied().unwrap());
         }
     }

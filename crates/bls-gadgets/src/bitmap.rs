@@ -84,6 +84,8 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_helpers::print_unsatisfied_constraints;
+
     use algebra::{
         bls12_377::{Fq, Fr},
         Bls12_377,
@@ -148,6 +150,7 @@ mod tests {
         // should also work
         let cs = ConstraintSystem::<Fr>::new_ref();
         circuit.clone().generate_constraints(cs.clone()).unwrap();
+        print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
         let proof = create_random_proof(circuit, &params, rng).unwrap();
 
