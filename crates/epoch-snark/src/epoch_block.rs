@@ -1,5 +1,8 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
-use algebra::bls12_377::G1Projective;
+use algebra::{
+    bls12_377::{G1Projective, G2Projective},
+    curves::ProjectiveCurve,
+};
 use blake2s_simd::Params;
 use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
@@ -37,6 +40,8 @@ pub struct EpochBlock {
     pub parent_entropy: Option<Vec<u8>>,
     /// The maximum allowed number of signers that may be absent
     pub maximum_non_signers: u32,
+    /// The maximum allowed number of validators
+    pub maximum_validators: usize,
     /// The public keys of the new validators
     pub new_public_keys: Vec<PublicKey>,
 }
@@ -51,6 +56,7 @@ impl EpochBlock {
         epoch_entropy: Option<Vec<u8>>,
         parent_entropy: Option<Vec<u8>>,
         maximum_non_signers: u32,
+        maximum_validators: usize,
         new_public_keys: Vec<PublicKey>,
     ) -> Self {
         Self {
@@ -58,6 +64,7 @@ impl EpochBlock {
             epoch_entropy,
             parent_entropy,
             maximum_non_signers,
+            maximum_validators,
             new_public_keys,
         }
     }
@@ -106,6 +113,13 @@ impl EpochBlock {
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+        }
+        let difference = self.new_public_keys.len() - self.maximum_validators;
+        if difference > 0 {
+            let generator = PublicKey::from(G2Projective::prime_subgroup_generator());
+            for _ in 0..difference {
+                epoch_bits.extend_from_slice(encode_public_key(&generator)?.as_slice());
+            }
         }
         Ok(epoch_bits)
     }
@@ -174,6 +188,7 @@ mod tests {
             Some(vec![255u8; EpochBlock::ENTROPY_BYTES]),
             Some(vec![254u8; EpochBlock::ENTROPY_BYTES]),
             3,
+            pubkeys.len(),
             pubkeys,
         );
         assert_eq!(
@@ -188,7 +203,7 @@ mod tests {
         let pubkeys = (0..10)
             .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
             .collect::<Vec<_>>();
-        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
+        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys.len(), pubkeys);
         assert_eq!(
             hex::encode(epoch.encode_to_bytes()?),
             EXPECTED_ENCODING_WITHOUT_ENTROPY

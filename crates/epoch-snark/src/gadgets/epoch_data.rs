@@ -319,6 +319,7 @@ mod tests {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
+            pubkeys.len(),
             pubkeys,
         )
         .encode_to_bytes()
@@ -367,6 +368,7 @@ mod tests {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
+            pubkeys.len(),
             pubkeys.clone(),
         )
         .encode_to_bits()
@@ -378,6 +380,7 @@ mod tests {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
+            pubkeys.len(),
             pubkeys,
         )
         .encode_to_bits_with_aggregated_pk()
