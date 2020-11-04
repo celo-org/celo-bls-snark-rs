@@ -1,78 +1,91 @@
-use crate::utils::is_setup;
 use algebra::PrimeField;
-use r1cs_core::{ConstraintSystem, LinearCombination, SynthesisError};
+use crate::utils::is_setup;
+use r1cs_core::{LinearCombination, lc, SynthesisError, Variable};
 use r1cs_std::{
-    fields::{fp::FpGadget, FieldGadget},
+    fields::{fp::FpVar},
     prelude::*,
-    Assignment,
 };
 
-/// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
-/// present in the provided bitmap
-pub fn enforce_maximum_occurrences_in_bitmap<F: PrimeField, CS: ConstraintSystem<F>>(
-    cs: &mut CS,
-    bitmap: &[Boolean],
-    max_occurrences: &FpGadget<F>,
-    value: bool,
-) -> Result<(), SynthesisError> {
-    let mut value_fp = F::one();
-    if !value {
-        // using the opposite value if we are counting 0s
-        value_fp = value_fp.neg();
-    }
-    // If we're in setup mode, we skip the bit counting part since the bitmap
-    // will be empty
-    let is_setup = is_setup(&bitmap);
-
-    let mut occurrences = 0;
-    let mut occurrences_lc = LinearCombination::zero();
-    // For each bit, increment the number of occurences if the bit matched `value`
-    // We calculate both the number of occurrences
-    // and a linear combination over it, in order to do 2 things:
-    // 1. enforce that occurrences < maximum_occurences
-    // 2. enforce that occurrences was calculated correctly from the bitmap
-    for bit in bitmap {
-        // Update the constraints
-        if !value {
-            // add 1 here only for zeros
-            occurrences_lc += (F::one(), CS::one());
-        }
-        occurrences_lc = occurrences_lc + bit.lc(CS::one(), value_fp);
-
-        // Update our count
-        if !is_setup {
-            let got_value = bit.get_value().get()?;
-            occurrences += (got_value == value) as u8;
-        }
-    }
-
-    // Rebind `occurrences` to a constraint
-    let occurrences = FpGadget::alloc(&mut cs.ns(|| "num occurrences"), || {
-        Ok(F::from(occurrences))
-    })?;
-
-    // Enforce `occurences <= max_occurences`
-    occurrences.enforce_cmp(
-        &mut cs.ns(|| "enforce maximum number of occurrences"),
-        &max_occurrences,
-        std::cmp::Ordering::Less,
-        true,
-    )?;
-
-    // Enforce that we have correctly counted the number of occurrences
-    cs.enforce(
-        || "enforce num occurrences lc equal to num",
-        |_| occurrences_lc,
-        |lc| lc + (F::one(), CS::one()),
-        |lc| occurrences.get_variable() + lc,
-    );
-
-    Ok(())
+pub trait Bitmap<F: PrimeField> {
+    fn enforce_maximum_occurrences_in_bitmap( 
+        &self,
+        max_occurrences: &FpVar<F>,
+        value: bool,
+    ) -> Result<(), SynthesisError>;
 }
+
+impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
+    /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
+    /// present in the provided bitmap
+    fn enforce_maximum_occurrences_in_bitmap(
+        &self,
+        max_occurrences: &FpVar<F>,
+        value: bool,
+    ) -> Result<(), SynthesisError> {
+        let mut value_fp = F::one();
+        if !value {
+            // using the opposite value if we are counting 0s
+            value_fp = value_fp.neg();
+        }
+        // If we're in setup mode, we skip the bit counting part since the bitmap
+        // will be empty
+        let is_setup = is_setup(self);
+
+        let mut occurrences = 0;
+        let mut occurrences_lc = LinearCombination::zero();
+        // For each bit, increment the number of occurences if the bit matched `value`
+        // We calculate both the number of occurrences
+        // and a linear combination over it, in order to do 2 things:
+        // 1. enforce that occurrences < maximum_occurences
+        // 2. enforce that occurrences was calculated correctly from the bitmap
+        for bit in self {
+            // Update the constraints
+            if !value {
+                // add 1 here only for zeros
+                occurrences_lc += (F::one(), Variable::One);
+            }
+            occurrences_lc = occurrences_lc + bit.lc() * value_fp;
+
+            // Update our count
+            if !is_setup {
+                let got_value = bit.value()?;
+                occurrences += (got_value == value) as u8;
+            }
+        }
+
+        // Rebind `occurrences` to a constraint
+        let occurrences = FpVar::new_witness(self.cs(),
+            || { Ok(F::from(occurrences)) }
+        )?;
+
+        // Enforce `occurences <= max_occurences`
+        occurrences.enforce_cmp(
+            &max_occurrences,
+            std::cmp::Ordering::Less,
+            true,
+        )?;
+
+        let occurrences_var = match occurrences {
+            FpVar::Var(v) => v.variable,
+            _ => unreachable!(),
+        };
+        // Enforce that we have correctly counted the number of occurrences
+        self.cs().enforce_constraint(
+            occurrences_lc,
+            lc!() + (F::one(), Variable::One),
+            lc!() + occurrences_var,
+        )?;
+
+        Ok(())
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_helpers::print_unsatisfied_constraints;
+
     use algebra::{
         bls12_377::{Fq, Fr},
         Bls12_377,
@@ -80,8 +93,8 @@ mod tests {
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use r1cs_core::ConstraintSynthesizer;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef, ConstraintSynthesizer};
+    use std::assert;
 
     #[test]
     // "I know of a bitmap that has at most 2 zeros"
@@ -96,23 +109,23 @@ mod tests {
         }
 
         impl ConstraintSynthesizer<Fr> for BitmapGadget {
-            fn generate_constraints<CS: ConstraintSystem<Fr>>(
+            fn generate_constraints(
                 self,
-                cs: &mut CS,
+                cs: ConstraintSystemRef<Fr>,
             ) -> Result<(), SynthesisError> {
                 let bitmap = self
                     .bitmap
                     .iter()
                     .enumerate()
-                    .map(|(i, b)| {
-                        Boolean::alloc(cs.ns(|| i.to_string()), || Ok(b.unwrap())).unwrap()
+                    .map(|(_i, b)| {
+                        Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();
-                let max_occurrences = FpGadget::<Fr>::alloc(cs.ns(|| "max occurences"), || {
+                let max_occurrences = FpVar::<Fr>::new_witness(cs.clone(), || {
                     Ok(Fr::from(self.max_occurrences))
                 })
                 .unwrap();
-                enforce_maximum_occurrences_in_bitmap(cs, &bitmap, &max_occurrences, self.value)
+                bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, self.value)
             }
         }
 
@@ -135,9 +148,10 @@ mod tests {
 
         // since our Test constraint system is satisfied, the groth16 proof
         // should also work
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        circuit.clone().generate_constraints(&mut cs).unwrap();
-        assert!(cs.is_satisfied());
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.clone().generate_constraints(cs.clone()).unwrap();
+        print_unsatisfied_constraints(cs.clone());
+        assert!(cs.is_satisfied().unwrap());
         let proof = create_random_proof(circuit, &params, rng).unwrap();
 
         let pvk = prepare_verifying_key(&params.vk);
@@ -148,15 +162,15 @@ mod tests {
         bitmap: &[bool],
         max_number: u64,
         is_one: bool,
-    ) -> TestConstraintSystem<Fq> {
-        let mut cs = TestConstraintSystem::<Fq>::new();
+    ) -> ConstraintSystemRef<Fq> {
+        let cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap
             .iter()
-            .map(|b| Boolean::constant(*b))
+            .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)).unwrap())
             .collect::<Vec<_>>();
         let max_occurrences =
-            FpGadget::<Fq>::alloc(cs.ns(|| "max occurences"), || Ok(Fq::from(max_number))).unwrap();
-        enforce_maximum_occurrences_in_bitmap(&mut cs, &bitmap, &max_occurrences, is_one).unwrap();
+            FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(max_number))).unwrap();
+        bitmap[..].enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one).unwrap();
         cs
     }
 
@@ -165,23 +179,24 @@ mod tests {
 
         #[test]
         fn one_zero_allowed() {
-            assert!(cs_enforce_value(&[false], 1, false).is_satisfied());
+            assert!(cs_enforce_value(&[false], 1, false).is_satisfied().unwrap());
         }
 
         #[test]
         fn no_zeros_allowed() {
-            assert!(!cs_enforce_value(&[false], 0, false).is_satisfied());
+            assert!(!cs_enforce_value(&[false], 0, false).is_satisfied().unwrap());
         }
 
         #[test]
+
         fn three_zeros_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied());
+            assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied().unwrap());
         }
 
         #[test]
         fn four_zeros_not_allowed() {
             assert!(
-                !cs_enforce_value(&[false, false, true, false, false], 3, false).is_satisfied()
+                !cs_enforce_value(&[false, false, true, false, false], 3, false).is_satisfied().unwrap()
             );
         }
     }
@@ -191,22 +206,22 @@ mod tests {
 
         #[test]
         fn one_one_allowed() {
-            assert!(cs_enforce_value(&[true], 1, true).is_satisfied());
+            assert!(cs_enforce_value(&[true], 1, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn no_ones_allowed() {
-            assert!(!cs_enforce_value(&[true], 0, true).is_satisfied());
+            assert!(!cs_enforce_value(&[true], 0, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn three_ones_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true).is_satisfied());
+            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true).is_satisfied().unwrap());
         }
 
         #[test]
         fn four_ones_not_allowed() {
-            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied());
+            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied().unwrap());
         }
     }
 }

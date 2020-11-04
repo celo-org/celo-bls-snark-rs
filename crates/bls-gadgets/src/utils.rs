@@ -1,11 +1,11 @@
-use algebra::Field;
-use r1cs_core::{ConstraintSystem, SynthesisError};
-use r1cs_std::{alloc::AllocGadget, boolean::Boolean};
-
+use algebra::{ 
+    PrimeField
+};
+use r1cs_std::{boolean::Boolean, R1CSVar};
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup
-pub fn is_setup(message: &[Boolean]) -> bool {
-    message.iter().any(|m| m.get_value().is_none())
+pub fn is_setup<F: PrimeField>(message: &[Boolean<F>]) -> bool {
+    message.iter().any(|m| m.value().is_err())
 }
 
 /// Converts the provided bits to LE bytes
@@ -50,32 +50,17 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
-pub(crate) fn constrain_bool<F: Field, CS: ConstraintSystem<F>>(
-    cs: &mut CS,
-    input: &[bool],
-) -> Result<Vec<Boolean>, SynthesisError> {
-    input
-        .iter()
-        .enumerate()
-        .map(|(j, b)| Boolean::alloc(cs.ns(|| format!("{}", j)), || Ok(b)))
-        .collect::<Result<Vec<_>, _>>()
-}
-
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
-    use algebra::{Field, Group};
-    use r1cs_core::ConstraintSystem;
-    use r1cs_std::groups::GroupGadget;
+    use algebra::PrimeField;
+    use r1cs_core::ConstraintSystemRef;
 
-    /// Allocates an array of group elements to a group gadget
-    pub fn alloc_vec<F: Field, G: Group, GG: GroupGadget<G, F>, CS: ConstraintSystem<F>>(
-        cs: &mut CS,
-        elements: &[G],
-    ) -> Vec<GG> {
-        elements
-            .iter()
-            .enumerate()
-            .map(|(i, element)| GG::alloc(&mut cs.ns(|| format!("{}", i)), || Ok(element)).unwrap())
-            .collect::<Vec<_>>()
+    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) -> () {
+       if !cs.is_satisfied().unwrap() {
+            println!("=========================================================");
+            println!("Unsatisfied constraints:");
+            println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
+            println!("=========================================================");
+        } 
     }
 }

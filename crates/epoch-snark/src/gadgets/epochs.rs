@@ -2,30 +2,31 @@
 //!
 //! Prove the validator state transition function for the BLS 12-377 curve.
 
+use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
+use bls_gadgets::{BlsVerifyGadget, FpUtils};
+
 use algebra::{
-    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters},
+    curves::bls12::Bls12Parameters,
+    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
     bw6_761::Fr,
     PairingEngine, ProjectiveCurve,
 };
-use r1cs_std::prelude::*;
+use groth16::{Proof, VerifyingKey};
+use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
 use r1cs_std::{
-    bls12_377::{G1Gadget, G2Gadget, PairingGadget},
-    bls12_377::{G1PreparedGadget, G2PreparedGadget},
-    fields::fp::FpGadget,
-    pairing::PairingGadget as _,
+    alloc::AllocationMode,
+    bls12_377::{G1Var, G2Var, PairingVar},
+    bls12_377::{G1PreparedVar, G2PreparedVar},
+    fields::fp::FpVar,
+    pairing::PairingVar as _,
+    prelude::*,
     Assignment,
 };
 use tracing::{debug, info, span, Level};
 
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
-
-use groth16::{Proof, VerifyingKey};
-
-use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
-
-use bls_gadgets::{BlsVerifyGadget, YToBitGadget};
-type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
-type FrGadget = FpGadget<Fr>;
+type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
+type FrVar = FpVar<Fr>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 #[derive(Clone)]
 /// Contains the initial epoch block, followed by a list of epoch block transitions. The
@@ -81,15 +82,16 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     // Enforce that the signatures over the epochs have been calculated
     // correctly, and then compress the public inputs
-    fn generate_constraints<CS: ConstraintSystem<Fr>>(
+    fn generate_constraints(
         self,
-        cs: &mut CS,
+        cs: ConstraintSystemRef<Fr>,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
         info!("generating constraints");
-        let epoch_bits = self.enforce(&mut cs.ns(|| "check signature"))?;
-        epoch_bits.verify(&mut cs.ns(|| "compress public inputs"), self.hash_helper)?;
+        let epoch_bits = self.enforce(cs)?;
+        let x = epoch_bits.first_epoch_bits[0].cs();
+        epoch_bits.verify(self.hash_helper, x)?;
 
         info!("constraints generated");
 
@@ -98,7 +100,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
-    fn enforce<CS: ConstraintSystem<Fr>>(&self, cs: &mut CS) -> Result<EpochBits, SynthesisError> {
+    fn enforce(&self, cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>) -> Result<EpochBits, SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
@@ -112,7 +114,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             _first_parent_entropy,
             initial_maximum_non_signers,
             initial_pubkey_vars,
-        ) = self.initial_epoch.to_bits(&mut cs.ns(|| "initial epoch"))?;
+        ) = self.initial_epoch.to_bits(cs.clone())?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
@@ -124,7 +126,6 @@ impl ValidatorSetUpdate<Bls12_377> {
             prepared_aggregated_public_keys,
             prepared_message_hashes,
         ) = self.verify_intermediate_epochs(
-            &mut cs.ns(|| "verify epochs"),
             first_epoch_index,
             initial_pubkey_vars,
             initial_maximum_non_signers,
@@ -133,9 +134,9 @@ impl ValidatorSetUpdate<Bls12_377> {
         // Verify the aggregate BLS signature
         debug!("verifying bls signature");
         self.verify_signature(
-            &mut cs.ns(|| "verify aggregated signature"),
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
+            first_epoch_bits.cs()
         )?;
 
         Ok(EpochBits {
@@ -150,32 +151,33 @@ impl ValidatorSetUpdate<Bls12_377> {
     /// and generates the witness data necessary for the final BLS Sig
     /// verification and witness compression
     #[allow(clippy::type_complexity)]
-    fn verify_intermediate_epochs<CS: ConstraintSystem<Fr>>(
+    fn verify_intermediate_epochs(
         &self,
-        cs: &mut CS,
-        first_epoch_index: FrGadget,
-        initial_pubkey_vars: Vec<G2Gadget>,
-        initial_max_non_signers: FrGadget,
+        first_epoch_index: FrVar,
+        initial_pubkey_vars: Vec<G2Var>,
+        initial_max_non_signers: FrVar,
     ) -> Result<
         (
-            Vec<Boolean>,
-            Vec<Boolean>,
-            Vec<Boolean>,
-            Vec<G2PreparedGadget>,
-            Vec<G1PreparedGadget>,
+            Vec<Bool>,
+            Vec<Bool>,
+            Vec<Bool>,
+            Vec<G2PreparedVar>,
+            Vec<G1PreparedVar>,
         ),
         SynthesisError,
     > {
         let span = span!(Level::TRACE, "verify_intermediate_epochs");
         let _enter = span.enter();
 
-        let dummy_pk = G2Gadget::alloc_constant(
-            cs.ns(|| "dummy public key"),
-            G2Projective::prime_subgroup_generator(),
+        let dummy_pk = G2Var::new_variable_omit_prime_order_check(
+            first_epoch_index.cs(),
+            || Ok(G2Projective::prime_subgroup_generator()),
+            AllocationMode::Constant,
         )?;
-        let dummy_message = G1Gadget::alloc_constant(
-            cs.ns(|| "dummy sig"),
-            G1Projective::prime_subgroup_generator(),
+        let dummy_message = G1Var::new_variable_omit_prime_order_check(
+            first_epoch_index.cs(),
+            || Ok(G1Projective::prime_subgroup_generator()),
+            AllocationMode::Constant,
         )?;
 
         let mut prepared_aggregated_public_keys = vec![];
@@ -190,7 +192,6 @@ impl ValidatorSetUpdate<Bls12_377> {
             let span = span!(Level::TRACE, "index", i);
             let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
-                &mut cs.ns(|| format!("epoch {}", i)),
                 &previous_pubkey_vars,
                 &previous_epoch_index,
                 &previous_max_non_signers,
@@ -198,15 +199,10 @@ impl ValidatorSetUpdate<Bls12_377> {
                 self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
             )?;
 
-            let index_bit = YToBitGadget::<Parameters>::is_eq_zero(
-                &mut cs.ns(|| format!("is index {} zero", i)),
-                &constrained_epoch.index,
-            )?
-            .not();
+            let index_bit = constrained_epoch.index.is_eq_zero()?.not();
 
             // Update the pubkeys for the next iteration
-            previous_epoch_index = FrGadget::conditionally_select(
-                cs.ns(|| format!("conditionally update previous epoch index {}", i)),
+            previous_epoch_index = FrVar::conditionally_select(
                 &index_bit,
                 &constrained_epoch.index,
                 &previous_epoch_index,
@@ -216,45 +212,37 @@ impl ValidatorSetUpdate<Bls12_377> {
                 .iter()
                 .zip(previous_pubkey_vars.iter())
                 .enumerate()
-                .map(|(j, (new_pk, old_pk))| {
-                    G2Gadget::conditionally_select(
-                        cs.ns(|| {
-                            format!("conditionally update previous pub key {} in epoch {}", j, i)
-                        }),
+                .map(|(_j, (new_pk, old_pk))| {
+                    G2Var::conditionally_select(
                         &index_bit,
                         new_pk,
                         old_pk,
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            previous_max_non_signers = FrGadget::conditionally_select(
-                cs.ns(|| format!("conditionally update previous max non signers {}", i)),
+            previous_max_non_signers = FrVar::conditionally_select(
                 &index_bit,
                 &constrained_epoch.new_max_non_signers,
                 &previous_max_non_signers,
             )?;
 
-            let aggregate_pk = G2Gadget::conditionally_select(
-                cs.ns(|| format!("conditionally select aggregate pk in epoch {}", i)),
+            let aggregate_pk = G2Var::conditionally_select(
                 &index_bit,
                 &constrained_epoch.aggregate_pk,
                 &dummy_pk,
             )?;
 
-            let prepared_aggregate_pk = PairingGadget::prepare_g2(
-                cs.ns(|| format!("prepare aggregate pk in epoch {}", i)),
+            let prepared_aggregate_pk = PairingVar::prepare_g2(
                 &aggregate_pk,
             )?;
 
-            let message_hash = G1Gadget::conditionally_select(
-                cs.ns(|| format!("conditionally select message hash in epoch {}", i)),
+            let message_hash = G1Var::conditionally_select(
                 &index_bit,
                 &constrained_epoch.message_hash,
                 &dummy_message,
             )?;
 
-            let prepared_message_hash = PairingGadget::prepare_g1(
-                cs.ns(|| format!("prepare message hash in epoch {}", i)),
+            let prepared_message_hash = PairingVar::prepare_g1(
                 &message_hash,
             )?;
 
@@ -267,17 +255,15 @@ impl ValidatorSetUpdate<Bls12_377> {
             all_xof_bits.extend_from_slice(&constrained_epoch.xof_bits);
             if i == self.epochs.len() - 1 {
                 let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
-                    cs.ns(|| "last epoch aggregated pk"),
                     &previous_pubkey_vars, // These are now the last epoch new pubkeys
                 )?;
                 let last_apk_bits =
-                    g2_to_bits(&mut cs.ns(|| "last epoch aggregated pk bits"), &last_apk)?;
+                    g2_to_bits(&last_apk)?;
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
 
                 // make sure the last epoch index is not zero
                 index_bit.enforce_equal(
-                    cs.ns(|| "last epoch index is not zero"),
                     &Boolean::Constant(true),
                 )?;
             }
@@ -296,17 +282,17 @@ impl ValidatorSetUpdate<Bls12_377> {
     }
 
     // Verify the aggregate signature
-    fn verify_signature<CS: ConstraintSystem<Fr>>(
+    fn verify_signature(
         &self,
-        cs: &mut CS,
-        pubkeys: &[G2PreparedGadget],
-        messages: &[G1PreparedGadget],
+        pubkeys: &[G2PreparedVar],
+        messages: &[G1PreparedVar],
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
     ) -> Result<(), SynthesisError> {
-        let aggregated_signature = G1Gadget::alloc(cs.ns(|| "aggregated signature"), || {
+        let aggregated_signature = G1Var::new_variable_omit_prime_order_check(cs, || {
             self.aggregated_signature.get()
-        })?;
+        },
+        AllocationMode::Witness)?;
         BlsGadget::batch_verify_prepared(
-            cs.ns(|| "batch verify BLS"),
             &pubkeys,
             &messages,
             &aggregated_signature,
@@ -319,11 +305,12 @@ impl ValidatorSetUpdate<Bls12_377> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::gadgets::single_update::test_helpers::generate_single_update;
+    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_core::ConstraintSystem;
 
     type Curve = Bls12_377;
 
@@ -402,9 +389,11 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            assert!(cs.is_satisfied());
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+
+            print_unsatisfied_constraints(cs.clone());
+            assert!(cs.is_satisfied().unwrap());
         }
 
         #[test]
@@ -492,12 +481,11 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
-            }
-            assert!(cs.is_satisfied());
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+
+            print_unsatisfied_constraints(cs.clone());
+            assert!(cs.is_satisfied().unwrap());
         }
 
         #[test]
@@ -585,12 +573,11 @@ mod tests {
                 hash_helper: None,
             };
 
-            let mut cs = TestConstraintSystem::<Fr>::new();
-            valset.enforce(&mut cs).unwrap();
-            if !cs.is_satisfied() {
-                println!("unsatisfied: {}", cs.which_is_unsatisfied().unwrap());
-            }
-            assert!(cs.is_satisfied());
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            valset.enforce(cs.clone()).unwrap();
+
+            print_unsatisfied_constraints(cs.clone());
+            assert!(cs.is_satisfied().unwrap());
         }
     }
 }

@@ -3,11 +3,10 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use algebra::{ed_on_bw6_761::EdwardsProjective as Edwards, CanonicalSerialize, ProjectiveCurve};
-
+use algebra::{ed_on_bw6_761::{EdwardsParameters, EdwardsProjective}, CanonicalSerialize, ProjectiveCurve};
 use blake2s_simd::Params;
 use crypto_primitives::crh::{
-    bowe_hopwood::BoweHopwoodPedersenCRH, pedersen::PedersenWindow, FixedLengthCRH,
+    bowe_hopwood, pedersen, FixedLengthCRH,
 };
 use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng};
@@ -15,13 +14,13 @@ use rand_chacha::ChaChaRng;
 
 // Fix to get around leaking a private type in a public interface
 mod window {
-    use super::PedersenWindow;
+    use super::pedersen;
 
     /// The window which will be used with the Fixed Length CRH
     #[derive(Clone)]
     pub struct Window;
 
-    impl PedersenWindow for Window {
+    impl pedersen::Window for Window {
         const WINDOW_SIZE: usize = 93;
         const NUM_WINDOWS: usize = 560;
     }
@@ -29,7 +28,7 @@ mod window {
 
 /// Bowe Hopwood Pedersen CRH instantiated over Edwards BW6_761 with `WINDOW_SIZE = 93` and
 /// `NUM_WINDOWS = 560`
-pub type CRH = BoweHopwoodPedersenCRH<Edwards, window::Window>;
+pub type CRH = bowe_hopwood::CRH<EdwardsParameters, window::Window>;
 
 /// Lazily evaluated composite hasher instantiated over the
 /// Bowe-Hopwood-Pedersen CRH.
@@ -72,7 +71,7 @@ impl<H: FixedLengthCRH> CompositeHasher<H> {
     }
 }
 
-impl<H: FixedLengthCRH<Output = Edwards>> Hasher for CompositeHasher<H> {
+impl<H: FixedLengthCRH<Output = EdwardsProjective>> Hasher for CompositeHasher<H> {
     type Error = BLSError;
 
     // TODO: Should we improve the trait design somehow? Seems like there's a bad abstraction

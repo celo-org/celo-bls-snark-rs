@@ -1,7 +1,11 @@
-use algebra::{BigInteger, FpParameters, PrimeField};
+use algebra::{
+    FpParameters, 
+    PrimeField
+};
+use algebra_core::biginteger::BigInteger;
 use bls_gadgets::utils::is_setup;
 use r1cs_core::SynthesisError;
-use r1cs_std::{fields::fp::FpGadget, prelude::*, Assignment};
+use r1cs_std::{Assignment, fields::fp::FpVar, prelude::*};
 use tracing::{span, trace, Level};
 
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
@@ -11,12 +15,11 @@ impl MultipackGadget {
     /// Packs the provided boolean constraints to a vector of field element gadgets of
     /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
     /// will be made as public inputs.
-    pub fn pack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
-        mut cs: CS,
-        bits: &[Boolean],
+    pub fn pack<F: PrimeField, Fp: FpParameters>(
+        bits: &[Boolean<F>],
         element_size: usize,
         should_alloc_input: bool,
-    ) -> Result<Vec<FpGadget<F>>, SynthesisError> {
+    ) -> Result<Vec<FpVar<F>>, SynthesisError> {
         let span = span!(Level::TRACE, "multipack_gadget");
         let _enter = span.enter();
         let mut packed = vec![];
@@ -24,27 +27,29 @@ impl MultipackGadget {
         for (i, chunk) in fp_chunks.enumerate() {
             trace!(iteration = i);
             let alloc = if should_alloc_input {
-                FpGadget::<F>::alloc_input
+                FpVar::<F>::new_input
             } else {
-                FpGadget::<F>::alloc
+                FpVar::<F>::new_witness
             };
-            let fp = alloc(cs.ns(|| format!("chunk {}", i)), || {
+            let fp = alloc(bits.cs(),
+            || {
                 if is_setup(&chunk) {
                     return Err(SynthesisError::AssignmentMissing);
                 }
                 let fp_val = F::BigInt::from_bits(
                     &chunk
                         .iter()
-                        .map(|x| x.get_value().get())
+                        .map(|x| x.value())
                         .collect::<Result<Vec<bool>, _>>()?,
                 );
                 Ok(F::from_repr(fp_val).get()?)
             })?;
-            let fp_bits = fp.to_bits(cs.ns(|| format!("chunk bits {}", i)))?;
+            let mut fp_bits = fp.to_bits_le()?;
+            fp_bits.reverse();
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[F::Params::MODULUS_BITS as usize - chunk_len + j]
-                    .enforce_equal(cs.ns(|| format!("fp bit {} for chunk {}", j, i)), &chunk[j])?;
+                fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j]
+                    .enforce_equal(&chunk[j])?;
             }
 
             packed.push(fp);
@@ -52,18 +57,17 @@ impl MultipackGadget {
         Ok(packed)
     }
 
-    /// Unpacks the provided field element gadget to a vector of boolean constraints
+/*    /// Unpacks the provided field element gadget to a vector of boolean constraints
     #[allow(unused)]
-    pub fn unpack<F: PrimeField, CS: r1cs_core::ConstraintSystem<F>>(
-        mut cs: CS,
-        packed: &[FpGadget<F>],
+    pub fn unpack(
+        packed: &[Fp],
         target_bits: usize,
         source_capacity: usize,
-    ) -> Result<Vec<Boolean>, SynthesisError> {
+    ) -> Result<Vec<Bool>, SynthesisError> {
         let bits_vecs = packed
             .iter()
             .enumerate()
-            .map(|(i, x)| x.to_bits(cs.ns(|| format!("elem {} bits", i))))
+            .map(|(i, x)| x.to_bits_le())
             .collect::<Result<Vec<_>, _>>()?;
         let mut bits = vec![];
         let mut chunk = 0;
@@ -75,11 +79,11 @@ impl MultipackGadget {
                 source_capacity as usize
             };
             bits.extend_from_slice(
-                &bits_vecs[chunk][<F::Params as FpParameters>::MODULUS_BITS as usize - diff..],
+                &bits_vecs[chunk][<FqParameters as FpParameters>::MODULUS_BITS as usize - diff..],
             );
             current_index += diff;
             chunk += 1;
         }
         Ok(bits)
-    }
+    }*/
 }
