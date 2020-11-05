@@ -219,8 +219,7 @@ mod tests {
         let prev_validators = pubkeys::<Bls12_377>(n_validators);
         let prev_validators = prev_validators
             .iter()
-            .enumerate()
-            .map(|(_i, element)| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap())
+            .map(|element| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap())
             .collect::<Vec<_>>(); 
         let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
         let prev_max_non_signers = FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap(); 

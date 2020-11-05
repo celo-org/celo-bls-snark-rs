@@ -116,8 +116,7 @@ mod tests {
                 let bitmap = self
                     .bitmap
                     .iter()
-                    .enumerate()
-                    .map(|(_i, b)| {
+                    .map(|b| {
                         Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap()
                     })
                     .collect::<Vec<_>>();

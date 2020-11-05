@@ -204,8 +204,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 .new_pubkeys
                 .iter()
                 .zip(previous_pubkey_vars.iter())
-                .enumerate()
-                .map(|(_j, (new_pk, old_pk))| {
+                .map(|(new_pk, old_pk)| {
                     G2Var::conditionally_select(
                         &index_bit,
                         new_pk,

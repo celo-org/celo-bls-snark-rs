@@ -81,6 +81,7 @@ fn fr_to_bits(
     Ok(input[0..length].to_vec())
 }
 
+/// Returns elements in big-endian order
 fn g2_to_bits(
     input: &G2Var,
 ) -> Result<Vec<Bool>, SynthesisError> {
@@ -102,7 +103,6 @@ fn constrain_bool<F: PrimeField>(
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
-        .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(cs.clone(), || b.get()))
+        .map(|b| Boolean::new_witness(cs.clone(), || b.get()))
         .collect::<Result<Vec<_>, _>>()
 }

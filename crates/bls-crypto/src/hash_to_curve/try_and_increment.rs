@@ -180,14 +180,13 @@ mod test {
         hash_to_curve_test::<<Parameters as Bls12Parameters>::G2Parameters, _>(h)
     }
 
-    #[allow(unused)]
     fn hash_to_curve_test<P: SWModelParameters, X: Hasher<Error = BLSError>>(h: X) {
         let hasher = TryAndIncrement::<X, P>::new(&h);
         let mut rng = rand::thread_rng();
         for length in &[10, 25, 50, 100, 200, 300] {
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
-            hasher.hash(&b"domain"[..], &input, &b"extra"[..]).unwrap();
+            let _ = hasher.hash(&b"domain"[..], &input, &b"extra"[..]).unwrap();
         }
     }
 

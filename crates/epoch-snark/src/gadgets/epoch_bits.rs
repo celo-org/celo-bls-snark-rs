@@ -59,7 +59,7 @@ impl EpochBits {
         // Verify the edges
         let mut xof_bits = vec![];
         let first_and_last_bits = [self.first_epoch_bits.clone(), self.last_epoch_bits.clone()];
-        for (_i, bits) in first_and_last_bits.iter().enumerate() {
+        for bits in first_and_last_bits.iter() {
             let mut message = bits.to_owned();
             message.reverse();
             let message_rounded_len = 8 * ((message.len() + 7) / 8);
@@ -182,8 +182,8 @@ mod tests {
         let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],
-            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), 
-            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),
+            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_input(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), 
+            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_input(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),
         };
 
         let packed = bits.verify_edges().unwrap();

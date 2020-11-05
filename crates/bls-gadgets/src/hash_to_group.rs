@@ -233,8 +233,7 @@ pub fn hash_to_bits<F: PrimeField>(
         };
 
         bits.iter()
-        .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
+        .map(|b| Boolean::new_witness(message[..].cs(), || Ok(b)))
         .collect::<Result<Vec<_>, _>>()?
     };
 
@@ -302,9 +301,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
-        for (_i, (a,b)) in compressed_point.iter()
+        for (a,b) in compressed_point.iter()
             .zip(x_bits.iter())
-            .enumerate() 
         {
             a.enforce_equal(&b)?;
         }
@@ -375,8 +373,7 @@ mod test {
         let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
-            .enumerate()
-            .map(|(_i, num)| {
+            .map(|num| {
                 UInt8::new_witness(cs.clone(), || Ok(num)).unwrap()
             })
             .collect::<Vec<_>>();

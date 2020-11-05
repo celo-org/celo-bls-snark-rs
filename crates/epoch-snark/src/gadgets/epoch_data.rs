@@ -120,7 +120,7 @@ impl EpochData<Bls12_377> {
         let mut epoch_bits: Vec<Bool> = [index_bits, maximum_non_signers_bits].concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
-        for (_j, maybe_pk) in self.public_keys.iter().enumerate() {
+        for maybe_pk in self.public_keys.iter() {
             let pk_var = G2Var::new_variable_omit_prime_order_check(index.cs(), || maybe_pk.get(), AllocationMode::Witness)?;
 
             // extend our epoch bits by the pubkeys
