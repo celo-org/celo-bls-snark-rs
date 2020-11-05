@@ -86,15 +86,15 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn to_fr<T: Into<u64>, F: PrimeField>(
-    cs: ConstraintSystemRef<F>,
+/*fn to_fr<T: Into<u64>>(
+    cs: ConstraintSystemRef<Fr>,
     num: Option<T>,
 ) -> Result<FrVar, SynthesisError> {
-    FrVar::new_witness(cs.clone(), || Ok(Fr::from(num.get()?.into())))
-}
+    FrVar::new_witness(cs.clone(), || Ok(Fr::from(num.get()?)))
+}*/
 
-fn bytes_to_fr<F: PrimeField>(
-    cs: ConstraintSystemRef<F>,
+fn bytes_to_fr(
+    cs: ConstraintSystemRef<Fr>,
     bytes: Option<&[u8]>,
 ) -> Result<FrVar, SynthesisError> {
     FrVar::new_witness(cs.clone(), || {

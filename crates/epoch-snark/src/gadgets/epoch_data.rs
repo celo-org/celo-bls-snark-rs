@@ -18,7 +18,7 @@ use r1cs_std::{
     Assignment,
 };
 
-use super::{bytes_to_fr, fr_to_bits, g2_to_bits, to_fr};
+use super::{bytes_to_fr, fr_to_bits, g2_to_bits};
 use tracing::{span, trace, Level};
 
 type FrVar = FpVar<Fr>;
@@ -108,8 +108,8 @@ impl EpochData<Bls12_377> {
 
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
         let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
-            self.to_bits(previous_index.cs().unwrap())?;
-        Self::enforce_next_epoch(previous_index.cs().unwrap(), previous_index, &index)?;
+            self.to_bits(previous_index.cs())?;
+        Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
         let (message_hash, crh_bits, xof_bits) = Self::hash_bits_to_g1(
@@ -145,8 +145,8 @@ impl EpochData<Bls12_377> {
         )?;
 =======*/
         cs: ConstraintSystemRef<Bls12_377_Fq>,
-    ) -> Result<(Vec<Bool>, FrVar, FrVar, Vec<G2Var>), SynthesisError> {
-        let index = FpVar::new_witness(cs, || Ok(Fr::from(self.index.get()?)))?;
+    ) -> Result<EpochDataToBits, SynthesisError> {
+        let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
         let index_bits = fr_to_bits(&index, 16)?;
 
         let maximum_non_signers = FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
@@ -158,25 +158,23 @@ impl EpochData<Bls12_377> {
         )?;
 
         let epoch_entropy = bytes_to_fr(
-            &mut cs.ns(|| "epoch entropy"),
+            cs.clone(),
             self.epoch_entropy.as_deref(),
         )?;
         let epoch_entropy_bits = fr_to_bits(
-            &mut cs.ns(|| "epoch entropy bits"),
             &epoch_entropy,
             8 * Self::ENTROPY_BYTES,
         )?;
         let parent_entropy = bytes_to_fr(
-            &mut cs.ns(|| "parent entropy"),
+            cs.clone(),
             self.parent_entropy.as_deref(),
         )?;
         let parent_entropy_bits = fr_to_bits(
-            &mut cs.ns(|| "parent entropy bits"),
             &parent_entropy,
             8 * Self::ENTROPY_BYTES,
         )?;
 
-        let mut epoch_bits: Vec<Boolean> = [
+        let mut epoch_bits: Vec<Bool> = [
             index_bits,
             epoch_entropy_bits,
             parent_entropy_bits,
