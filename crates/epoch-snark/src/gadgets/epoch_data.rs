@@ -133,17 +133,6 @@ impl EpochData<Bls12_377> {
     /// Encodes the epoch to bits (index and non-signers encoded as LE)
     pub fn to_bits(
         &self,
-/*<<<<<<< HEAD
-        cs: &mut CS,
-    ) -> Result<EpochDataToBits, SynthesisError> {
-        let index = to_fr(&mut cs.ns(|| "index"), self.index)?;
-        let index_bits = fr_to_bits(&mut cs.ns(|| "index bits"), &index, 16)?;
-
-        let maximum_non_signers = to_fr(
-            &mut cs.ns(|| "max non signers"),
-            Some(self.maximum_non_signers),
-        )?;
-=======*/
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<EpochDataToBits, SynthesisError> {
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
@@ -151,7 +140,6 @@ impl EpochData<Bls12_377> {
 
         let maximum_non_signers = FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
 
-//>>>>>>> straka/zexe_refactor
         let maximum_non_signers_bits = fr_to_bits(
             &maximum_non_signers,
             32,
