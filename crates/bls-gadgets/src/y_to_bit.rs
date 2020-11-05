@@ -1,16 +1,14 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
 use algebra::{
-    bls12_377::Parameters as Bls12_377_Parameters,
-    curves::bls12::Bls12Parameters, 
-    PrimeField, Zero
+    bls12_377::Parameters as Bls12_377_Parameters, curves::bls12::Bls12Parameters, PrimeField, Zero,
 };
-use r1cs_core::{SynthesisError, Variable, lc, LinearCombination};
+use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
 use r1cs_std::{
     alloc::AllocVar,
     boolean::Boolean,
-    fields::{fp::FpVar},
+    fields::fp::FpVar,
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
-    Assignment, R1CSVar 
+    Assignment, R1CSVar,
 };
 
 /// The goal of the gadget is to provide the bit according to the value of y,
@@ -25,16 +23,11 @@ pub trait YToBitGadget<P: Bls12Parameters> {
 }
 
 pub trait FpUtils<F: PrimeField> {
-    fn is_eq_zero(
-        &self,
-    ) -> Result<Boolean<F>, SynthesisError>; 
-    fn normalize(
-        &self,
-    ) -> Result<Boolean<F>, SynthesisError>;
+    fn is_eq_zero(&self) -> Result<Boolean<F>, SynthesisError>;
+    fn normalize(&self) -> Result<Boolean<F>, SynthesisError>;
 }
 
-impl YToBitGadget<Bls12_377_Parameters> for G1Var<Bls12_377_Parameters> 
-{
+impl YToBitGadget<Bls12_377_Parameters> for G1Var<Bls12_377_Parameters> {
     fn y_to_bit(
         &self,
     ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
@@ -49,11 +42,15 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
     ) -> Result<Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>, SynthesisError> {
         // Apply the point compression logic for getting the y bit's value.
         let y_bit = Boolean::new_witness(self.cs(), || {
-            let half = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(<Bls12_377_Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two()).get()?;
+            let half = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(
+                <Bls12_377_Parameters as Bls12Parameters>::Fp::modulus_minus_one_div_two(),
+            )
+            .get()?;
             let c1 = self.y.c1.value()?;
             let c0 = self.y.c0.value()?;
 
-            let bit = c1 > half || (c1 == <Bls12_377_Parameters as Bls12Parameters>::Fp::zero() && c0 > half);
+            let bit = c1 > half
+                || (c1 == <Bls12_377_Parameters as Bls12Parameters>::Fp::zero() && c0 > half);
             Ok(bit)
         })?;
 
@@ -85,16 +82,11 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
 }
 
 impl<F: PrimeField> FpUtils<F> for FpVar<F> {
-    fn is_eq_zero(
-        &self,
-    ) -> Result<Boolean<F>, SynthesisError> {
+    fn is_eq_zero(&self) -> Result<Boolean<F>, SynthesisError> {
         match self {
             Self::Constant(_) => Ok(Boolean::constant(self.value()? == F::zero())),
             Self::Var(self_val) => {
-
-                let bit = Boolean::new_witness(self.cs(),
-                    || { Ok(self.value()? == F::zero())
-                })?;
+                let bit = Boolean::new_witness(self.cs(), || Ok(self.value()? == F::zero()))?;
 
                 // This enforces bit = 1 <=> el == 0.
                 // The idea is that if el is 0, then a constraint of the form `el * el_inv == 1 - result`
@@ -102,14 +94,14 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 // `el*result == 0` forces result to be 0. inv is set to be 0 in case el is 0 because
                 // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
                 // witness calculation to pass.
-                let inv = FpVar::new_witness(self.cs(),
-                    || { Ok(self.value()?.inverse().unwrap_or(F::zero()))
+                let inv = FpVar::new_witness(self.cs(), || {
+                    Ok(self.value()?.inverse().unwrap_or(F::zero()))
                 })?;
 
                 // (el * inv == 1 - bit)
                 self.cs().enforce_constraint(
                     LinearCombination::from(self_val.variable) + lc!(),
-                    match inv { 
+                    match inv {
                         Self::Constant(_) => unreachable!(),
                         Self::Var(v) => LinearCombination::from(v.variable) + lc!(),
                     },
@@ -129,20 +121,14 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
     }
 
     // Returns 1 if el > half, else 0.
-    fn normalize(
-        &self,
-    ) -> Result<Boolean<F>, SynthesisError> {
+    fn normalize(&self) -> Result<Boolean<F>, SynthesisError> {
         let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
         match self {
             Self::Constant(_) => Ok(Boolean::constant(self.value()? > half)),
             Self::Var(self_val) => {
+                let bit = Boolean::new_witness(self.cs(), || Ok(self.value()? > half))?;
 
-                let bit = Boolean::new_witness(self.cs(),
-                    || Ok(self.value()? > half))?;
-
-                let adjusted = FpVar::new_witness(
-                    self.cs(),
-                    || {
+                let adjusted = FpVar::new_witness(self.cs(), || {
                     let el = self.value()?;
 
                     let adjusted = if el > half { el - &half } else { el };
@@ -156,15 +142,13 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 };
 
                 self.cs().enforce_constraint(
-                    lc!() +  LinearCombination::from(Variable::One),
+                    lc!() + LinearCombination::from(Variable::One),
                     LinearCombination::from(self_val.variable) + (bit.lc() * half.neg()),
-                    LinearCombination::from(adjusted_var)
+                    LinearCombination::from(adjusted_var),
                 )?;
 
                 // Enforce `adjusted <= half`
-                FpVar::enforce_smaller_or_equal_than_mod_minus_one_div_two(
-                    &adjusted,
-                )?;
+                FpVar::enforce_smaller_or_equal_than_mod_minus_one_div_two(&adjusted)?;
 
                 Ok(bit)
             }
@@ -187,7 +171,10 @@ mod test {
     use r1cs_core::ConstraintSystem;
     use r1cs_std::{
         alloc::AllocationMode,
-        groups::{CurveVar, curves::short_weierstrass::bls12::{G1Var, G2Var}},
+        groups::{
+            curves::short_weierstrass::bls12::{G1Var, G2Var},
+            CurveVar,
+        },
     };
 
     type Fp = <Parameters as Bls12Parameters>::Fp;
@@ -202,15 +189,16 @@ mod test {
 
             let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
-            let allocated =
-                G1Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
+            let allocated = G1Var::<Parameters>::new_variable_omit_prime_order_check(
+                cs.clone(),
+                || Ok(element),
+                AllocationMode::Witness,
+            )
+            .unwrap();
 
             let y_bit = allocated.y_to_bit().unwrap();
 
-            assert_eq!(
-                allocated.y.value().unwrap() > half,
-                y_bit.value().unwrap()
-            );
+            assert_eq!(allocated.y.value().unwrap() > half, y_bit.value().unwrap());
 
             assert_eq!(cs.num_constraints(), 1003);
 
@@ -231,8 +219,12 @@ mod test {
 
             let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
-            let allocated =
-                G2Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
+            let allocated = G2Var::<Parameters>::new_variable_omit_prime_order_check(
+                cs.clone(),
+                || Ok(element),
+                AllocationMode::Witness,
+            )
+            .unwrap();
 
             let y_bit = allocated.y_to_bit().unwrap();
 
@@ -266,8 +258,12 @@ mod test {
 
             let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
 
-            let allocated =
-                G2Var::<Parameters>::new_variable_omit_prime_order_check(cs.clone(), || Ok(element), AllocationMode::Witness).unwrap();
+            let allocated = G2Var::<Parameters>::new_variable_omit_prime_order_check(
+                cs.clone(),
+                || Ok(element),
+                AllocationMode::Witness,
+            )
+            .unwrap();
 
             let y_bit = allocated.y_to_bit().unwrap();
 
@@ -284,10 +280,9 @@ mod test {
 
             // we're not checking this, because we couldn't find a matching point on BLS12-377,
             // and so we can't generate proper points on the curve
-            
+
             //print_unsatisfied_constraints(cs.clone());
             //assert!(cs.is_satisfied().unwrap());
-            
         }
     }
 

@@ -6,17 +6,17 @@ use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochDa
 use bls_gadgets::{BlsVerifyGadget, FpUtils};
 
 use algebra::{
-    curves::bls12::Bls12Parameters,
     bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
     bw6_761::Fr,
+    curves::bls12::Bls12Parameters,
     PairingEngine, ProjectiveCurve,
 };
 use groth16::{Proof, VerifyingKey};
-use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
+use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
-    bls12_377::{G1Var, G2Var, PairingVar},
     bls12_377::{G1PreparedVar, G2PreparedVar},
+    bls12_377::{G1Var, G2Var, PairingVar},
     fields::fp::FpVar,
     pairing::PairingVar as _,
     prelude::*,
@@ -82,10 +82,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     // Enforce that the signatures over the epochs have been calculated
     // correctly, and then compress the public inputs
-    fn generate_constraints(
-        self,
-        cs: ConstraintSystemRef<Fr>,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
         info!("generating constraints");
@@ -100,7 +97,10 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
-    fn enforce(&self, cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>) -> Result<EpochBits, SynthesisError> {
+    fn enforce(
+        &self,
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
+    ) -> Result<EpochBits, SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
@@ -129,7 +129,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         self.verify_signature(
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
-            first_epoch_bits.cs()
+            first_epoch_bits.cs(),
         )?;
 
         Ok(EpochBits {
@@ -204,13 +204,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 .new_pubkeys
                 .iter()
                 .zip(previous_pubkey_vars.iter())
-                .map(|(new_pk, old_pk)| {
-                    G2Var::conditionally_select(
-                        &index_bit,
-                        new_pk,
-                        old_pk,
-                    )
-                })
+                .map(|(new_pk, old_pk)| G2Var::conditionally_select(&index_bit, new_pk, old_pk))
                 .collect::<Result<Vec<_>, _>>()?;
             previous_max_non_signers = FrVar::conditionally_select(
                 &index_bit,
@@ -224,9 +218,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &dummy_pk,
             )?;
 
-            let prepared_aggregate_pk = PairingVar::prepare_g2(
-                &aggregate_pk,
-            )?;
+            let prepared_aggregate_pk = PairingVar::prepare_g2(&aggregate_pk)?;
 
             let message_hash = G1Var::conditionally_select(
                 &index_bit,
@@ -234,9 +226,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &dummy_message,
             )?;
 
-            let prepared_message_hash = PairingVar::prepare_g1(
-                &message_hash,
-            )?;
+            let prepared_message_hash = PairingVar::prepare_g1(&message_hash)?;
 
             // Save the aggregated pubkey / message hash pair for the BLS batch verification
             prepared_aggregated_public_keys.push(prepared_aggregate_pk);
@@ -249,15 +239,12 @@ impl ValidatorSetUpdate<Bls12_377> {
                 let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
                     &previous_pubkey_vars, // These are now the last epoch new pubkeys
                 )?;
-                let last_apk_bits =
-                    g2_to_bits(&last_apk)?;
+                let last_apk_bits = g2_to_bits(&last_apk)?;
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
 
                 // make sure the last epoch index is not zero
-                index_bit.enforce_equal(
-                    &Boolean::Constant(true),
-                )?;
+                index_bit.enforce_equal(&Boolean::Constant(true))?;
             }
             debug!("epoch {} constrained", i);
         }
@@ -278,17 +265,14 @@ impl ValidatorSetUpdate<Bls12_377> {
         &self,
         pubkeys: &[G2PreparedVar],
         messages: &[G1PreparedVar],
-        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
     ) -> Result<(), SynthesisError> {
-        let aggregated_signature = G1Var::new_variable_omit_prime_order_check(cs, || {
-            self.aggregated_signature.get()
-        },
-        AllocationMode::Witness)?;
-        BlsGadget::batch_verify_prepared(
-            &pubkeys,
-            &messages,
-            &aggregated_signature,
+        let aggregated_signature = G1Var::new_variable_omit_prime_order_check(
+            cs,
+            || self.aggregated_signature.get(),
+            AllocationMode::Witness,
         )?;
+        BlsGadget::batch_verify_prepared(&pubkeys, &messages, &aggregated_signature)?;
 
         Ok(())
     }

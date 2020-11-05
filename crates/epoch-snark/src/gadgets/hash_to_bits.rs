@@ -2,12 +2,12 @@ use algebra::{
     bls12_377::{Fr, FrParameters},
     FpParameters,
 };
-use r1cs_core::{ConstraintSystemRef, ConstraintSynthesizer, SynthesisError};
+use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use tracing::{debug, info, span, trace, Level};
 
+use crate::gadgets::constrain_bool;
 use bls_crypto::SIG_DOMAIN;
 use bls_gadgets::hash_to_bits;
-use crate::gadgets::constrain_bool;
 
 use super::MultipackGadget;
 
@@ -35,10 +35,7 @@ impl HashToBits {
 
 impl ConstraintSynthesizer<Fr> for HashToBits {
     #[allow(clippy::cognitive_complexity)] // false positive triggered by the info!("generating constraints") log
-    fn generate_constraints(
-        self,
-        cs: ConstraintSystemRef<Fr>,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "HashToBits");
         info!("generating constraints");
         let _enter = span.enter();
@@ -50,12 +47,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
             let bits = constrain_bool(&message_bits, cs.clone())?;
-            let hash = hash_to_bits(
-                &bits[..],
-                512,
-                personalization,
-                true,
-            )?;
+            let hash = hash_to_bits(&bits[..], 512, personalization, true)?;
             all_bits.extend_from_slice(&bits);
             xof_bits.extend_from_slice(&hash);
         }
@@ -82,9 +74,9 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gadgets::pack;
     use bls_crypto::hashers::{DirectHasher, Hasher};
     use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
-    use crate::gadgets::pack;
 
     use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use groth16::{

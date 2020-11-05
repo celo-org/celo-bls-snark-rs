@@ -1,12 +1,9 @@
 use algebra::PrimeField;
-use r1cs_core::{LinearCombination, lc, SynthesisError, Variable};
-use r1cs_std::{
-    fields::{fp::FpVar},
-    prelude::*,
-};
+use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
+use r1cs_std::{fields::fp::FpVar, prelude::*};
 
 pub trait Bitmap<F: PrimeField> {
-    fn enforce_maximum_occurrences_in_bitmap( 
+    fn enforce_maximum_occurrences_in_bitmap(
         &self,
         max_occurrences: &FpVar<F>,
         value: bool,
@@ -53,16 +50,10 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
 
         // Rebind `occurrences` to a constraint
-        let occurrences = FpVar::new_witness(self.cs(),
-            || { Ok(F::from(occurrences)) }
-        )?;
+        let occurrences = FpVar::new_witness(self.cs(), || Ok(F::from(occurrences)))?;
 
         // Enforce `occurences <= max_occurences`
-        occurrences.enforce_cmp(
-            &max_occurrences,
-            std::cmp::Ordering::Less,
-            true,
-        )?;
+        occurrences.enforce_cmp(&max_occurrences, std::cmp::Ordering::Less, true)?;
 
         let occurrences_var = match occurrences {
             FpVar::Var(v) => v.variable,
@@ -79,7 +70,6 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,7 +82,7 @@ mod tests {
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef, ConstraintSynthesizer};
+    use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
     use std::assert;
 
     #[test]
@@ -115,14 +105,11 @@ mod tests {
                 let bitmap = self
                     .bitmap
                     .iter()
-                    .map(|b| {
-                        Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap()
-                    })
+                    .map(|b| Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap())
                     .collect::<Vec<_>>();
-                let max_occurrences = FpVar::<Fr>::new_witness(cs.clone(), || {
-                    Ok(Fr::from(self.max_occurrences))
-                })
-                .unwrap();
+                let max_occurrences =
+                    FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(self.max_occurrences)))
+                        .unwrap();
                 bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, self.value)
             }
         }
@@ -156,11 +143,7 @@ mod tests {
         assert!(verify_proof(&pvk, &proof, &[]).unwrap());
     }
 
-    fn cs_enforce_value(
-        bitmap: &[bool],
-        max_number: u64,
-        is_one: bool,
-    ) -> ConstraintSystemRef<Fq> {
+    fn cs_enforce_value(bitmap: &[bool], max_number: u64, is_one: bool) -> ConstraintSystemRef<Fq> {
         let cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap
             .iter()
@@ -168,7 +151,9 @@ mod tests {
             .collect::<Vec<_>>();
         let max_occurrences =
             FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(max_number))).unwrap();
-        bitmap[..].enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one).unwrap();
+        bitmap[..]
+            .enforce_maximum_occurrences_in_bitmap(&max_occurrences, is_one)
+            .unwrap();
         cs
     }
 
@@ -188,13 +173,19 @@ mod tests {
         #[test]
 
         fn three_zeros_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, false, false], 3, false).is_satisfied().unwrap());
+            assert!(
+                cs_enforce_value(&[false, true, true, false, false], 3, false)
+                    .is_satisfied()
+                    .unwrap()
+            );
         }
 
         #[test]
         fn four_zeros_not_allowed() {
             assert!(
-                !cs_enforce_value(&[false, false, true, false, false], 3, false).is_satisfied().unwrap()
+                !cs_enforce_value(&[false, false, true, false, false], 3, false)
+                    .is_satisfied()
+                    .unwrap()
             );
         }
     }
@@ -214,12 +205,16 @@ mod tests {
 
         #[test]
         fn three_ones_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true).is_satisfied().unwrap());
+            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true)
+                .is_satisfied()
+                .unwrap());
         }
 
         #[test]
         fn four_ones_not_allowed() {
-            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true).is_satisfied().unwrap());
+            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true)
+                .is_satisfied()
+                .unwrap());
         }
     }
 }

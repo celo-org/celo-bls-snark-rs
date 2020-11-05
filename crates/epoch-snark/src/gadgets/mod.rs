@@ -18,11 +18,10 @@ pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
 use algebra::{
-    bls12_377::{Parameters as Bls12_377_Parameters},
-    bw6_761::Fr, 
-    curves::bls12::Bls12Parameters,
-    BigInteger, FpParameters, PrimeField};
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
+    bls12_377::Parameters as Bls12_377_Parameters, bw6_761::Fr, curves::bls12::Bls12Parameters,
+    BigInteger, FpParameters, PrimeField,
+};
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
 
 type FrVar = FpVar<Fr>;
@@ -73,18 +72,13 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn fr_to_bits(
-    input: &FrVar,
-    length: usize,
-) -> Result<Vec<Bool>, SynthesisError> {
+fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
     let input = input.to_bits_le()?;
     Ok(input[0..length].to_vec())
 }
 
 /// Returns elements in big-endian order
-fn g2_to_bits(
-    input: &G2Var,
-) -> Result<Vec<Bool>, SynthesisError> {
+fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
     let mut x_0 = input.x.c0.to_bits_le()?;
     let mut x_1 = input.x.c1.to_bits_le()?;
     x_0.reverse();

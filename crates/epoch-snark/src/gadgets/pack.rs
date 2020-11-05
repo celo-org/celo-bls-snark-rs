@@ -1,10 +1,7 @@
-use algebra::{
-    FpParameters, 
-    PrimeField
-};
+use algebra::{FpParameters, PrimeField};
 use algebra_core::biginteger::BigInteger;
 use r1cs_core::SynthesisError;
-use r1cs_std::{Assignment, fields::fp::FpVar, prelude::*};
+use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
 use tracing::{span, trace, Level};
 
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
@@ -30,8 +27,7 @@ impl MultipackGadget {
             } else {
                 FpVar::<F>::new_witness
             };
-            let fp = alloc(bits.cs(),
-            || {
+            let fp = alloc(bits.cs(), || {
                 if chunk.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
@@ -47,8 +43,7 @@ impl MultipackGadget {
             fp_bits.reverse();
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
-                fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j]
-                    .enforce_equal(&chunk[j])?;
+                fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j].enforce_equal(&chunk[j])?;
             }
 
             packed.push(fp);
@@ -56,7 +51,7 @@ impl MultipackGadget {
         Ok(packed)
     }
 
-/*    /// Unpacks the provided field element gadget to a vector of boolean constraints
+    /*    /// Unpacks the provided field element gadget to a vector of boolean constraints
     #[allow(unused)]
     pub fn unpack(
         packed: &[Fp],

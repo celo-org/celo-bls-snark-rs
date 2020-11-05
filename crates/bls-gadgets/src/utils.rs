@@ -46,11 +46,11 @@ pub mod test_helpers {
     use r1cs_core::ConstraintSystemRef;
 
     pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) -> () {
-       if !cs.is_satisfied().unwrap() {
+        if !cs.is_satisfied().unwrap() {
             println!("=========================================================");
             println!("Unsatisfied constraints:");
             println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
             println!("=========================================================");
-        } 
+        }
     }
 }
