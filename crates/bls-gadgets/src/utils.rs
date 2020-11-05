@@ -1,13 +1,3 @@
-use algebra::{ 
-    PrimeField
-};
-use r1cs_std::{boolean::Boolean, R1CSVar};
-/// Helper used to skip operations which should not be executed when running the
-/// trusted setup
-pub fn is_setup<F: PrimeField>(message: &[Boolean<F>]) -> bool {
-    message.iter().any(|m| m.value().is_err())
-}
-
 /// Converts the provided bits to LE bytes
 pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     let reversed_bits = {

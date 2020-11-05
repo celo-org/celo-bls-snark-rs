@@ -42,7 +42,7 @@ impl<E: PairingEngine> ConstraintSynthesizer<E::Fr> for TestCircuit<E> {
         // where the params are smaller than the circuit size
         // (7 in this case, since we allocated 3 constraints, plus 4 below)
         for _ in 0..4 {
-            FpVar::<E::Fr>::new_witness(cs.clone(),
+            let _ =FpVar::<E::Fr>::new_witness(cs.clone(),
                 || self.0.ok_or(SynthesisError::AssignmentMissing),
             )
             .unwrap();

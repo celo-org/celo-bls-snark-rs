@@ -129,7 +129,7 @@ impl EpochBits {
 
         let public_inputs: Vec<Vec<Bool>> = [packed_crh_bits, packed_xof_bits].concat();
 
-        <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
+        let _ = <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
             Groth16<Bls12_377, HashToBits, BlsFr>,
             Fr,
         >>::verify(

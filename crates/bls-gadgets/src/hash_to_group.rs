@@ -17,7 +17,7 @@ use bls_crypto::{
     SIG_DOMAIN,
 };
 use crate::{
-    utils::{bits_to_bytes, bytes_to_bits, is_setup},
+    utils::{bits_to_bytes, bytes_to_bits},
     YToBitGadget,
 };
 use crypto_primitives::{
@@ -219,7 +219,7 @@ pub fn hash_to_bits<F: PrimeField>(
         xof_bits
     } else {
         trace!("generating hash without constraints");
-        let bits = if is_setup(&message) {
+        let bits = if message.cs().is_in_setup_mode() {
             vec![false; 512]
         } else {
             let message = message
@@ -260,7 +260,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 x_bits.cs(),
                 || {
                 // if we're in setup mode, just return an error
-                if is_setup(&x_bits) {
+                if x_bits.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
 

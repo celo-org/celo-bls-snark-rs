@@ -5,7 +5,7 @@ use algebra::{
     One, PairingEngine,
 };
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
-use bls_gadgets::{utils::is_setup, 
+use bls_gadgets::{ 
     FpUtils, 
     HashToGroupGadget, 
 };
@@ -164,7 +164,7 @@ impl EpochData<Bls12_377> {
         let mut epoch_bits = epoch_bits.to_vec();
         epoch_bits.reverse();
 
-        let is_setup = is_setup(&epoch_bits);
+        let is_setup = epoch_bits.cs().is_in_setup_mode();
 
         // Pack them to Uint8s
         let input_bytes_var: Vec<U8> = epoch_bits

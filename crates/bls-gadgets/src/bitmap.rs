@@ -1,5 +1,4 @@
 use algebra::PrimeField;
-use crate::utils::is_setup;
 use r1cs_core::{LinearCombination, lc, SynthesisError, Variable};
 use r1cs_std::{
     fields::{fp::FpVar},
@@ -29,7 +28,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
         // If we're in setup mode, we skip the bit counting part since the bitmap
         // will be empty
-        let is_setup = is_setup(self);
+        let is_setup = self.cs().is_in_setup_mode();
 
         let mut occurrences = 0;
         let mut occurrences_lc = LinearCombination::zero();
