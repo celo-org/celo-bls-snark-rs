@@ -45,7 +45,7 @@ pub mod test_helpers {
     use algebra::PrimeField;
     use r1cs_core::ConstraintSystemRef;
 
-    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) -> () {
+    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) {
         if !cs.is_satisfied().unwrap() {
             println!("=========================================================");
             println!("Unsatisfied constraints:");
