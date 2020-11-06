@@ -236,8 +236,7 @@ pub fn hash_to_bits<F: PrimeField>(
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
             let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-            let bits = bytes_to_bits(&hash_result, 512);
-            bits
+            bytes_to_bits(&hash_result, 512)
         };
 
         bits.iter()
@@ -257,7 +256,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
-        let mut xof_bits = xof_bits.to_vec().clone();
+        let mut xof_bits = xof_bits.to_vec();
 
         xof_bits.reverse();
         let x_bits = &xof_bits[..X_BITS];

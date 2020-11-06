@@ -95,7 +95,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
                 // the value of el_inv is not significant in that case (el is 0 anyway) and we need the
                 // witness calculation to pass.
                 let inv = FpVar::new_witness(self.cs(), || {
-                    Ok(self.value()?.inverse().unwrap_or(F::zero()))
+                    Ok(self.value()?.inverse().unwrap_or_else(F::zero))
                 })?;
 
                 // (el * inv == 1 - bit)

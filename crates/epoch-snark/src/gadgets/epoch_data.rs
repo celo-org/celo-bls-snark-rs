@@ -245,7 +245,7 @@ mod tests {
 
         // compare it with the one calculated in the circuit from its bytes
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let bits = epoch.to_bits(cs.clone()).unwrap().0;
+        let bits = epoch.to_bits(cs).unwrap().0;
         let ret = EpochData::hash_bits_to_g1(&bits, false).unwrap();
         assert_eq!(ret.0.value().unwrap(), hash);
     }
@@ -293,7 +293,7 @@ mod tests {
 
         // calculate the bits from the epoch
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let ret = epoch.to_bits(cs.clone()).unwrap();
+        let ret = epoch.to_bits(cs).unwrap();
 
         // compare with the result
         let bits_inner = ret.0.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
