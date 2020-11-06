@@ -18,17 +18,16 @@ pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
 use algebra::{
-    bls12_377::{Parameters as Bls12_377_Parameters},
-    bw6_761::Fr, 
-    curves::bls12::Bls12Parameters,
-    BigInteger, FpParameters, PrimeField};
-use r1cs_core::{SynthesisError, ConstraintSystemRef};
+    bls12_377::Parameters as Bls12_377_Parameters, bw6_761::Fr, curves::bls12::Bls12Parameters,
+    BigInteger, FpParameters, PrimeField,
+};
+use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
 
 type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
-use bls_gadgets::YToBitGadget;
 use bls_gadgets::utils::bytes_to_bits;
+use bls_gadgets::YToBitGadget;
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -80,28 +79,20 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn bytes_to_fr(
-    cs: ConstraintSystemRef<Fr>,
-    bytes: Option<&[u8]>,
-) -> Result<FrVar, SynthesisError> {
-    FrVar::new_witness(cs.clone(), || {
+fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVar, SynthesisError> {
+    FrVar::new_witness(cs, || {
         let bits = bytes_to_bits(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
         Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bits)))
     })
 }
 
 /// Returns the bit representation of the Fr element in *little-endian* ordering.
-fn fr_to_bits(
-    input: &FrVar,
-    length: usize,
-) -> Result<Vec<Bool>, SynthesisError> {
+fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
     let input = input.to_bits_le()?;
     Ok(input[0..length].to_vec())
 }
 
-fn g2_to_bits(
-    input: &G2Var,
-) -> Result<Vec<Bool>, SynthesisError> {
+fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
     let mut x_0 = input.x.c0.to_bits_le()?;
     let mut x_1 = input.x.c1.to_bits_le()?;
     x_0.reverse();

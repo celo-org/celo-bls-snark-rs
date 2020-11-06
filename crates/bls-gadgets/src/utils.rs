@@ -1,6 +1,4 @@
-use algebra::{ 
-    PrimeField
-};
+use algebra::PrimeField;
 use r1cs_std::{boolean::Boolean, R1CSVar};
 /// Helper used to skip operations which should not be executed when running the
 /// trusted setup
@@ -55,12 +53,12 @@ pub mod test_helpers {
     use algebra::PrimeField;
     use r1cs_core::ConstraintSystemRef;
 
-    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) -> () {
-       if !cs.is_satisfied().unwrap() {
+    pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) {
+        if !cs.is_satisfied().unwrap() {
             println!("=========================================================");
             println!("Unsatisfied constraints:");
             println!("{}", cs.which_is_unsatisfied().unwrap().unwrap());
             println!("=========================================================");
-        } 
+        }
     }
 }

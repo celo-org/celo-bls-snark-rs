@@ -2,8 +2,8 @@ use crate::Bitmap;
 use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
 use r1cs_core::SynthesisError;
 use r1cs_std::{
-    alloc::AllocationMode, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, 
-    fields::FieldVar, R1CSVar, groups::CurveVar, pairing::PairingVar,
+    alloc::AllocationMode, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar,
+    groups::CurveVar, pairing::PairingVar, R1CSVar,
 };
 use std::marker::PhantomData;
 use std::ops::AddAssign;
@@ -48,18 +48,12 @@ where
         let _enter = span.enter();
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
-        let (message_hash, aggregated_pk) = Self::enforce_bitmap(
-            pub_keys,
-            signed_bitmap,
-            message_hash,
-            maximum_non_signers,
-        )?;
+        let (message_hash, aggregated_pk) =
+            Self::enforce_bitmap(pub_keys, signed_bitmap, message_hash, maximum_non_signers)?;
 
-        let prepared_aggregated_pk =
-            P::prepare_g2(&aggregated_pk)?;
+        let prepared_aggregated_pk = P::prepare_g2(&aggregated_pk)?;
 
-        let prepared_message_hash =
-            P::prepare_g1(&message_hash)?;
+        let prepared_message_hash = P::prepare_g1(&message_hash)?;
 
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
@@ -88,11 +82,7 @@ where
         let prepared_message_hashes = message_hashes
             .iter()
             .enumerate()
-            .map(|(_i, message_hash)| {
-                P::prepare_g1(
-                    &message_hash,
-                )
-            })
+            .map(|(_i, message_hash)| P::prepare_g1(&message_hash))
             .collect::<Result<Vec<_>, _>>()?;
         let prepared_aggregated_pub_keys = aggregated_pub_keys
             .iter()
@@ -161,7 +151,7 @@ where
         for (_i, pk) in pub_keys.iter().enumerate() {
             // Add the pubkey to the sum
             // aggregated_pk += pk
-            aggregated_pk += pk; 
+            aggregated_pk += pk;
         }
 
         Ok(aggregated_pk)
@@ -202,8 +192,7 @@ where
         )?;
         // and negate it for the purpose of verification
         let g2_neg_generator = g2_generator.negate()?;
-        let prepared_g2_neg_generator =
-            P::prepare_g2(&g2_neg_generator)?;
+        let prepared_g2_neg_generator = P::prepare_g2(&g2_neg_generator)?;
 
         Ok((prepared_signature, prepared_g2_neg_generator))
     }
@@ -228,8 +217,8 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use bls_crypto::test_helpers::*;
     use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use bls_crypto::test_helpers::*;
 
     use algebra::{
         bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
@@ -253,15 +242,29 @@ mod verify_one_message {
     ) -> ConstraintSystemRef<F> {
         let cs = ConstraintSystem::<F>::new_ref();
 
-        let message_hash_var =
-            P::G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(message_hash), AllocationMode::Witness).unwrap();
-        let signature_var = P::G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(signature), AllocationMode::Witness).unwrap();
+        let message_hash_var = P::G1Var::new_variable_omit_prime_order_check(
+            cs.clone(),
+            || Ok(message_hash),
+            AllocationMode::Witness,
+        )
+        .unwrap();
+        let signature_var = P::G1Var::new_variable_omit_prime_order_check(
+            cs.clone(),
+            || Ok(signature),
+            AllocationMode::Witness,
+        )
+        .unwrap();
 
         let pub_keys = pub_keys
             .iter()
             .enumerate()
             .map(|(_i, pub_key)| {
-                P::G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*pub_key), AllocationMode::Witness).unwrap()
+                P::G2Var::new_variable_omit_prime_order_check(
+                    cs.clone(),
+                    || Ok(*pub_key),
+                    AllocationMode::Witness,
+                )
+                .unwrap()
             })
             .collect::<Vec<_>>();
         let bitmap = bitmap
@@ -270,8 +273,7 @@ mod verify_one_message {
             .collect::<Vec<_>>();
 
         let max_occurrences =
-            &FpVar::<F>::new_witness(cs.clone(), || Ok(F::from(num_non_signers)))
-                .unwrap();
+            &FpVar::<F>::new_witness(cs.clone(), || Ok(F::from(num_non_signers))).unwrap();
         BlsVerifyGadget::<E, F, P>::verify(
             &pub_keys,
             &bitmap[..],
@@ -310,9 +312,36 @@ mod verify_one_message {
 
         // allocate the constraints
         let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
-        let messages = messages.iter().enumerate().map(|(_i, element)| G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap()).collect::<Vec<_>>();
-        let aggregate_pubkeys = aggregate_pubkeys.iter().enumerate().map(|(_i, element)| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap()).collect::<Vec<_>>();
-        let asig = G1Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(asig), AllocationMode::Witness).unwrap();
+        let messages = messages
+            .iter()
+            .enumerate()
+            .map(|(_i, element)| {
+                G1Var::new_variable_omit_prime_order_check(
+                    cs.clone(),
+                    || Ok(*element),
+                    AllocationMode::Witness,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let aggregate_pubkeys = aggregate_pubkeys
+            .iter()
+            .enumerate()
+            .map(|(_i, element)| {
+                G2Var::new_variable_omit_prime_order_check(
+                    cs.clone(),
+                    || Ok(*element),
+                    AllocationMode::Witness,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let asig = G1Var::new_variable_omit_prime_order_check(
+            cs.clone(),
+            || Ok(asig),
+            AllocationMode::Witness,
+        )
+        .unwrap();
 
         // check that verification is correct
         BlsVerifyGadget::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>::batch_verify(

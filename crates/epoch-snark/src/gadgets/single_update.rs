@@ -1,8 +1,8 @@
 use algebra::{
-    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters}, 
-    bw6_761::Fr, 
+    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
+    bw6_761::Fr,
     curves::bls12::Bls12Parameters,
-    PairingEngine
+    PairingEngine,
 };
 use r1cs_core::SynthesisError;
 use r1cs_std::{
@@ -86,10 +86,9 @@ impl SingleUpdate<Bls12_377> {
         assert_eq!(num_validators as usize, self.epoch_data.public_keys.len());
 
         // Get the constrained epoch data
-        let epoch_data = self.epoch_data.constrain(
-            previous_epoch_index,
-            generate_constraints_for_hash,
-        )?;
+        let epoch_data = self
+            .epoch_data
+            .constrain(previous_epoch_index, generate_constraints_for_hash)?;
 
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
@@ -166,15 +165,15 @@ pub mod test_helpers {
 
 #[cfg(test)]
 mod tests {
+    use super::{test_helpers::generate_single_update, *};
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
-    use super::{*, test_helpers::generate_single_update};
 
     use algebra::UniformRand;
     use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::{
-        alloc::{AllocationMode, AllocVar}, 
-        bls12_377::G2Var, 
-        groups::CurveVar
+        alloc::{AllocVar, AllocationMode},
+        bls12_377::G2Var,
+        groups::CurveVar,
     };
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
@@ -207,7 +206,7 @@ mod tests {
     #[should_panic]
     fn validator_number_cannot_change() {
         let cs = ConstraintSystem::<Fr>::new_ref();
-        single_update_enforce(cs.clone(), 5, 6, 0, 0, 0, &[]);
+        single_update_enforce(cs, 5, 6, 0, 0, 0, &[]);
     }
 
     fn single_update_enforce(
@@ -224,10 +223,18 @@ mod tests {
         let prev_validators = prev_validators
             .iter()
             .enumerate()
-            .map(|(_i, element)| G2Var::new_variable_omit_prime_order_check(cs.clone(), || Ok(*element), AllocationMode::Witness).unwrap())
-            .collect::<Vec<_>>(); 
+            .map(|(_i, element)| {
+                G2Var::new_variable_omit_prime_order_check(
+                    cs.clone(),
+                    || Ok(*element),
+                    AllocationMode::Witness,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
         let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
-        let prev_max_non_signers = FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap(); 
+        let prev_max_non_signers =
+            FrVar::new_witness(cs, || Ok(Fr::from(maximum_non_signers))).unwrap();
 
         // generate the update via the helper
         let next_epoch = generate_single_update(

@@ -1,3 +1,7 @@
+use crate::{
+    utils::{bits_to_bytes, bytes_to_bits, is_setup},
+    YToBitGadget,
+};
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     curves::{
@@ -16,21 +20,20 @@ use bls_crypto::{
     },
     SIG_DOMAIN,
 };
-use crate::{
-    utils::{bits_to_bytes, bytes_to_bits, is_setup},
-    YToBitGadget,
-};
 use crypto_primitives::{
-    crh::{
-        bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget
-    },
+    crh::{bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget},
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
 use r1cs_core::SynthesisError;
 use r1cs_std::{
     alloc::{AllocVar, AllocationMode},
-    bits::ToBitsGadget, boolean::Boolean,
-    groups::bls12::G1Var, groups::CurveVar, uint8::UInt8, Assignment, R1CSVar, eq::EqGadget
+    bits::ToBitsGadget,
+    boolean::Boolean,
+    eq::EqGadget,
+    groups::bls12::G1Var,
+    groups::CurveVar,
+    uint8::UInt8,
+    Assignment, R1CSVar,
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
@@ -104,7 +107,14 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         counter: UInt8<Bls12_377_Fq>,
         message: &[UInt8<Bls12_377_Fq>],
         generate_constraints_for_hash: bool,
-    ) -> Result<(G1Var<Bls12_377_Parameters>, Vec<Boolean<Bls12_377_Fq>>, Vec<Boolean<Bls12_377_Fq>>), SynthesisError> {
+    ) -> Result<
+        (
+            G1Var<Bls12_377_Parameters>,
+            Vec<Boolean<Bls12_377_Fq>>,
+            Vec<Boolean<Bls12_377_Fq>>,
+        ),
+        SynthesisError,
+    > {
         let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
 
@@ -203,10 +213,8 @@ pub fn hash_to_bits<F: PrimeField>(
             trace!(blake_iteration = i);
             // calculate the hash (Vec<Boolean>)
             let blake2s_parameters = blake2xs_params(hash_length, i.into(), personalization);
-            let xof_result = evaluate_blake2s_with_parameters(
-                &message,
-                &blake2s_parameters.parameters(),
-            )?;
+            let xof_result =
+                evaluate_blake2s_with_parameters(&message, &blake2s_parameters.parameters())?;
             // convert hash result to LE bits
             let xof_bits_i = xof_result
                 .into_iter()
@@ -228,14 +236,13 @@ pub fn hash_to_bits<F: PrimeField>(
                 .collect::<Result<Vec<_>, _>>()?;
             let message = bits_to_bytes(&message);
             let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-            let bits = bytes_to_bits(&hash_result, 512);
-            bits
+            bytes_to_bits(&hash_result, 512)
         };
 
         bits.iter()
-        .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
-        .collect::<Result<Vec<_>, _>>()?
+            .enumerate()
+            .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
+            .collect::<Result<Vec<_>, _>>()?
     };
 
     Ok(xof_bits)
@@ -250,51 +257,55 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
-        let mut xof_bits = xof_bits.to_vec().clone();
+        let mut xof_bits = xof_bits.to_vec();
 
         xof_bits.reverse();
         let x_bits = &xof_bits[..X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
         let expected_point_before_cofactor =
-            <G1Var::<Bls12_377_Parameters>>::new_variable_omit_prime_order_check(
+            <G1Var<Bls12_377_Parameters>>::new_variable_omit_prime_order_check(
                 x_bits.cs(),
                 || {
-                // if we're in setup mode, just return an error
-                if is_setup(&x_bits) {
-                    return Err(SynthesisError::AssignmentMissing);
-                }
+                    // if we're in setup mode, just return an error
+                    if is_setup(&x_bits) {
+                        return Err(SynthesisError::AssignmentMissing);
+                    }
 
-                // get the bits from the Boolean constraints
-                // we assume that these are already encoded as LE
-                let mut bits = x_bits
-                    .iter()
-                    .map(|x| x.value())
-                    .collect::<Result<Vec<bool>, _>>()?;
+                    // get the bits from the Boolean constraints
+                    // we assume that these are already encoded as LE
+                    let mut bits = x_bits
+                        .iter()
+                        .map(|x| x.value())
+                        .collect::<Result<Vec<bool>, _>>()?;
 
-                // `BigInt::from_bits` takes BigEndian representations so we need to
-                // reverse them since they are read in LE
-                bits.reverse();
+                    // `BigInt::from_bits` takes BigEndian representations so we need to
+                    // reverse them since they are read in LE
+                    bits.reverse();
 
-                let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
+                    let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
 
-                let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
-                let sign_bit_value = sign_bit.value()?;
+                    let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
+                    let sign_bit_value = sign_bit.value()?;
 
-                // Converts the point read from the xof bits to a G1 element
-                // with point decompression
-                let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, sign_bit_value)
+                    // Converts the point read from the xof bits to a G1 element
+                    // with point decompression
+                    let p = GroupAffine::<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>::get_point_from_x(x, sign_bit_value)
                     .ok_or(SynthesisError::AssignmentMissing)?;
 
-                Ok(p.into_projective())
-            }, AllocationMode::Witness)?;
+                    Ok(p.into_projective())
+                },
+                AllocationMode::Witness,
+            )?;
 
         trace!("compressing y");
         // Point compression on the G1 Gadget
-        let (compressed_point, compressed_sign_bit): (Vec<Boolean<Bls12_377_Fq>>, Boolean<Bls12_377_Fq>) = {
+        let (compressed_point, compressed_sign_bit): (
+            Vec<Boolean<Bls12_377_Fq>>,
+            Boolean<Bls12_377_Fq>,
+        ) = {
             // Convert x to LE
-            let bits: Vec<Boolean<Bls12_377_Fq>> =
-                expected_point_before_cofactor.x.to_bits_le()?;
+            let bits: Vec<Boolean<Bls12_377_Fq>> = expected_point_before_cofactor.x.to_bits_le()?;
 
             // Get a constraint about the y point's sign
             let greatest_bit = expected_point_before_cofactor.y_to_bit()?;
@@ -302,18 +313,13 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
-        for (_i, (a,b)) in compressed_point.iter()
-            .zip(x_bits.iter())
-            .enumerate() 
-        {
+        for (_i, (a, b)) in compressed_point.iter().zip(x_bits.iter()).enumerate() {
             a.enforce_equal(&b)?;
         }
         compressed_sign_bit.enforce_equal(&sign_bit)?;
 
         trace!("scaling by G1 cofactor");
-        let scaled_point = Self::scale_by_cofactor_g1(
-            &expected_point_before_cofactor,
-        )?;
+        let scaled_point = Self::scale_by_cofactor_g1(&expected_point_before_cofactor)?;
 
         Ok(scaled_point)
     }
@@ -322,7 +328,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         p: &G1Var<Bls12_377_Parameters>,
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError>
     where
-        G1Projective<Bls12_377_Parameters>: Borrow<GroupProjective<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>>,
+        G1Projective<Bls12_377_Parameters>:
+            Borrow<GroupProjective<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>>,
     {
         // get the cofactor's bits
         let mut x_bits = BitIteratorBE::new(P::G1Parameters::COFACTOR)
@@ -333,8 +340,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         x_bits.reverse();
 
         // return p * cofactor
-        let scaled = p
-            .scalar_mul_le(x_bits.iter())?;
+        let scaled = p.scalar_mul_le(x_bits.iter())?;
         Ok(scaled)
     }
 }
@@ -346,13 +352,12 @@ mod test {
 
     use algebra::bls12_377;
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use rand::{thread_rng, RngCore};
     use r1cs_core::ConstraintSystem;
     use r1cs_std::bits::uint8::UInt8;
+    use rand::{thread_rng, RngCore};
 
     #[test]
     fn test_hash_to_group() {
-
         let mut rng = thread_rng();
         // test for various input sizes
         for length in &[10, 25, 50, 100, 200, 300] {
@@ -376,18 +381,15 @@ mod test {
         let input = input
             .iter()
             .enumerate()
-            .map(|(_i, num)| {
-                UInt8::new_witness(cs.clone(), || Ok(num)).unwrap()
-            })
+            .map(|(_i, num)| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
             .collect::<Vec<_>>();
 
-        let hash = HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
-            counter,
-            &input,
-            true,
-        )
-        .unwrap()
-        .0;
+        let hash =
+            HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
+                counter, &input, true,
+            )
+            .unwrap()
+            .0;
 
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());

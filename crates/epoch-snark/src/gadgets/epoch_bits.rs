@@ -1,7 +1,9 @@
 use algebra::{
-    curves::bls12::Bls12Parameters,
-    bls12_377::{Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters, Parameters as Bls12_377_Parameters},
+    bls12_377::{
+        Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters, Parameters as Bls12_377_Parameters,
+    },
     bw6_761::{Fr, FrParameters},
+    curves::bls12::Bls12Parameters,
     FpParameters,
 };
 
@@ -16,8 +18,8 @@ use crypto_primitives::{
     },
     prf::blake2s::{constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
-use r1cs_std::{bls12_377::PairingVar, fields::fp::FpVar, prelude::*};
 use r1cs_core::{ConstraintSystemRef, SynthesisError};
+use r1cs_std::{bls12_377::PairingVar, fields::fp::FpVar, prelude::*};
 
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -43,7 +45,7 @@ impl EpochBits {
     pub fn verify(
         &self,
         helper: Option<HashToBitsHelper<Bls12_377>>,
-        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
     ) -> Result<(), SynthesisError> {
         // Only verify the proof if it was provided
         if let Some(helper) = helper {
@@ -53,9 +55,7 @@ impl EpochBits {
         Ok(())
     }
 
-    fn verify_edges(
-        &self,
-    ) -> Result<Vec<FrVar>, SynthesisError> {
+    fn verify_edges(&self) -> Result<Vec<FrVar>, SynthesisError> {
         // Verify the edges
         let mut xof_bits = vec![];
         let first_and_last_bits = [self.first_epoch_bits.clone(), self.last_epoch_bits.clone()];
@@ -81,10 +81,8 @@ impl EpochBits {
                 salt: [0; 8],
                 personalization,
             };
-            let xof_result = evaluate_blake2s_with_parameters(
-                &message,
-                &blake2s_parameters.parameters(),
-            )?;
+            let xof_result =
+                evaluate_blake2s_with_parameters(&message, &blake2s_parameters.parameters())?;
             let xof_bits_i = xof_result
                 .into_iter()
                 .map(|n| n.to_bits_le())
@@ -108,13 +106,10 @@ impl EpochBits {
     fn verify_proof(
         &self,
         helper: &HashToBitsHelper<Bls12_377>,
-        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>
+        cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
     ) -> Result<(), SynthesisError> {
         // Verify the proof
-        let proof = ProofVar::<_, PairingVar>::new_witness(cs, 
-        || {
-            Ok(helper.proof.clone())
-        })?;
+        let proof = ProofVar::<_, PairingVar>::new_witness(cs, || Ok(helper.proof.clone()))?;
 
         // Allocate the VK
         let verifying_key = VerifyingKeyVar::<_, PairingVar>::new_constant(
@@ -129,14 +124,10 @@ impl EpochBits {
 
         let public_inputs: Vec<Vec<Bool>> = [packed_crh_bits, packed_xof_bits].concat();
 
-        <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
+        let _ = <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
             Groth16<Bls12_377, HashToBits, BlsFr>,
             Fr,
-        >>::verify(
-            &verifying_key,
-            public_inputs.iter(),
-            &proof,
-        )?;
+        >>::verify(&verifying_key, public_inputs.iter(), &proof)?;
 
         Ok(())
     }
@@ -155,8 +146,8 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bls_gadgets::utils::{bytes_to_bits, test_helpers::print_unsatisfied_constraints};
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
+    use bls_gadgets::utils::{bytes_to_bits, test_helpers::print_unsatisfied_constraints};
 
     use r1cs_core::ConstraintSystem;
     use rand::RngCore;
@@ -182,8 +173,16 @@ mod tests {
         let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],
-            first_epoch_bits: first_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(), 
-            last_epoch_bits: last_epoch_bits.iter().map(|b| Boolean::new_witness(cs.clone(), || Ok(*b))).collect::<Result<Vec<_>, _>>().unwrap(),
+            first_epoch_bits: first_epoch_bits
+                .iter()
+                .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)))
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            last_epoch_bits: last_epoch_bits
+                .iter()
+                .map(|b| Boolean::new_witness(cs.clone(), || Ok(*b)))
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
         };
 
         let packed = bits.verify_edges().unwrap();

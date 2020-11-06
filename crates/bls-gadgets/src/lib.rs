@@ -10,7 +10,7 @@ mod bitmap;
 pub(crate) use bitmap::Bitmap;
 
 mod y_to_bit;
-pub use y_to_bit::{YToBitGadget, FpUtils};
+pub use y_to_bit::{FpUtils, YToBitGadget};
 
 mod hash_to_group;
 pub use hash_to_group::{hash_to_bits, HashToGroupGadget};
