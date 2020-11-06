@@ -93,7 +93,7 @@ fn deserialize<T: CanonicalDeserialize>(
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let bytes = unsafe { slice::from_raw_parts(in_bytes, in_bytes_len as usize) };
-        let key = T::deserialize(&mut &bytes[..])?;
+        let key: T = CanonicalDeserialize::deserialize(&mut &bytes[..])?;
         unsafe {
             *out = Box::into_raw(Box::new(key));
         }

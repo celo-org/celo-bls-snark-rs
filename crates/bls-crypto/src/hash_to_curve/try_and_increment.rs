@@ -186,7 +186,7 @@ mod test {
         for length in &[10, 25, 50, 100, 200, 300] {
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
-            hasher.hash(&b"domain"[..], &input, &b"extra"[..]).unwrap();
+            let _ = hasher.hash(&b"domain"[..], &input, &b"extra"[..]).unwrap();
         }
     }
 

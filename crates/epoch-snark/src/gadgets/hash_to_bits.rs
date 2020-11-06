@@ -2,13 +2,14 @@ use algebra::{
     bls12_377::{Fr, FrParameters},
     FpParameters,
 };
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
+use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use tracing::{debug, info, span, trace, Level};
 
+use crate::gadgets::constrain_bool;
 use bls_crypto::SIG_DOMAIN;
 use bls_gadgets::hash_to_bits;
 
-use super::{constrain_bool, MultipackGadget};
+use super::MultipackGadget;
 
 #[derive(Clone)]
 /// Gadget which converts its inputs to Boolean constraints, applies blake2x to them
@@ -34,10 +35,7 @@ impl HashToBits {
 
 impl ConstraintSynthesizer<Fr> for HashToBits {
     #[allow(clippy::cognitive_complexity)] // false positive triggered by the info!("generating constraints") log
-    fn generate_constraints<CS: ConstraintSystem<Fr>>(
-        self,
-        cs: &mut CS,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "HashToBits");
         info!("generating constraints");
         let _enter = span.enter();
@@ -48,29 +46,21 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
-            let bits = constrain_bool(&mut cs.ns(|| i.to_string()), &message_bits)?;
-            let hash = hash_to_bits(
-                cs.ns(|| format!("{}: hash to bits", i)),
-                &bits,
-                512,
-                personalization,
-                true,
-            )?;
+            let bits = constrain_bool(&message_bits, cs.clone())?;
+            let hash = hash_to_bits(&bits[..], 512, personalization, true)?;
             all_bits.extend_from_slice(&bits);
             xof_bits.extend_from_slice(&hash);
         }
 
         // Pack them as public inputs
         debug!(capacity = FrParameters::CAPACITY, "packing CRH bits");
-        MultipackGadget::pack(
-            cs.ns(|| "pack messages"),
-            &all_bits,
+        MultipackGadget::pack::<Fr, FrParameters>(
+            &all_bits[..],
             FrParameters::CAPACITY as usize,
             true,
         )?;
         debug!(capacity = FrParameters::CAPACITY, "packing XOF bits");
-        MultipackGadget::pack(
-            cs.ns(|| "pack xof bits"),
+        MultipackGadget::pack::<Fr, FrParameters>(
             &xof_bits,
             FrParameters::CAPACITY as usize,
             true,
@@ -85,9 +75,10 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
 mod tests {
     use super::*;
     use crate::gadgets::pack;
-    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use bls_crypto::hashers::{DirectHasher, Hasher};
     use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
+
+    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
@@ -99,9 +90,7 @@ mod tests {
         personalization.copy_from_slice(SIG_DOMAIN);
         let message = bits_to_bytes(&message);
         let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-        let mut bits = bytes_to_bits(&hash_result, 512);
-        bits.reverse();
-        bits
+        bytes_to_bits(&hash_result, 512)
     }
 
     #[test]

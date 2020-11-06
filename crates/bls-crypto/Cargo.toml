@@ -1,13 +1,13 @@
 [package]
 name = "bls-crypto"
 version = "0.1.4"
-authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org>", "Georgios Konstantopoulos <me@gakonst.com>"]
+authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@clabs.co>", "Georgios Konstantopoulos <me@gakonst.com>"]
 edition = "2018"
 
 [dependencies]
-algebra = { git = "https://github.com/scipr-lab/zexe", features = ["derive", "bls12_377", "ed_on_bw6_761", "parallel"], rev = "38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1" }
-crypto-primitives = { git = "https://github.com/scipr-lab/zexe", features = ["parallel"], rev = "38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1" }
-bench-utils = { git = "https://github.com/scipr-lab/zexe", rev = "38b6f6f2c6b9a6a1b5e8eb90b1287c98b06520d1" }
+algebra = { git = "https://github.com/celo-org/zexe", features = ["derive", "bls12_377", "ed_on_bw6_761", "parallel"] }
+crypto-primitives = { git = "https://github.com/celo-org/zexe", features = ["parallel"] }
+bench-utils = { git = "https://github.com/celo-org/zexe" }
 
 # other deps
 rand = { version = "0.7" }

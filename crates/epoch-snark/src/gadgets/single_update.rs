@@ -1,9 +1,15 @@
-use algebra::{bls12_377::Bls12_377, bw6_761::Fr, PairingEngine};
-use r1cs_core::{ConstraintSystem, SynthesisError};
+use algebra::{
+    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
+    bw6_761::Fr,
+    curves::bls12::Bls12Parameters,
+    PairingEngine,
+};
+use r1cs_core::SynthesisError;
 use r1cs_std::{
-    bls12_377::{G1Gadget, G2Gadget, PairingGadget},
+    bls12_377::{G1Var, G2Var, PairingVar},
     boolean::Boolean,
-    fields::fp::FpGadget,
+    fields::fp::FpVar,
+    R1CSVar,
 };
 
 use super::{constrain_bool, EpochData};
@@ -11,8 +17,9 @@ use bls_gadgets::BlsVerifyGadget;
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
-type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingGadget>;
-type FrGadget = FpGadget<Fr>;
+type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
+type FrVar = FpVar<Fr>;
+type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
 #[derive(Clone, Debug)]
 /// An epoch block transition which includes the new epoch block's metadata, as well as
@@ -40,22 +47,22 @@ impl<E: PairingEngine> SingleUpdate<E> {
 /// [`SingleUpdate.constrain`]: struct.SingleUpdate.html#method.constrain
 pub struct ConstrainedEpoch {
     /// The new validators for this epoch
-    pub new_pubkeys: Vec<G2Gadget>,
+    pub new_pubkeys: Vec<G2Var>,
     /// The new threshold needed for signatures
-    pub new_max_non_signers: FrGadget,
+    pub new_max_non_signers: FrVar,
     /// The epoch's G1 Hash
-    pub message_hash: G1Gadget,
+    pub message_hash: G1Var,
     /// The aggregate pubkey based on the bitmap of the validators
     /// of the previous epoch
-    pub aggregate_pk: G2Gadget,
+    pub aggregate_pk: G2Var,
     /// The epoch's index
-    pub index: FrGadget,
+    pub index: FrVar,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
-    pub bits: Vec<Boolean>,
+    pub bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub xof_bits: Vec<Boolean>,
+    pub xof_bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
-    pub crh_bits: Vec<Boolean>,
+    pub crh_bits: Vec<Bool>,
 }
 
 impl SingleUpdate<Bls12_377> {
@@ -65,12 +72,11 @@ impl SingleUpdate<Bls12_377> {
     /// # Panics
     ///
     /// - If `num_validators != self.epoch_data.public_keys.len()`
-    pub fn constrain<CS: ConstraintSystem<Fr>>(
+    pub fn constrain(
         &self,
-        cs: &mut CS,
-        previous_pubkeys: &[G2Gadget],
-        previous_epoch_index: &FrGadget,
-        previous_max_non_signers: &FrGadget,
+        previous_pubkeys: &[G2Var],
+        previous_epoch_index: &FrVar,
+        previous_max_non_signers: &FrVar,
         num_validators: u32,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
@@ -80,19 +86,17 @@ impl SingleUpdate<Bls12_377> {
         assert_eq!(num_validators as usize, self.epoch_data.public_keys.len());
 
         // Get the constrained epoch data
-        let epoch_data = self.epoch_data.constrain(
-            &mut cs.ns(|| "constrain"),
-            previous_epoch_index,
-            generate_constraints_for_hash,
-        )?;
+        let epoch_data = self
+            .epoch_data
+            .constrain(previous_epoch_index, generate_constraints_for_hash)?;
 
         // convert the bitmap to constraints
-        let signed_bitmap = constrain_bool(&mut cs.ns(|| "signed bitmap"), &self.signed_bitmap)?;
+        let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
 
+        // convert the bitmap to constraints
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
-            cs.ns(|| "verify signature partial"),
             previous_pubkeys,
             &signed_bitmap,
             &epoch_data.message_hash,
@@ -116,6 +120,7 @@ impl SingleUpdate<Bls12_377> {
 pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
+
     use algebra::ProjectiveCurve;
 
     pub fn generate_single_update<E: PairingEngine>(
@@ -156,12 +161,16 @@ pub mod test_helpers {
 
 #[cfg(test)]
 mod tests {
-    use super::test_helpers::generate_single_update;
-    use super::*;
-    use crate::gadgets::to_fr;
+    use super::{test_helpers::generate_single_update, *};
+    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+
     use algebra::UniformRand;
-    use bls_gadgets::utils::test_helpers::alloc_vec;
-    use r1cs_std::test_constraint_system::TestConstraintSystem;
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
+    use r1cs_std::{
+        alloc::{AllocVar, AllocationMode},
+        bls12_377::G2Var,
+        groups::CurveVar,
+    };
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
@@ -172,30 +181,32 @@ mod tests {
 
     #[test]
     fn test_enough_pubkeys_for_update() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        single_update_enforce(&mut cs, 5, 5, 1, 2, 1, &[true, true, true, true, false]);
-        assert!(cs.is_satisfied());
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        single_update_enforce(cs.clone(), 5, 5, 1, 2, 1, &[true, true, true, true, false]);
+
+        print_unsatisfied_constraints(cs.clone());
+        assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
     fn not_enough_pubkeys_for_update() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         // 2 false in the bitmap when only 1 allowed
-        single_update_enforce(&mut cs, 5, 5, 4, 5, 1, &[true, true, false, true, false]);
-        assert!(!cs.is_satisfied());
-        let not_satisfied = cs.which_is_unsatisfied();
-        assert_eq!(not_satisfied.unwrap(), "constrain epoch 2/verify signature partial/enforce maximum number of occurrences/enforce smaller than/enforce smaller than/enforce smaller than");
+        single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
+
+        print_unsatisfied_constraints(cs.clone());
+        assert!(!cs.is_satisfied().unwrap());
     }
 
     #[test]
     #[should_panic]
     fn validator_number_cannot_change() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        single_update_enforce(&mut cs, 5, 6, 0, 0, 0, &[]);
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        single_update_enforce(cs, 5, 6, 0, 0, 0, &[]);
     }
 
-    fn single_update_enforce<CS: ConstraintSystem<Fr>>(
-        cs: &mut CS,
+    fn single_update_enforce(
+        cs: ConstraintSystemRef<Fr>,
         prev_n_validators: usize,
         n_validators: usize,
         prev_index: u16,
@@ -204,13 +215,21 @@ mod tests {
         bitmap: &[bool],
     ) -> ConstrainedEpoch {
         // convert to constraints
-        let prev_validators = alloc_vec(cs, &pubkeys::<Bls12_377>(n_validators));
-        let prev_index = to_fr(&mut cs.ns(|| "prev index to fr"), Some(prev_index)).unwrap();
-        let prev_max_non_signers = to_fr(
-            &mut cs.ns(|| "prev max non signers to fr"),
-            Some(maximum_non_signers),
-        )
-        .unwrap();
+        let prev_validators = pubkeys::<Bls12_377>(n_validators);
+        let prev_validators = prev_validators
+            .iter()
+            .map(|element| {
+                G2Var::new_variable_omit_prime_order_check(
+                    cs.clone(),
+                    || Ok(*element),
+                    AllocationMode::Witness,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
+        let prev_max_non_signers =
+            FrVar::new_witness(cs, || Ok(Fr::from(maximum_non_signers))).unwrap();
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
@@ -223,7 +242,6 @@ mod tests {
         // enforce
         next_epoch
             .constrain(
-                &mut cs.ns(|| "constrain epoch 2"),
                 &prev_validators,
                 &prev_index,
                 &prev_max_non_signers,

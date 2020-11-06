@@ -30,12 +30,12 @@ impl AsRef<G1Projective> for Signature {
 }
 
 impl CanonicalSerialize for Signature {
-    fn serialize<W: Write>(&self, mut writer: W) -> Result<(), SerializationError> {
-        self.0.into_affine().serialize(&mut writer)
+    fn serialize<W: Write>(&self, writer: W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize(writer)
     }
 
-    fn serialize_uncompressed<W: Write>(&self, mut writer: W) -> Result<(), SerializationError> {
-        self.0.into_affine().serialize_uncompressed(&mut writer)
+    fn serialize_uncompressed<W: Write>(&self, writer: W) -> Result<(), SerializationError> {
+        self.0.into_affine().serialize_uncompressed(writer)
     }
 
     fn serialized_size(&self) -> usize {
@@ -44,15 +44,15 @@ impl CanonicalSerialize for Signature {
 }
 
 impl CanonicalDeserialize for Signature {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self, SerializationError> {
+    fn deserialize<R: Read>(reader: R) -> Result<Self, SerializationError> {
         Ok(Signature::from(
-            G1Affine::deserialize(&mut reader)?.into_projective(),
+            G1Affine::deserialize(reader)?.into_projective(),
         ))
     }
 
-    fn deserialize_uncompressed<R: Read>(mut reader: R) -> Result<Self, SerializationError> {
+    fn deserialize_uncompressed<R: Read>(reader: R) -> Result<Self, SerializationError> {
         Ok(Signature::from(
-            G1Affine::deserialize_uncompressed(&mut reader)?.into_projective(),
+            G1Affine::deserialize_uncompressed(reader)?.into_projective(),
         ))
     }
 }
