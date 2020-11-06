@@ -222,8 +222,7 @@ mod tests {
         let prev_validators = pubkeys::<Bls12_377>(n_validators);
         let prev_validators = prev_validators
             .iter()
-            .enumerate()
-            .map(|(_i, element)| {
+            .map(|element| {
                 G2Var::new_variable_omit_prime_order_check(
                     cs.clone(),
                     || Ok(*element),

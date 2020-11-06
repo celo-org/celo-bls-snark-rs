@@ -81,13 +81,11 @@ where
         debug!("batch verifying BLS signature");
         let prepared_message_hashes = message_hashes
             .iter()
-            .enumerate()
-            .map(|(_i, message_hash)| P::prepare_g1(&message_hash))
+            .map(|message_hash| P::prepare_g1(&message_hash))
             .collect::<Result<Vec<_>, _>>()?;
         let prepared_aggregated_pub_keys = aggregated_pub_keys
             .iter()
-            .enumerate()
-            .map(|(_i, pubkey)| P::prepare_g2(&pubkey))
+            .map(|pubkey| P::prepare_g2(&pubkey))
             .collect::<Result<Vec<_>, _>>()?;
 
         Self::batch_verify_prepared(
@@ -133,7 +131,7 @@ where
         assert_eq!(signed_bitmap.len(), pub_keys.len());
 
         let mut aggregated_pk = P::G2Var::zero();
-        for (_i, (pk, bit)) in pub_keys.iter().zip(signed_bitmap).enumerate() {
+        for (pk, bit) in pub_keys.iter().zip(signed_bitmap) {
             // If bit = 1, add pk
             let adder = bit.select(pk, &P::G2Var::zero())?;
             aggregated_pk += &adder;
@@ -148,7 +146,7 @@ where
         pub_keys: &[P::G2Var],
     ) -> Result<P::G2Var, SynthesisError> {
         let mut aggregated_pk = P::G2Var::zero();
-        for (_i, pk) in pub_keys.iter().enumerate() {
+        for pk in pub_keys.iter() {
             // Add the pubkey to the sum
             // aggregated_pk += pk
             aggregated_pk += pk;
@@ -257,8 +255,7 @@ mod verify_one_message {
 
         let pub_keys = pub_keys
             .iter()
-            .enumerate()
-            .map(|(_i, pub_key)| {
+            .map(|pub_key| {
                 P::G2Var::new_variable_omit_prime_order_check(
                     cs.clone(),
                     || Ok(*pub_key),
@@ -314,8 +311,7 @@ mod verify_one_message {
         let cs = ConstraintSystem::<BW6_761Fr>::new_ref();
         let messages = messages
             .iter()
-            .enumerate()
-            .map(|(_i, element)| {
+            .map(|element| {
                 G1Var::new_variable_omit_prime_order_check(
                     cs.clone(),
                     || Ok(*element),
@@ -326,8 +322,7 @@ mod verify_one_message {
             .collect::<Vec<_>>();
         let aggregate_pubkeys = aggregate_pubkeys
             .iter()
-            .enumerate()
-            .map(|(_i, element)| {
+            .map(|element| {
                 G2Var::new_variable_omit_prime_order_check(
                     cs.clone(),
                     || Ok(*element),

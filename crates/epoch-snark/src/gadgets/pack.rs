@@ -1,6 +1,5 @@
 use algebra::{FpParameters, PrimeField};
 use algebra_core::biginteger::BigInteger;
-use bls_gadgets::utils::is_setup;
 use r1cs_core::SynthesisError;
 use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
 use tracing::{span, trace, Level};
@@ -29,7 +28,7 @@ impl MultipackGadget {
                 FpVar::<F>::new_witness
             };
             let fp = alloc(bits.cs(), || {
-                if is_setup(&chunk) {
+                if chunk.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
                 let fp_val = F::BigInt::from_bits(

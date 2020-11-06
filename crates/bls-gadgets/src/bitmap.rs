@@ -1,4 +1,3 @@
-use crate::utils::is_setup;
 use algebra::PrimeField;
 use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
 use r1cs_std::{fields::fp::FpVar, prelude::*};
@@ -26,7 +25,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         }
         // If we're in setup mode, we skip the bit counting part since the bitmap
         // will be empty
-        let is_setup = is_setup(self);
+        let is_setup = self.cs().is_in_setup_mode();
 
         let mut occurrences = 0;
         let mut occurrences_lc = LinearCombination::zero();
@@ -106,12 +105,10 @@ mod tests {
                 let bitmap = self
                     .bitmap
                     .iter()
-                    .enumerate()
-                    .map(|(_i, b)| Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap())
+                    .map(|b| Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap())
                     .collect::<Vec<_>>();
                 let max_occurrences =
-                    FpVar::<Fr>::new_witness(cs, || Ok(Fr::from(self.max_occurrences)))
-                        .unwrap();
+                    FpVar::<Fr>::new_witness(cs, || Ok(Fr::from(self.max_occurrences))).unwrap();
                 bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, self.value)
             }
         }

@@ -26,8 +26,7 @@ use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
 
 type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
-use bls_gadgets::utils::bytes_to_bits;
-use bls_gadgets::YToBitGadget;
+use bls_gadgets::{utils::bytes_to_bits, YToBitGadget};
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -92,6 +91,7 @@ fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError>
     Ok(input[0..length].to_vec())
 }
 
+/// Returns elements in big-endian order
 fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
     let mut x_0 = input.x.c0.to_bits_le()?;
     let mut x_1 = input.x.c1.to_bits_le()?;
@@ -111,7 +111,6 @@ fn constrain_bool<F: PrimeField>(
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
     input
         .iter()
-        .enumerate()
-        .map(|(_j, b)| Boolean::new_witness(cs.clone(), || b.get()))
+        .map(|b| Boolean::new_witness(cs.clone(), || b.get()))
         .collect::<Result<Vec<_>, _>>()
 }

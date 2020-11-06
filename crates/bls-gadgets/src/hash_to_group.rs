@@ -1,5 +1,5 @@
 use crate::{
-    utils::{bits_to_bytes, bytes_to_bits, is_setup},
+    utils::{bits_to_bytes, bytes_to_bits},
     YToBitGadget,
 };
 use algebra::{
@@ -227,7 +227,7 @@ pub fn hash_to_bits<F: PrimeField>(
         xof_bits
     } else {
         trace!("generating hash without constraints");
-        let bits = if is_setup(&message) {
+        let bits = if message.cs().is_in_setup_mode() {
             vec![false; 512]
         } else {
             let message = message
@@ -240,8 +240,7 @@ pub fn hash_to_bits<F: PrimeField>(
         };
 
         bits.iter()
-            .enumerate()
-            .map(|(_j, b)| Boolean::new_witness(message[..].cs(), || Ok(b)))
+            .map(|b| Boolean::new_witness(message[..].cs(), || Ok(b)))
             .collect::<Result<Vec<_>, _>>()?
     };
 
@@ -268,7 +267,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
                 x_bits.cs(),
                 || {
                     // if we're in setup mode, just return an error
-                    if is_setup(&x_bits) {
+                    if x_bits.cs().is_in_setup_mode() {
                         return Err(SynthesisError::AssignmentMissing);
                     }
 
@@ -313,7 +312,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
-        for (_i, (a, b)) in compressed_point.iter().zip(x_bits.iter()).enumerate() {
+        for (a, b) in compressed_point.iter().zip(x_bits.iter()) {
             a.enforce_equal(&b)?;
         }
         compressed_sign_bit.enforce_equal(&sign_bit)?;
@@ -380,8 +379,7 @@ mod test {
         let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
-            .enumerate()
-            .map(|(_i, num)| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
+            .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
             .collect::<Vec<_>>();
 
         let hash =

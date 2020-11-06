@@ -5,7 +5,7 @@ use algebra::{
     One, PairingEngine,
 };
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
-use bls_gadgets::{utils::is_setup, FpUtils, HashToGroupGadget};
+use bls_gadgets::{FpUtils, HashToGroupGadget};
 use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
@@ -145,7 +145,7 @@ impl EpochData<Bls12_377> {
         .concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
-        for (_j, maybe_pk) in self.public_keys.iter().enumerate() {
+        for maybe_pk in self.public_keys.iter() {
             let pk_var = G2Var::new_variable_omit_prime_order_check(
                 index.cs(),
                 || maybe_pk.get(),
@@ -192,7 +192,7 @@ impl EpochData<Bls12_377> {
         let mut epoch_bits = epoch_bits.to_vec();
         epoch_bits.reverse();
 
-        let is_setup = is_setup(&epoch_bits);
+        let is_setup = epoch_bits.cs().is_in_setup_mode();
 
         // Pack them to Uint8s
         let input_bytes_var: Vec<U8> = epoch_bits
