@@ -5,11 +5,10 @@ use crate::{
 };
 use algebra::ProjectiveCurve;
 use bls_crypto::{
-    hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1,
     hashers::{Hasher, COMPOSITE_HASHER},
-    Signature, SIG_DOMAIN,
+    Signature,
 };
-use bls_gadgets::utils::bytes_to_bits;
+use bls_gadgets::utils::bytes_le_to_bits_be;
 
 use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
 use r1cs_core::SynthesisError;
@@ -88,7 +87,6 @@ fn generate_hash_helper(
     params: &Groth16Parameters<BLSCurve>,
     transitions: &[EpochTransition],
 ) -> Result<HashToBitsHelper<BLSCurve>, SynthesisError> {
-    let hash_to_g1 = &COMPOSITE_HASH_TO_G1;
     let composite_hasher = &COMPOSITE_HASHER;
 
     // Generate the CRH per epoch
@@ -96,18 +94,14 @@ fn generate_hash_helper(
         .iter()
         .map(|transition| {
             let block = &transition.block;
-            let epoch_bytes = block.encode_to_bytes().unwrap();
+            let (epoch_bytes, _) = block.encode_inner_to_bytes().unwrap();
 
-            // We need to find the counter so that the CRH hash we use will eventually result on an element on the curve
-            let (_, counter) = hash_to_g1
-                .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
-                .unwrap();
             let crh_bytes = composite_hasher
-                .crh(&[], &[&[counter as u8][..], &epoch_bytes].concat(), 0)
+                .crh(&[], &epoch_bytes, 0)
                 .unwrap();
             // The verifier should run both the crh and the xof here to generate a
             // valid statement for the verify
-            bytes_to_bits(&crh_bytes, 384)
+            bytes_le_to_bits_be(&crh_bytes, 384)
                 .iter()
                 .map(|b| Some(*b))
                 .collect()

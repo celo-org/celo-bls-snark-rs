@@ -5,7 +5,7 @@ use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
-use bls_gadgets::utils::{bits_to_bytes, bytes_to_bits};
+use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be};
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -65,9 +65,9 @@ impl EpochBlock {
     /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
     /// group using `SIG_DOMAIN` as a domain separator
     pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
-        let input = self.encode_to_bytes()?;
+        let (input, extra_data_input) = self.encode_inner_to_bytes()?;
         let expected_hash: G1Projective =
-            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &[]).unwrap();
+            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &extra_data_input).unwrap();
         Ok(expected_hash)
     }
 
@@ -87,7 +87,7 @@ impl EpochBlock {
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         if self.epoch_entropy.is_some() {
             // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_to_bits(
+            let mut bits = bytes_le_to_bits_be(
                 self.epoch_entropy.as_ref().unwrap(),
                 Self::ENTROPY_BYTES * 8,
             );
@@ -96,7 +96,7 @@ impl EpochBlock {
         }
         if self.parent_entropy.is_some() {
             // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_to_bits(
+            let mut bits = bytes_le_to_bits_be(
                 self.parent_entropy.as_ref().unwrap(),
                 Self::ENTROPY_BYTES * 8,
             );
@@ -110,6 +110,36 @@ impl EpochBlock {
         Ok(epoch_bits)
     }
 
+    /// Encodes the block to LE bits
+    pub fn encode_inner_to_bits(&self) -> Result<(Vec<bool>, Vec<bool>), EncodingError> {
+        let mut epoch_bits = vec![];
+        let mut extra_data_bits = vec![];
+        extra_data_bits.extend_from_slice(&encode_u16(self.index)?);
+        extra_data_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
+        if self.epoch_entropy.is_some() {
+            // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
+            let mut bits = bytes_le_to_bits_be(
+                self.epoch_entropy.as_ref().unwrap(),
+                Self::ENTROPY_BYTES * 8,
+            );
+            bits.reverse();
+            epoch_bits.extend_from_slice(&bits);
+        }
+        if self.parent_entropy.is_some() {
+            // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
+            let mut bits = bytes_le_to_bits_be(
+                self.parent_entropy.as_ref().unwrap(),
+                Self::ENTROPY_BYTES * 8,
+            );
+            bits.reverse();
+            epoch_bits.extend_from_slice(&bits);
+        }
+        for added_public_key in &self.new_public_keys {
+            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+        }
+        Ok((epoch_bits, extra_data_bits))
+    }
+
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bits
     pub fn encode_to_bits_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = self.encode_to_bits()?;
@@ -120,12 +150,18 @@ impl EpochBlock {
 
     /// Encodes the block to LE bytes
     pub fn encode_to_bytes(&self) -> Result<Vec<u8>, EncodingError> {
-        Ok(bits_to_bytes(&self.encode_to_bits()?))
+        Ok(bits_be_to_bytes_le(&self.encode_to_bits()?))
     }
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
     pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
-        Ok(bits_to_bytes(&self.encode_to_bits_with_aggregated_pk()?))
+        Ok(bits_be_to_bytes_le(&self.encode_to_bits_with_aggregated_pk()?))
+    }
+
+    /// Encodes an inner block to LE bytes
+    pub fn encode_inner_to_bytes(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
+        let (inner_bits, extra_data_bits) = self.encode_inner_to_bits()?;
+        Ok((bits_be_to_bytes_le(&inner_bits), bits_be_to_bytes_le(&extra_data_bits)))
     }
 }
 
@@ -150,7 +186,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
         .finalize()
         .as_ref()
         .to_vec();
-    let mut bits = bytes_to_bits(&hash, 256);
+    let mut bits = bytes_le_to_bits_be(&hash, 256);
     bits.reverse();
     bits
 }

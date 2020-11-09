@@ -303,6 +303,7 @@ mod tests {
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
 
         #[test]
+        #[ignore]
         fn test_multiple_epochs() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
@@ -380,6 +381,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore]
         fn test_multiple_epochs_with_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;

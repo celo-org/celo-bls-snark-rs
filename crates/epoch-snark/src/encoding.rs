@@ -3,7 +3,7 @@ use algebra::{
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
 use bls_crypto::PublicKey;
-use bls_gadgets::utils::bytes_to_bits;
+use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
 
@@ -33,11 +33,11 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingEr
     let mut bits = vec![];
     let mut x_bytes_c0 = vec![];
     x.c0.write(&mut x_bytes_c0)?;
-    let bits_c0 = bytes_to_bits(&x_bytes_c0, FqParameters::MODULUS_BITS as usize);
+    let bits_c0 = bytes_le_to_bits_be(&x_bytes_c0, FqParameters::MODULUS_BITS as usize);
     bits.extend_from_slice(&bits_c0);
     let mut x_bytes_c1 = vec![];
     x.c1.write(&mut x_bytes_c1)?;
-    let bits_c1 = bytes_to_bits(&x_bytes_c1, FqParameters::MODULUS_BITS as usize);
+    let bits_c1 = bytes_le_to_bits_be(&x_bytes_c1, FqParameters::MODULUS_BITS as usize);
     bits.extend_from_slice(&bits_c1);
     bits.push(is_over_half);
 
@@ -72,7 +72,7 @@ pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
 mod test {
     use super::*;
     use algebra::{bls12_377::FqParameters, FpParameters};
-    use bls_gadgets::utils::bits_to_bytes;
+    use bls_gadgets::utils::bits_be_to_bytes_le;
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
@@ -88,7 +88,7 @@ mod test {
             let mut bytes = vec![];
             bytes.write_u64::<LittleEndian>(n).unwrap();
 
-            let bits = bytes_to_bits(&bytes, FqParameters::MODULUS_BITS as usize);
+            let bits = bytes_le_to_bits_be(&bytes, FqParameters::MODULUS_BITS as usize);
             let mut twoi: u64 = 1;
             let mut result: u64 = 0;
             let bits_len = bits.len();
@@ -114,8 +114,8 @@ mod test {
             let mut bytes = vec![];
             bytes.write_u64::<LittleEndian>(n).unwrap();
 
-            let bits = bytes_to_bits(&bytes, FqParameters::MODULUS_BITS as usize);
-            let result_bytes = bits_to_bytes(&bits);
+            let bits = bytes_le_to_bits_be(&bytes, FqParameters::MODULUS_BITS as usize);
+            let result_bytes = bits_be_to_bytes_le(&bits);
 
             assert_eq!(bytes, result_bytes);
         }

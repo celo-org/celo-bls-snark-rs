@@ -42,6 +42,7 @@ pub struct EpochData<E: PairingEngine> {
 
 /// Output type of EpochData.to_bits including bit representation and gadgets.
 type EpochDataToBits = (Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
+type InnerEpochDataToBits = (Vec<Bool>, Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
 
 /// [`EpochData`] is constrained to a `ConstrainedEpochData` via [`EpochData.constrain`]
 ///
@@ -97,13 +98,13 @@ impl EpochData<Bls12_377> {
         let _enter = span.enter();
 
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
-        let (bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
-            self.to_bits(previous_index.cs())?;
+        let (bits, extra_data_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
+            self.to_bits_inner(previous_index.cs())?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
         let (message_hash, crh_bits, xof_bits) =
-            Self::hash_bits_to_g1(&bits, generate_constraints_for_hash)?;
+            Self::hash_bits_to_g1(&bits, &extra_data_bits, generate_constraints_for_hash)?;
 
         Ok(ConstrainedEpochData {
             bits,
@@ -170,6 +171,63 @@ impl EpochData<Bls12_377> {
         ))
     }
 
+
+    /// Encodes the inner epoch to bits (index and non-signers encoded as LE)
+    pub fn to_bits_inner(
+        &self,
+        cs: ConstraintSystemRef<Bls12_377_Fq>,
+    ) -> Result<InnerEpochDataToBits, SynthesisError> {
+        let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+        let index_bits = fr_to_bits(&index, 16)?;
+
+        let maximum_non_signers =
+            FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
+
+        let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
+
+        let epoch_entropy = bytes_to_fr(cs.clone(), self.epoch_entropy.as_deref())?;
+        let epoch_entropy_bits = fr_to_bits(&epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
+        let parent_entropy = bytes_to_fr(cs, self.parent_entropy.as_deref())?;
+        let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
+
+        let mut epoch_bits: Vec<Bool> = [
+            epoch_entropy_bits,
+            parent_entropy_bits,
+        ]
+            .concat();
+
+        let extra_data_bits: Vec<Bool> = [
+            index_bits,
+            maximum_non_signers_bits,
+        ].concat();
+
+        let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
+        for maybe_pk in self.public_keys.iter() {
+            let pk_var = G2Var::new_variable_omit_prime_order_check(
+                index.cs(),
+                || maybe_pk.get(),
+                AllocationMode::Witness,
+            )?;
+
+            // extend our epoch bits by the pubkeys
+            let pk_bits = g2_to_bits(&pk_var)?;
+            epoch_bits.extend_from_slice(&pk_bits);
+
+            // save the allocated pubkeys
+            pubkey_vars.push(pk_var);
+        }
+
+        Ok((
+            epoch_bits,
+            extra_data_bits,
+            index,
+            epoch_entropy,
+            parent_entropy,
+            maximum_non_signers,
+            pubkey_vars,
+        ))
+    }
+
     /// Enforces that `index = previous_index + 1`
     fn enforce_next_epoch(previous_index: &FrVar, index: &FrVar) -> Result<(), SynthesisError> {
         trace!("enforcing next epoch");
@@ -185,17 +243,30 @@ impl EpochData<Bls12_377> {
     /// Also returns the auxiliary CRH and XOF bits for potential compression from consumers
     fn hash_bits_to_g1(
         epoch_bits: &[Bool],
+        epoch_extra_data_bits: &[Bool],
         generate_constraints_for_hash: bool,
     ) -> Result<(G1Var, Vec<Bool>, Vec<Bool>), SynthesisError> {
         trace!("hashing epoch to g1");
         // Reverse to LE
         let mut epoch_bits = epoch_bits.to_vec();
         epoch_bits.reverse();
+        let mut epoch_extra_data_bits = epoch_extra_data_bits.to_vec();
+        epoch_extra_data_bits.reverse();
 
         let is_setup = epoch_bits.cs().is_in_setup_mode();
 
         // Pack them to Uint8s
         let input_bytes_var: Vec<U8> = epoch_bits
+            .chunks(8)
+            .map(|chunk| {
+                let mut chunk = chunk.to_vec();
+                if chunk.len() < 8 {
+                    chunk.resize(8, Bool::constant(false));
+                }
+                UInt8::from_bits_le(&chunk)
+            })
+            .collect();
+        let input_extra_data_bytes_var: Vec<U8> = epoch_extra_data_bits
             .chunks(8)
             .map(|chunk| {
                 let mut chunk = chunk.to_vec();
@@ -215,9 +286,13 @@ impl EpochData<Bls12_377> {
                 .iter()
                 .map(|b| b.value())
                 .collect::<Result<Vec<_>, _>>()?;
+            let input_extra_data_bytes = input_extra_data_bytes_var
+                .iter()
+                .map(|b| b.value())
+                .collect::<Result<Vec<_>, _>>()?;
 
             let (_, counter) = COMPOSITE_HASH_TO_G1
-                .hash_with_attempt(SIG_DOMAIN, &input_bytes, &[])
+                .hash_with_attempt(SIG_DOMAIN, &input_bytes, &input_extra_data_bytes)
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
             counter
         };
@@ -226,6 +301,7 @@ impl EpochData<Bls12_377> {
         HashToGroupGadget::enforce_hash_to_group(
             counter_var,
             &input_bytes_var,
+            &input_extra_data_bytes_var,
             generate_constraints_for_hash,
         )
     }
@@ -280,23 +356,25 @@ mod tests {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(
+        let (epoch_bytes, extra_data_bytes) = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_to_bytes()
+        .encode_inner_to_bytes()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
-            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
+            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let bits = epoch.to_bits(cs).unwrap().0;
-        let ret = EpochData::hash_bits_to_g1(&bits, false).unwrap();
+        let (bits, extra_data_bits, _, _, _, _, _) = epoch.to_bits_inner(cs.clone()).unwrap();
+        let ret = EpochData::hash_bits_to_g1(&bits, &extra_data_bits, true).unwrap();
+        print_unsatisfied_constraints(cs.clone());
+        assert!(cs.is_satisfied().unwrap());
         assert_eq!(ret.0.value().unwrap(), hash);
     }
 

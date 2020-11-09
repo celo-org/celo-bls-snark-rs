@@ -14,16 +14,17 @@ use std::{
 const PUBKEY_BYTES: usize = 96;
 
 #[no_mangle]
-pub extern "C" fn encode_epoch_block_to_bytes(
+pub extern "C" fn encode_inner_epoch_block_to_bytes(
     in_epoch_index: c_ushort,
     in_epoch_entropy: *const u8,
     in_parent_entropy: *const u8,
     in_maximum_non_signers: c_uint,
     in_added_public_keys: *const *const PublicKey,
     in_added_public_keys_len: c_int,
-    in_should_encode_aggregated_pk: bool,
     out_bytes: *mut *mut u8,
     out_len: *mut c_int,
+    out_extra_data_bytes: *mut *mut u8,
+    out_extra_data_len: *mut c_int,
 ) -> bool {
     convert_result_to_bool::<_, EncodingError, _>(|| {
         let added_public_keys_ptrs = unsafe {
@@ -44,17 +45,18 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             in_maximum_non_signers as u32,
             added_public_keys,
         );
-        let mut encoded = if in_should_encode_aggregated_pk {
-            epoch_block.encode_to_bytes_with_aggregated_pk()?
-        } else {
-            epoch_block.encode_to_bytes()?
-        };
-        encoded.shrink_to_fit();
+        let (mut encoded_inner, mut encoded_extra_data) =
+            epoch_block.encode_inner_to_bytes()?;
+        encoded_inner.shrink_to_fit();
+        encoded_extra_data.shrink_to_fit();
         unsafe {
-            *out_bytes = encoded.as_mut_ptr();
-            *out_len = encoded.len() as c_int;
+            *out_bytes = encoded_inner.as_mut_ptr();
+            *out_len = encoded_inner.len() as c_int;
+            *out_extra_data_bytes = encoded_extra_data.as_mut_ptr();
+            *out_extra_data_len = encoded_extra_data.len() as c_int;
         }
-        std::mem::forget(encoded);
+        std::mem::forget(encoded_inner);
+        std::mem::forget(encoded_extra_data);
         Ok(())
     })
 }

@@ -147,7 +147,7 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 mod tests {
     use super::*;
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
-    use bls_gadgets::utils::{bytes_to_bits, test_helpers::print_unsatisfied_constraints};
+    use bls_gadgets::utils::{bytes_le_to_bits_be, test_helpers::print_unsatisfied_constraints};
 
     use r1cs_core::ConstraintSystem;
     use rand::RngCore;
@@ -168,8 +168,8 @@ mod tests {
 
         let cs = ConstraintSystem::<Fr>::new_ref();
         // encode each epoch's bytes to LE and pass them to the constraint system
-        let first_epoch_bits = bytes_to_bits(&first_bytes, 256);
-        let last_epoch_bits = bytes_to_bits(&last_bytes, 256);
+        let first_epoch_bits = bytes_le_to_bits_be(&first_bytes, 256);
+        let last_epoch_bits = bytes_le_to_bits_be(&last_bytes, 256);
         let bits = EpochBits {
             crh_bits: vec![],
             xof_bits: vec![],

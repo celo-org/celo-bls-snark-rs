@@ -26,7 +26,7 @@ use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
 
 type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
-use bls_gadgets::{utils::bytes_to_bits, YToBitGadget};
+use bls_gadgets::{utils::bytes_le_to_bits_be, YToBitGadget};
 
 #[cfg(test)]
 pub mod test_helpers {
@@ -80,7 +80,7 @@ pub(super) fn pack<F: PrimeField, P: FpParameters>(
 
 fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVar, SynthesisError> {
     FrVar::new_witness(cs, || {
-        let bits = bytes_to_bits(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
+        let bits = bytes_le_to_bits_be(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
         Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bits)))
     })
 }
