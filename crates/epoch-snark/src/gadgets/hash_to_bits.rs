@@ -76,7 +76,7 @@ mod tests {
     use super::*;
     use crate::gadgets::pack;
     use bls_crypto::hashers::{DirectHasher, Hasher};
-    use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be};
+    use bls_gadgets::utils::{bytes_le_to_bits_le, bits_le_to_bytes_le};
 
     use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use groth16::{
@@ -88,9 +88,9 @@ mod tests {
     fn hash_to_bits_fn(message: &[bool]) -> Vec<bool> {
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
-        let message = bits_be_to_bytes_le(&message);
+        let message = bits_le_to_bytes_le(&message);
         let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-        bytes_le_to_bits_be(&hash_result, 512)
+        bytes_le_to_bits_le(&hash_result, 512)
     }
 
     #[test]
@@ -112,7 +112,7 @@ mod tests {
                 // say we have some input
                 let mut input = vec![0; 64];
                 rng.fill_bytes(&mut input);
-                let bits = bytes_le_to_bits_be(&input, 384)
+                let bits = bytes_le_to_bits_le(&input, 384)
                     .iter()
                     .map(|b| Some(*b))
                     .collect::<Vec<_>>();
