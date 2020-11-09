@@ -49,17 +49,17 @@ pub mod test_helpers {
         }
 
         // Calculate the hash from our to_bytes function
-        let epoch_bytes = EpochBlock::new(
+        let (epoch_bytes, extra_data) = EpochBlock::new(
             epoch.index.unwrap(),
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_to_bytes()
+        .encode_inner_to_bytes()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
-            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &[])
+            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &extra_data)
             .unwrap();
 
         hash
