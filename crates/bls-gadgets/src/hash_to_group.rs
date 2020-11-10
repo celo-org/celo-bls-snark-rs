@@ -359,16 +359,18 @@ mod test {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
+            let mut extra_input = vec![0; *length];
+            rng.fill_bytes(&mut extra_input);
             // check that they get hashed properly
             dbg!(length);
-            hash_to_group(&input);
+            hash_to_group(&input, &extra_input);
         }
     }
 
-    fn hash_to_group(input: &[u8]) {
+    fn hash_to_group(input: &[u8], extra_input: &[u8]) {
         let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let (expected_hash, attempt) = try_and_increment
-            .hash_with_attempt_cip22(SIG_DOMAIN, input, &[])
+            .hash_with_attempt_cip22(SIG_DOMAIN, input, extra_input)
             .unwrap();
 
         let cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
@@ -377,10 +379,14 @@ mod test {
             .iter()
             .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
             .collect::<Vec<_>>();
+        let extra_input = extra_input
+            .iter()
+            .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
+            .collect::<Vec<_>>();
 
         let hash =
             HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
-                counter, &input, true,
+                counter, &input, &extra_input, true,
             )
             .unwrap()
             .0;
