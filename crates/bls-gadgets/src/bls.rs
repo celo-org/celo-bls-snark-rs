@@ -1,10 +1,11 @@
 use crate::Bitmap;
-use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
-use r1cs_core::SynthesisError;
-use r1cs_std::{
+use ark_ec::{PairingEngine, ProjectiveCurve};
+use ark_ff::PrimeField;
+use ark_r1cs_std::{
     alloc::AllocationMode, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar,
     groups::CurveVar, pairing::PairingVar, R1CSVar,
 };
+use ark_relations::r1cs::SynthesisError;
 use std::marker::PhantomData;
 use std::ops::AddAssign;
 use tracing::{debug, span, trace, Level};
@@ -218,17 +219,15 @@ mod verify_one_message {
     use crate::utils::test_helpers::print_unsatisfied_constraints;
     use bls_crypto::test_helpers::*;
 
-    use algebra::{
-        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
-        bw6_761::Fr as BW6_761Fr,
-        ProjectiveCurve, UniformRand, Zero,
+    use ark_bls12_377::{
+        constraints::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
+        Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective,
     };
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::{
-        alloc::AllocVar,
-        bls12_377::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
-        boolean::Boolean,
-    };
+    use ark_bw6_761::Fr as BW6_761Fr;
+    use ark_ec::ProjectiveCurve;
+    use ark_ff::{UniformRand, Zero};
+    use ark_r1cs_std::{alloc::AllocVar, boolean::Boolean};
+    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
     // converts the arguments to constraints and checks them against the `verify` function
     fn cs_verify<E: PairingEngine, F: PrimeField, P: PairingVar<E, F>>(

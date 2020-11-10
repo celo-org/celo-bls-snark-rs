@@ -45,13 +45,16 @@ pub fn bytes_le_to_bits_be(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 }
 
 pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
-    bytes_le_to_bits_be(bytes, bits_to_take).into_iter().rev().collect()
+    bytes_le_to_bits_be(bytes, bits_to_take)
+        .into_iter()
+        .rev()
+        .collect()
 }
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
-    use algebra::PrimeField;
-    use r1cs_core::ConstraintSystemRef;
+    use ark_ff::PrimeField;
+    use ark_relations::r1cs::ConstraintSystemRef;
 
     pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) {
         if !cs.is_satisfied().unwrap() {

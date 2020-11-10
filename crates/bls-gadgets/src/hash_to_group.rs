@@ -1,37 +1,37 @@
 use crate::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
 use crate::YToBitGadget;
-use algebra::{
-    bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-    curves::{
-        bls12::G1Projective,
-        models::bls12::Bls12Parameters,
-        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-        SWModelParameters,
-    },
-    ed_on_bw6_761::EdwardsParameters,
-    AffineCurve, BigInteger, BitIteratorBE, PrimeField,
+use ark_bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters};
+use ark_crypto_primitives::{
+    crh::{bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget},
+    prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
+use ark_ec::{
+    bls12::G1Projective,
+    models::bls12::Bls12Parameters,
+    short_weierstrass_jacobian::{GroupAffine, GroupProjective},
+    AffineCurve, SWModelParameters,
+};
+use ark_ed_on_bw6_761::EdwardsParameters;
+use ark_ff::{BigInteger, BitIteratorBE, PrimeField};
+use ark_r1cs_std::groups::curves::twisted_edwards::AffineVar;
+use ark_r1cs_std::{
+    alloc::{AllocVar, AllocationMode},
+    bits::ToBitsGadget,
+    boolean::Boolean,
+    eq::EqGadget,
+    fields::fp::FpVar,
+    groups::bls12::G1Var,
+    groups::CurveVar,
+    uint8::UInt8,
+    Assignment, R1CSVar,
+};
+use ark_relations::r1cs::SynthesisError;
 use bls_crypto::{
     hashers::{
         composite::{CompositeHasher, CRH},
         DirectHasher, Hasher,
     },
     SIG_DOMAIN,
-};
-use crypto_primitives::{
-    crh::{bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget},
-    prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
-};
-use r1cs_core::SynthesisError;
-use r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
-    bits::ToBitsGadget,
-    boolean::Boolean,
-    eq::EqGadget,
-    groups::bls12::G1Var,
-    groups::CurveVar,
-    uint8::UInt8,
-    Assignment, R1CSVar,
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
@@ -148,17 +148,20 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
     ) -> Result<Vec<Boolean<Bls12_377_Fq>>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
         let crh_params =
-            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<CRH, _>>::ParametersVar::new_constant(
+            <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as FixedLengthCRHGadget<
+                CRH,
+                Bls12_377_Fq,
+            >>::ParametersVar::new_constant(
                 input.cs(),
                 CompositeHasher::<CRH>::setup_crh()
                     .map_err(|_| SynthesisError::AssignmentMissing)?,
             )?;
 
-        let pedersen_hash =
-            <BHHash<EdwardsParameters, _> as FixedLengthCRHGadget<CRH, _>>::evaluate(
-                &crh_params,
-                &input,
-            )?;
+        let pedersen_hash: AffineVar<EdwardsParameters, FpVar<Bls12_377_Fq>> =
+            <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as FixedLengthCRHGadget<
+                CRH,
+                Bls12_377_Fq,
+            >>::evaluate(&crh_params, &input)?;
 
         let mut crh_bits = pedersen_hash.x.to_bits_le().unwrap();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
@@ -345,10 +348,9 @@ mod test {
     use super::*;
     use crate::utils::test_helpers::print_unsatisfied_constraints;
 
-    use algebra::bls12_377;
+    use ark_r1cs_std::bits::uint8::UInt8;
+    use ark_relations::r1cs::ConstraintSystem;
     use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use r1cs_core::ConstraintSystem;
-    use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
 
     #[test]
@@ -371,7 +373,7 @@ mod test {
             .hash_with_attempt_cip22(SIG_DOMAIN, input, &[])
             .unwrap();
 
-        let cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
+        let cs = ConstraintSystem::<ark_bls12_377::Fq>::new_ref();
         let counter = UInt8::new_witness(cs.clone(), || Ok(attempt as u8)).unwrap();
         let input = input
             .iter()
@@ -379,8 +381,8 @@ mod test {
             .collect::<Vec<_>>();
 
         let hash =
-            HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
-                counter, &input, true,
+            HashToGroupGadget::<ark_bls12_377::Parameters, ark_bls12_377::Fq>::enforce_hash_to_group(
+                counter, &input, &[], true,
             )
             .unwrap()
             .0;

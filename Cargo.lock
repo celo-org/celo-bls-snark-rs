@@ -80,6 +80,18 @@ source = "git+https://github.com/celo-org/curves#e523a7e3fc01f42bd5dac674434b726
 dependencies = [
  "ark-ec",
  "ark-ff",
+ "ark-r1cs-std",
+ "ark-std",
+]
+
+[[package]]
+name = "ark-bw6-761"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/curves#e523a7e3fc01f42bd5dac674434b726746ef9447"
+dependencies = [
+ "ark-bls12-377",
+ "ark-ec",
+ "ark-ff",
  "ark-std",
 ]
 
@@ -90,6 +102,8 @@ source = "git+https://github.com/celo-org/crypto-primitives?branch=main#cabdebc0
 dependencies = [
  "ark-ec",
  "ark-ff",
+ "ark-nonnative-field",
+ "ark-r1cs-std",
  "ark-relations",
  "ark-snark",
  "ark-std",
@@ -99,6 +113,7 @@ dependencies = [
  "digest",
  "rand",
  "rayon",
+ "tracing",
 ]
 
 [[package]]
@@ -159,9 +174,70 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-groth16"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/groth16#13b246d2b3c20fd581756fbfe05a465a93828c07"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize",
+ "ark-std",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/utils)",
+ "derivative",
+ "rand",
+ "rayon",
+ "tracing",
+]
+
+[[package]]
+name = "ark-nonnative-field"
+version = "0.0.4"
+source = "git+https://github.com/celo-org/nonnative#8fa0d72d0465fae62649ae783779f3323befa785"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
+ "derivative",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "tracing",
+]
+
+[[package]]
+name = "ark-poly"
+version = "0.1.0"
+source = "git+https://github.com/arkworks-rs/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "ark-ff",
+ "ark-std",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "ark-r1cs-std"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/r1cs-std#e5ec2e66d3aead34f7e3fa15909f22e1600bd11d"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-relations",
+ "ark-std",
+ "derivative",
+ "tracing",
+]
+
+[[package]]
 name = "ark-relations"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
+source = "git+https://github.com/celo-org/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
 dependencies = [
  "ark-ff",
  "ark-std",
@@ -191,7 +267,7 @@ dependencies = [
 [[package]]
 name = "ark-snark"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
+source = "git+https://github.com/celo-org/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
 dependencies = [
  "ark-ff",
  "ark-relations",
@@ -316,13 +392,17 @@ dependencies = [
 name = "bls-gadgets"
 version = "0.1.4"
 dependencies = [
- "algebra",
- "algebra-core",
+ "ark-bls12-377",
+ "ark-bw6-761",
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ed-on-bw6-761",
+ "ark-ff",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize",
  "bls-crypto",
- "crypto-primitives",
- "groth16",
- "r1cs-core",
- "r1cs-std",
  "rand",
  "rand_xorshift",
  "tracing",
@@ -885,6 +965,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg 1.0.1",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]

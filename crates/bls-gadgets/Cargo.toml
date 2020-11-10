@@ -7,11 +7,15 @@ edition = "2018"
 [dependencies]
 bls-crypto = { path = "../bls-crypto", default-features = false }
 
-algebra = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-algebra-core = { git = "https://github.com/celo-org/zexe" } 
-r1cs-core = { git = "https://github.com/celo-org/zexe", default-features = false }
-r1cs-std = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }
-crypto-primitives = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["parallel"] }
+ark-relations = { git = "https://github.com/celo-org/snark", features = [ "std" ] }
+ark-serialize = { git = "https://github.com/celo-org/algebra", features = [ "derive" ] }
+ark-ff = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
+ark-ec = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
+ark-r1cs-std = { git = "https://github.com/celo-org/r1cs-std", default-features = false, features = ["std", "parallel"] }
+ark-crypto-primitives = { git = "https://github.com/celo-org/crypto-primitives", branch = "main", features = ["parallel", "r1cs"] }
+ark-ed-on-bw6-761 = { git = "https://github.com/celo-org/curves" }
+ark-bls12-377 = { git = "https://github.com/celo-org/curves", features = [ "r1cs" ] }
+ark-bw6-761 = { git = "https://github.com/celo-org/curves" }
 
 # used only when exporting our test helpers to be used in the snark crate
 rand_xorshift = { version = "0.2", optional = true }
@@ -21,7 +25,7 @@ tracing = "0.1.13"
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
 rand = { version = "0.7" }
-groth16 = { git = "https://github.com/celo-org/zexe" }
+ark-groth16 = { git = "https://github.com/celo-org/groth16", features = [ "std", "parallel", "r1cs" ] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
 tracing-subscriber = { version = "0.2" }
 
