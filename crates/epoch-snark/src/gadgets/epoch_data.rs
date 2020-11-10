@@ -42,7 +42,7 @@ pub struct EpochData<E: PairingEngine> {
 
 /// Output type of EpochData.to_bits including bit representation and gadgets.
 type EpochDataToBits = (Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
-type InnerEpochDataToBits = (Vec<Bool>, Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
+type InnerEpochDataToBits = (Vec<Bool>, Vec<Bool>, Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
 
 /// [`EpochData`] is constrained to a `ConstrainedEpochData` via [`EpochData.constrain`]
 ///
@@ -98,7 +98,7 @@ impl EpochData<Bls12_377> {
         let _enter = span.enter();
 
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
-        let (bits, extra_data_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
+        let (bits, extra_data_bits, combined_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
             self.to_bits_inner(previous_index.cs())?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
@@ -107,7 +107,7 @@ impl EpochData<Bls12_377> {
             Self::hash_bits_to_g1(&bits, &extra_data_bits, generate_constraints_for_hash)?;
 
         Ok(ConstrainedEpochData {
-            bits,
+            bits: combined_bits,
             index,
             epoch_entropy,
             parent_entropy,
@@ -191,15 +191,24 @@ impl EpochData<Bls12_377> {
         let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Bool> = [
-            epoch_entropy_bits,
-            parent_entropy_bits,
+            epoch_entropy_bits.clone(),
+            parent_entropy_bits.clone(),
         ]
             .concat();
 
         let extra_data_bits: Vec<Bool> = [
-            index_bits,
-            maximum_non_signers_bits,
+            index_bits.clone(),
+            maximum_non_signers_bits.clone(),
         ].concat();
+
+        let mut combined_bits: Vec<Bool> = [
+            index_bits,
+            epoch_entropy_bits,
+            parent_entropy_bits,
+            maximum_non_signers_bits,
+        ]
+            .concat();
+
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for maybe_pk in self.public_keys.iter() {
@@ -212,6 +221,7 @@ impl EpochData<Bls12_377> {
             // extend our epoch bits by the pubkeys
             let pk_bits = g2_to_bits(&pk_var)?;
             epoch_bits.extend_from_slice(&pk_bits);
+            combined_bits.extend_from_slice(&pk_bits);
 
             // save the allocated pubkeys
             pubkey_vars.push(pk_var);
@@ -220,6 +230,7 @@ impl EpochData<Bls12_377> {
         Ok((
             epoch_bits,
             extra_data_bits,
+            combined_bits,
             index,
             epoch_entropy,
             parent_entropy,
@@ -371,7 +382,7 @@ mod tests {
 
         // compare it with the one calculated in the circuit from its bytes
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let (bits, extra_data_bits, _, _, _, _, _) = epoch.to_bits_inner(cs.clone()).unwrap();
+        let (bits, extra_data_bits, _, _, _, _, _, _) = epoch.to_bits_inner(cs.clone()).unwrap();
         let ret = EpochData::hash_bits_to_g1(&bits, &extra_data_bits, true).unwrap();
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
