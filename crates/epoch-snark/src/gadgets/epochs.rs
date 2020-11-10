@@ -5,23 +5,17 @@
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 use bls_gadgets::{BlsVerifyGadget, FpUtils};
 
-use algebra::{
-    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
-    bw6_761::Fr,
-    curves::bls12::Bls12Parameters,
-    PairingEngine, ProjectiveCurve,
+use ark_bls12_377::{
+    constraints::{Fq2Var, G1PreparedVar, G1Var, G2PreparedVar, G2Var, PairingVar},
+    Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters,
 };
-use groth16::{Proof, VerifyingKey};
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
-use r1cs_std::{
-    alloc::AllocationMode,
-    bls12_377::{G1PreparedVar, G2PreparedVar},
-    bls12_377::{G1Var, G2Var, PairingVar, Fq2Var},
-    fields::fp::FpVar,
-    pairing::PairingVar as _,
-    prelude::*,
-    Assignment,
+use ark_bw6_761::Fr;
+use ark_ec::{bls12::Bls12Parameters, PairingEngine, ProjectiveCurve};
+use ark_groth16::{Proof, VerifyingKey};
+use ark_r1cs_std::{
+    alloc::AllocationMode, fields::fp::FpVar, pairing::PairingVar as _, prelude::*, Assignment,
 };
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use tracing::{debug, info, span, Level};
 
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
@@ -294,9 +288,10 @@ mod tests {
     use crate::gadgets::single_update::test_helpers::generate_single_update;
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
 
-    use algebra::{bls12_377::G1Projective, ProjectiveCurve};
+    use ark_bls12_377::G1Projective;
+    use ark_ec::ProjectiveCurve;
+    use ark_relations::r1cs::ConstraintSystem;
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
-    use r1cs_core::ConstraintSystem;
 
     type Curve = Bls12_377;
 

@@ -40,6 +40,7 @@ ark-ec = { git = "https://github.com/celo-org/algebra", features = [ "std", "par
 ark-bls12-377 = { git = "https://github.com/celo-org/curves" }
 ark-ed-on-bw6-761 = { git = "https://github.com/celo-org/curves" }
 ark-bw6-761 = { git = "https://github.com/celo-org/curves" }
+ark-ed-on-bls12-377 = { git = "https://github.com/celo-org/curves" }
 
 [patch.'https://github.com/arkworks-rs/utils']
 ark-std = { git = "https://github.com/celo-org/utils" }

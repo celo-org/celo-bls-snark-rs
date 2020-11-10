@@ -1,13 +1,12 @@
-use algebra::{
-    bls12_377::{Fq, FqParameters},
-    FpParameters, PrimeField, ProjectiveCurve, ToBytes,
-};
+use ark_bls12_377::{Fq, FqParameters};
+use ark_ec::ProjectiveCurve;
+use ark_ff::{FpParameters, PrimeField, ToBytes};
+use ark_serialize::SerializationError;
 use bls_crypto::PublicKey;
 use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
 
-use algebra::serialize::SerializationError;
 #[derive(Debug, Error)]
 /// Union type for data serialization errors
 pub enum EncodingError {
@@ -71,7 +70,8 @@ pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use algebra::{bls12_377::FqParameters, FpParameters};
+    use ark_bls12_377::FqParameters;
+    use ark_ff::FpParameters;
     use bls_gadgets::utils::bits_be_to_bytes_le;
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{Rng, SeedableRng};

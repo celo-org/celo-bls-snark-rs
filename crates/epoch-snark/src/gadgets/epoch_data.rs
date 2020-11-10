@@ -1,19 +1,14 @@
-use algebra::{
-    bls12_377::{Bls12_377, Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
-    bw6_761::Fr,
-    curves::bls12::Bls12Parameters,
-    One, PairingEngine,
+use ark_bls12_377::{
+    constraints::{G1Var, G2Var},
+    Bls12_377, Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters,
 };
+use ark_bw6_761::Fr;
+use ark_ec::{bls12::Bls12Parameters, PairingEngine};
+use ark_ff::One;
+use ark_r1cs_std::{alloc::AllocationMode, fields::fp::FpVar, prelude::*, Assignment};
+use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
 use bls_gadgets::{FpUtils, HashToGroupGadget};
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
-use r1cs_std::{
-    alloc::AllocationMode,
-    bls12_377::{G1Var, G2Var},
-    fields::fp::FpVar,
-    prelude::*,
-    Assignment,
-};
 
 use super::{bytes_to_fr, fr_to_bits, g2_to_bits};
 use tracing::{span, trace, Level};
@@ -335,11 +330,9 @@ mod tests {
     use bls_crypto::PublicKey;
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
 
-    use algebra::{
-        bls12_377::{Bls12_377, G2Projective as Bls12_377G2Projective},
-        UniformRand,
-    };
-    use r1cs_core::ConstraintSystem;
+    use ark_bls12_377::{Bls12_377, G2Projective as Bls12_377G2Projective};
+    use ark_ff::UniformRand;
+    use ark_relations::r1cs::ConstraintSystem;
 
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
         let rng = &mut rand::thread_rng();

@@ -1,16 +1,11 @@
-use algebra::{
-    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
-    bw6_761::Fr,
-    curves::bls12::Bls12Parameters,
-    PairingEngine,
+use ark_bls12_377::{
+    constraints::{G1Var, G2Var, PairingVar},
+    Bls12_377, Parameters as Bls12_377_Parameters,
 };
-use r1cs_core::SynthesisError;
-use r1cs_std::{
-    bls12_377::{G1Var, G2Var, PairingVar},
-    boolean::Boolean,
-    fields::fp::FpVar,
-    R1CSVar,
-};
+use ark_bw6_761::Fr;
+use ark_ec::{bls12::Bls12Parameters, PairingEngine};
+use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar, R1CSVar};
+use ark_relations::r1cs::SynthesisError;
 
 use super::{constrain_bool, EpochData};
 use bls_gadgets::BlsVerifyGadget;
@@ -121,7 +116,7 @@ pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
 
-    use algebra::ProjectiveCurve;
+    use ark_ec::ProjectiveCurve;
 
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
@@ -168,13 +163,13 @@ mod tests {
     use super::{test_helpers::generate_single_update, *};
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
 
-    use algebra::UniformRand;
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::{
+    use ark_bls12_377::constraints::G2Var;
+    use ark_ff::UniformRand;
+    use ark_r1cs_std::{
         alloc::{AllocVar, AllocationMode},
-        bls12_377::G2Var,
         groups::CurveVar,
     };
+    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();

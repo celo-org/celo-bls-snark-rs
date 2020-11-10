@@ -3,13 +3,13 @@
 /// Setup: Trusted setup over Groth16 for the Hash To Bits and the Epoch Transition circuits
 use crate::gadgets::{HashToBits, ValidatorSetUpdate};
 
-use algebra::PairingEngine;
-use r1cs_core::SynthesisError;
+use ark_ec::PairingEngine;
+use ark_relations::r1cs::SynthesisError;
 use rand::Rng;
 
 use super::{BLSCurve, CPCurve, CPFrParams};
 
-use groth16::{generate_random_parameters, Parameters as Groth16Parameters};
+use ark_groth16::{generate_random_parameters, ProvingKey as Groth16Parameters};
 use tracing::{info, span, Level};
 
 type Result<T> = std::result::Result<T, SynthesisError>;

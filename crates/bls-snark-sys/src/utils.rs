@@ -83,10 +83,8 @@ impl<'a> From<&Buffer> for &'a [u8] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use algebra::{
-        bls12_377::{G1Projective, G2Projective},
-        UniformRand,
-    };
+    use ark_bls12_377::{G1Projective, G2Projective};
+    use ark_ff::UniformRand;
 
     #[test]
     fn buffer_convert_ok() {

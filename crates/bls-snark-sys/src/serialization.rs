@@ -1,9 +1,9 @@
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
 use crate::cache::PUBLIC_KEY_CACHE;
-use algebra::{
-    bls12_377::{Fq, Fq2, G1Affine, G2Affine},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, FromBytes,
-};
+use ark_bls12_377::{Fq, Fq2, G1Affine, G2Affine};
+use ark_ec::AffineCurve;
+use ark_ff::FromBytes;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bls_crypto::BLSError;
 use std::{os::raw::c_int, slice};
 

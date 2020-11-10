@@ -1,5 +1,5 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
-use algebra::bls12_377::G1Projective;
+use ark_bls12_377::G1Projective;
 use blake2s_simd::Params;
 use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
@@ -66,8 +66,9 @@ impl EpochBlock {
     /// group using `SIG_DOMAIN` as a domain separator
     pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
         let (input, extra_data_input) = self.encode_inner_to_bytes()?;
-        let expected_hash: G1Projective =
-            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &extra_data_input).unwrap();
+        let expected_hash: G1Projective = COMPOSITE_HASH_TO_G1
+            .hash(SIG_DOMAIN, &input, &extra_data_input)
+            .unwrap();
         Ok(expected_hash)
     }
 
@@ -155,13 +156,18 @@ impl EpochBlock {
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
     pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
-        Ok(bits_be_to_bytes_le(&self.encode_to_bits_with_aggregated_pk()?))
+        Ok(bits_be_to_bytes_le(
+            &self.encode_to_bits_with_aggregated_pk()?,
+        ))
     }
 
     /// Encodes an inner block to LE bytes
     pub fn encode_inner_to_bytes(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
         let (inner_bits, extra_data_bits) = self.encode_inner_to_bits()?;
-        Ok((bits_be_to_bytes_le(&inner_bits), bits_be_to_bytes_le(&extra_data_bits)))
+        Ok((
+            bits_be_to_bytes_le(&inner_bits),
+            bits_be_to_bytes_le(&extra_data_bits),
+        ))
     }
 }
 
@@ -194,7 +200,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use algebra::{bls12_377, ProjectiveCurve};
+    use ark_ec::ProjectiveCurve;
 
     static EXPECTED_ENCODING_WITH_ENTROPY: &str = "fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790707fb550377dff3559f3b7fb5fc24c7c2eefe4cc03671f91f365e72833f7bb93a96aa0d8d8282d6eb8182080732030759651007c8fe4e374025453bb529f88719b6bdb57f501a57e31503e2071f065c5011d84a3a23096c8fe85c771be8084fbab85bae9fbafc99abfddff1266e2737927671e38fb889c2f3b4799b9df9d4c5503c5c6466971c3c500019c0381a9b38c02e07b241fa713a09ada95fa448cdb5cdbbeaa0f28f58b81f20189832f2b0ee8201c1585b144f62f3c8ef30524dc5f2dd44ddf7f4dd6fcedfe9730139fcb3b39f3c0d947e47cd939caccfdee64aa1a2836364a8b1b2e0608e01c084c9d651400df23f9389d00d5d4aed42762dce6daf6557d40a95f0c940f481c7c59714007e1a8288c25b27fe1719c2f20e1fe6aa16efafe6bb2e66ff7bf8499f85cdec99907ce3e22e7cbce5166ee772753d540b1b1515adc70314000e74060ea2ca300f81ec9c7e904a8a676a53e11e336d7b6afea034afd62a07c40e2e0cb8a033a084745612c91fd0b8fe37c0109f7570b75d3f75f93357fbbff25ccc4e7f24ece3c70f611395f768e3273bf3b99aa068a8d8dd2e2868b010238070253671905c0f7483e4e274035b52bf58918b7b9b67d551f50ea1703e50312075f561cd041382a0a6389ec5f781ce70b48b8bf5aa89bbeff9aacf9dbfd2f61263e977772e681b38fc8f9b2739499fbddc95435506c6c9416375c0c10c03910983acb2800be47f2713a01aaa95da94fc4b8cdb5edabfa8052bf18281f9038f8b2e2800ec25151184b64ffc2e3385f40c2fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce179030000000f0dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfffffffffffffffffffffffffffffff3f8007";
 
@@ -203,7 +209,7 @@ mod tests {
     #[test]
     fn encode_to_bytes() -> Result<(), EncodingError> {
         let pubkeys = (0..10)
-            .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
+            .map(|_| ark_bls12_377::G2Projective::prime_subgroup_generator().into())
             .collect::<Vec<_>>();
         let epoch = EpochBlock::new(
             120u16,
@@ -222,7 +228,7 @@ mod tests {
     #[test]
     fn encode_to_bytes_without_entropy() -> Result<(), EncodingError> {
         let pubkeys = (0..10)
-            .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
+            .map(|_| ark_bls12_377::G2Projective::prime_subgroup_generator().into())
             .collect::<Vec<_>>();
         let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
         assert_eq!(

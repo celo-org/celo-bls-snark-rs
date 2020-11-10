@@ -17,12 +17,12 @@ mod epochs;
 pub use epochs::{HashToBitsHelper, ValidatorSetUpdate};
 
 // some helpers
-use algebra::{
-    bls12_377::Parameters as Bls12_377_Parameters, bw6_761::Fr, curves::bls12::Bls12Parameters,
-    BigInteger, FpParameters, PrimeField,
-};
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
-use r1cs_std::{bls12_377::G2Var, fields::fp::FpVar, prelude::*, Assignment};
+use ark_bls12_377::{constraints::G2Var, Parameters as Bls12_377_Parameters};
+use ark_bw6_761::Fr;
+use ark_ec::bls12::Bls12Parameters;
+use ark_ff::{BigInteger, FpParameters, PrimeField};
+use ark_r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 
 type FrVar = FpVar<Fr>;
 pub type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -36,7 +36,7 @@ pub mod test_helpers {
         hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PublicKey, SIG_DOMAIN,
     };
 
-    use algebra::{bls12_377::G1Projective, Bls12_377};
+    use ark_bls12_377::{Bls12_377, G1Projective};
 
     pub fn to_option_iter<T: Copy>(it: &[T]) -> Vec<Option<T>> {
         it.iter().map(|t| Some(*t)).collect()

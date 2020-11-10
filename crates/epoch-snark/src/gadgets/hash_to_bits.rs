@@ -1,8 +1,6 @@
-use algebra::{
-    bls12_377::{Fr, FrParameters},
-    FpParameters,
-};
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use ark_bls12_377::{Fr, FrParameters};
+use ark_ff::FpParameters;
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use tracing::{debug, info, span, trace, Level};
 
 use crate::gadgets::constrain_bool;
@@ -76,10 +74,11 @@ mod tests {
     use super::*;
     use crate::gadgets::pack;
     use bls_crypto::hashers::{DirectHasher, Hasher};
-    use bls_gadgets::utils::{bytes_le_to_bits_le, bits_le_to_bytes_le};
+    use bls_gadgets::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
 
-    use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
-    use groth16::{
+    use ark_bls12_377::Bls12_377;
+    use ark_bw6_761::FrParameters as BW6_761FrParameters;
+    use ark_groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use rand::RngCore;

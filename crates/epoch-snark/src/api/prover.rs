@@ -3,15 +3,15 @@ use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
 };
-use algebra::ProjectiveCurve;
+use ark_ec::ProjectiveCurve;
 use bls_crypto::{
     hashers::{Hasher, COMPOSITE_HASHER},
     Signature,
 };
 use bls_gadgets::utils::bytes_le_to_bits_be;
 
-use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
-use r1cs_core::SynthesisError;
+use ark_groth16::{create_proof_no_zk, Proof as Groth16Proof, ProvingKey as Groth16Parameters};
+use ark_relations::r1cs::SynthesisError;
 
 use tracing::{info, span, Level};
 
@@ -96,9 +96,7 @@ fn generate_hash_helper(
             let block = &transition.block;
             let (epoch_bytes, _) = block.encode_inner_to_bytes().unwrap();
 
-            let crh_bytes = composite_hasher
-                .crh(&[], &epoch_bytes, 0)
-                .unwrap();
+            let crh_bytes = composite_hasher.crh(&[], &epoch_bytes, 0).unwrap();
             // The verifier should run both the crh and the xof here to generate a
             // valid statement for the verify
             bytes_le_to_bits_be(&crh_bytes, 384)

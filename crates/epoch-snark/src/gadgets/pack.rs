@@ -1,7 +1,6 @@
-use algebra::{FpParameters, PrimeField};
-use algebra_core::biginteger::BigInteger;
-use r1cs_core::SynthesisError;
-use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use ark_ff::{biginteger::BigInteger, FpParameters, PrimeField};
+use ark_r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use ark_relations::r1cs::SynthesisError;
 use tracing::{span, trace, Level};
 
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency

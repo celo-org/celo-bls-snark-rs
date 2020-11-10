@@ -4,7 +4,8 @@ use crate::{
     utils::{Message, MessageFFI},
     PrivateKey, PublicKey, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
 };
-use algebra::{ProjectiveCurve, ToBytes};
+use ark_ec::ProjectiveCurve;
+use ark_ff::ToBytes;
 use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use std::{os::raw::c_int, slice};
 

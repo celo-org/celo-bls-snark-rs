@@ -1,6 +1,6 @@
-use algebra::bls12_377::Bls12_377;
+use ark_bls12_377::Bls12_377;
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisMode};
 use epoch_snark::ValidatorSetUpdate;
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisMode};
 use std::env;
 
 fn main() {
