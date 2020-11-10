@@ -2,7 +2,7 @@ use bls_crypto::{
     hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PrivateKey, PublicKey, Signature,
 };
 
-use algebra::to_bytes;
+use ark_ff::to_bytes;
 
 use clap::{App, Arg};
 use rand::thread_rng;

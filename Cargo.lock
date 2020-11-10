@@ -40,7 +40,7 @@ dependencies = [
  "paste",
  "rand",
  "rayon",
- "rustc_version",
+ "rustc_version 0.2.3",
  "unroll",
  "voracious_radix_sort",
 ]
@@ -71,6 +71,140 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "ark-bls12-377"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/curves#e523a7e3fc01f42bd5dac674434b726746ef9447"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
+name = "ark-crypto-primitives"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/crypto-primitives?branch=main#cabdebc02158884677025def3dcc87d67f303956"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-relations",
+ "ark-snark",
+ "ark-std",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/utils)",
+ "blake2",
+ "derivative",
+ "digest",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "ark-ec"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "derivative",
+ "num-traits",
+ "rand",
+ "rayon",
+]
+
+[[package]]
+name = "ark-ed-on-bw6-761"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/curves#e523a7e3fc01f42bd5dac674434b726746ef9447"
+dependencies = [
+ "ark-ed-on-cp6-782",
+]
+
+[[package]]
+name = "ark-ed-on-cp6-782"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/curves#e523a7e3fc01f42bd5dac674434b726746ef9447"
+dependencies = [
+ "ark-bls12-377",
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
+name = "ark-ff"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "ark-ff-asm",
+ "ark-serialize",
+ "ark-std",
+ "derivative",
+ "num-traits",
+ "rand",
+ "rayon",
+ "rustc_version 0.3.0",
+]
+
+[[package]]
+name = "ark-ff-asm"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
+name = "ark-relations"
+version = "0.1.0"
+source = "git+https://github.com/arkworks-rs/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
+dependencies = [
+ "ark-ff",
+ "ark-std",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ark-serialize"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "ark-serialize-derive",
+ "ark-std",
+]
+
+[[package]]
+name = "ark-serialize-derive"
+version = "0.1.1-alpha.0"
+source = "git+https://github.com/celo-org/algebra#b4c3b438f63dcbcf854a6dbcaab5e983f19789fb"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
+name = "ark-snark"
+version = "0.1.0"
+source = "git+https://github.com/arkworks-rs/snark#6daf69e67644c4d500bffb4397a2db398a98bbbd"
+dependencies = [
+ "ark-ff",
+ "ark-relations",
+ "ark-std",
+ "rand",
+]
+
+[[package]]
+name = "ark-std"
+version = "0.1.0"
+source = "git+https://github.com/celo-org/utils#7bde3ab01799da8429b8fa9c3f152201415cdfe7"
+dependencies = [
+ "rayon",
 ]
 
 [[package]]
@@ -107,6 +241,11 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
+name = "bench-utils"
+version = "0.1.1-alpha.0"
+source = "git+https://github.com/celo-org/utils#7bde3ab01799da8429b8fa9c3f152201415cdfe7"
 
 [[package]]
 name = "bench-utils"
@@ -149,13 +288,18 @@ dependencies = [
 name = "bls-crypto"
 version = "0.1.4"
 dependencies = [
- "algebra",
- "bench-utils",
+ "ark-bls12-377",
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ed-on-bw6-761",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/utils)",
  "blake2s_simd",
  "byteorder",
  "clap",
  "criterion",
- "crypto-primitives",
  "csv",
  "env_logger",
  "hex 0.3.2",
@@ -237,7 +381,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b9434b9a5aa1450faa3f9cb14ea0e8c53bb5d2b3c1bfd1ab4fc03e9f33fbfb0"
 dependencies = [
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -428,7 +572,7 @@ version = "0.1.1-alpha.0"
 source = "git+https://github.com/celo-org/zexe#f940b561136942f4df4decb91c3e9dab2ad133fd"
 dependencies = [
  "algebra-core",
- "bench-utils",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/zexe)",
  "blake2",
  "derivative",
  "digest",
@@ -509,7 +653,7 @@ version = "0.1.4"
 dependencies = [
  "algebra",
  "algebra-core",
- "bench-utils",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/zexe)",
  "blake2s_simd",
  "bls-crypto",
  "bls-gadgets",
@@ -545,7 +689,7 @@ dependencies = [
  "cc",
  "libc",
  "log",
- "rustc_version",
+ "rustc_version 0.2.3",
  "winapi",
 ]
 
@@ -586,7 +730,7 @@ version = "0.1.1-alpha.0"
 source = "git+https://github.com/celo-org/zexe#f940b561136942f4df4decb91c3e9dab2ad133fd"
 dependencies = [
  "algebra-core",
- "bench-utils",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/zexe)",
  "ff-fft",
  "r1cs-core",
  "rand",
@@ -599,7 +743,7 @@ version = "0.1.1-alpha.0"
 source = "git+https://github.com/celo-org/zexe#f940b561136942f4df4decb91c3e9dab2ad133fd"
 dependencies = [
  "algebra-core",
- "bench-utils",
+ "bench-utils 0.1.1-alpha.0 (git+https://github.com/celo-org/zexe)",
  "ff-fft",
  "r1cs-core",
  "rand",
@@ -810,6 +954,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pest"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10f4872ae94d7b90ae48754df22fd42ad52ce740b8f370b03da4835417403e53"
+dependencies = [
+ "ucd-trie",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1011,7 +1164,16 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
- "semver",
+ "semver 0.9.0",
+]
+
+[[package]]
+name = "rustc_version"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65c94201b44764d6d1f7e37c15a8289ed55e546c1762c7f1d57f616966e0c181"
+dependencies = [
+ "semver 0.11.0",
 ]
 
 [[package]]
@@ -1047,7 +1209,16 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 dependencies = [
- "semver-parser",
+ "semver-parser 0.7.0",
+]
+
+[[package]]
+name = "semver"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
+dependencies = [
+ "semver-parser 0.10.1",
 ]
 
 [[package]]
@@ -1055,6 +1226,15 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "semver-parser"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ef146c2ad5e5f4b037cd6ce2ebb775401729b19a82040c1beac9d36c7d1428"
+dependencies = [
+ "pest",
+]
 
 [[package]]
 name = "serde"
@@ -1295,6 +1475,12 @@ name = "typenum"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
+
+[[package]]
+name = "ucd-trie"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56dee185309b50d1f11bfedef0fe6d036842e3fb77413abef29f8f8d1c5d4c1c"
 
 [[package]]
 name = "unicode-width"

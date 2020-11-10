@@ -1,10 +1,9 @@
 use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-use algebra::{
-    bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
-    SerializationError,
-};
+use ark_bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ff::One;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
     borrow::Borrow,

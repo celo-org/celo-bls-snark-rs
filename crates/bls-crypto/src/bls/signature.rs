@@ -1,11 +1,10 @@
 use super::PublicKey;
 use crate::{BLSError, HashToCurve};
 
-use algebra::{
-    bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
-    SerializationError,
-};
+use ark_bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ff::One;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
     borrow::Borrow,
@@ -144,11 +143,10 @@ mod tests {
         PrivateKey, PublicKeyCache, SIG_DOMAIN,
     };
 
-    use algebra::{
-        bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters},
-        curves::bls12::Bls12Parameters,
-        CanonicalDeserialize, CanonicalSerialize, UniformRand, Zero,
-    };
+    use ark_bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters};
+    use ark_ec::bls12::Bls12Parameters;
+    use ark_ff::{UniformRand, Zero};
+    use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
     use rand::{thread_rng, Rng};
 
     #[test]

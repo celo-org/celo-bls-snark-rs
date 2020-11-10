@@ -24,7 +24,7 @@
 /// Doing this manually requires importing the curves and instantiating the hashers as follows:
 ///
 /// ```rust
-/// use algebra::bls12_377::g1::Parameters;
+/// use ark_bls12_377::g1::Parameters;
 /// use bls_crypto::{
 ///     OUT_DOMAIN,
 ///     hashers::composite::{CompositeHasher, CRH}, // We'll use the Composite Hasher
@@ -39,7 +39,7 @@
 ///
 /// // You can also use the underlying struct's method to get the counter
 /// let (hash, counter) = hasher.hash_with_attempt(OUT_DOMAIN, &b"some_data"[..], &b"extra"[..]).expect("should not fail");
-/// assert_eq!(counter, 3);
+/// assert_eq!(counter, 0);
 /// ```
 pub mod try_and_increment;
 

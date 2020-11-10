@@ -10,12 +10,17 @@ use crate::hashers::{
 };
 use crate::BLSError;
 
-use algebra::{
-    bls12_377::Parameters,
-    curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-    curves::models::{bls12::Bls12Parameters, SWModelParameters},
-    AffineCurve, ConstantSerializedSize, Zero,
+use ark_bls12_377::Parameters;
+use ark_ec::{
+    bls12::Bls12Parameters,
+    models::{
+        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
+        SWModelParameters,
+    },
+    AffineCurve,
 };
+use ark_ff::Zero;
+use ark_serialize::ConstantSerializedSize;
 
 use once_cell::sync::Lazy;
 
@@ -112,7 +117,7 @@ where
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
             let candidate_hash = {
-                use algebra::serialize::{Flags, SWFlags};
+                use ark_serialize::{Flags, SWFlags};
 
                 let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
                 let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
@@ -210,7 +215,9 @@ fn hash_length(n: usize) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use algebra::{bls12_377::Parameters, CanonicalSerialize, ProjectiveCurve};
+    use ark_bls12_377::Parameters;
+    use ark_ec::ProjectiveCurve;
+    use ark_serialize::CanonicalSerialize;
     use rand::{Rng, RngCore};
 
     #[test]
@@ -295,14 +302,12 @@ mod compat_tests {
     #![allow(clippy::op_ref)]
 
     use super::*;
-    use algebra::{
-        curves::models::{
-            bls12::{G1Affine, G1Projective},
-            ModelParameters,
-        },
-        CanonicalSerialize, Field, FpParameters, FromBytes, PrimeField, ProjectiveCurve,
-        SquareRootField,
+    use ark_ec::{
+        bls12::{G1Affine, G1Projective},
+        ModelParameters, ProjectiveCurve,
     };
+    use ark_ff::{Field, FpParameters, FromBytes, PrimeField, SquareRootField};
+    use ark_serialize::CanonicalSerialize;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
@@ -352,14 +357,13 @@ mod compat_tests {
         assert_eq!(hash_num_bits, EXPECTED_TOTAL_BITS);
         let hash_num_bytes = hash_num_bits / 8;
         let mut counter: [u8; 1] = [0; 1];
+        let inner_hash = hasher.crh(domain, &message, hash_num_bytes)?;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
-            let hash = hasher.hash(
-                domain,
-                &[&counter, extra_data, &message].concat(),
-                hash_num_bytes,
-            )?;
+            let msg = &[&counter, extra_data, &inner_hash].concat();
+            let hash = hasher.xof(domain, &msg, hash_num_bytes)?;
+
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
                 let mut possible_x_bytes = hash[..num_bytes].to_vec();
@@ -431,7 +435,7 @@ mod compat_tests {
 mod non_compat_tests {
     use super::*;
     use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use algebra::bls12_377::Parameters;
+    use ark_bls12_377::Parameters;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 

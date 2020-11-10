@@ -1,6 +1,6 @@
 use bls_crypto::{hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1, PrivateKey};
 
-use algebra::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use clap::{App, Arg};
 

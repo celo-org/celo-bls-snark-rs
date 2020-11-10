@@ -3,12 +3,11 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use algebra::{
-    ed_on_bw6_761::{EdwardsParameters, EdwardsProjective},
-    CanonicalSerialize, ProjectiveCurve,
-};
+use ark_ed_on_bw6_761::{EdwardsParameters, EdwardsProjective};
+use ark_serialize::CanonicalSerialize;
+use ark_ec::ProjectiveCurve;
 use blake2s_simd::Params;
-use crypto_primitives::crh::{bowe_hopwood, pedersen, FixedLengthCRH};
+use ark_crypto_primitives::crh::{bowe_hopwood, pedersen, FixedLengthCRH};
 use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
