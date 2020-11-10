@@ -39,7 +39,7 @@
 ///
 /// // You can also use the underlying struct's method to get the counter
 /// let (hash, counter) = hasher.hash_with_attempt(OUT_DOMAIN, &b"some_data"[..], &b"extra"[..]).expect("should not fail");
-/// assert_eq!(counter, 0);
+/// assert_eq!(counter, 3);
 /// ```
 pub mod try_and_increment;
 

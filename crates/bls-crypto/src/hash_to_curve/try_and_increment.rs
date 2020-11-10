@@ -170,7 +170,7 @@ where
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
             let candidate_hash = {
-                use algebra::serialize::{Flags, SWFlags};
+                use ark_serialize::{Flags, SWFlags};
 
                 let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
                 let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
@@ -357,12 +357,14 @@ mod compat_tests {
         assert_eq!(hash_num_bits, EXPECTED_TOTAL_BITS);
         let hash_num_bytes = hash_num_bits / 8;
         let mut counter: [u8; 1] = [0; 1];
-        let inner_hash = hasher.crh(domain, &message, hash_num_bytes)?;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
-            let msg = &[&counter, extra_data, &inner_hash].concat();
-            let hash = hasher.xof(domain, &msg, hash_num_bytes)?;
+            let hash = hasher.hash(
+                domain,
+                &[&counter, extra_data, &message].concat(),
+                hash_num_bytes,
+            )?;
 
             let (possible_x, greatest) = {
                 //zero out the last byte except the first bit, to get to a total of 377 bits
