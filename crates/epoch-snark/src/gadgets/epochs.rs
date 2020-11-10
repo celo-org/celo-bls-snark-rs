@@ -16,7 +16,7 @@ use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
     bls12_377::{G1PreparedVar, G2PreparedVar},
-    bls12_377::{G1Var, G2Var, PairingVar},
+    bls12_377::{G1Var, G2Var, PairingVar, Fq2Var},
     fields::fp::FpVar,
     pairing::PairingVar as _,
     prelude::*,
@@ -246,7 +246,10 @@ impl ValidatorSetUpdate<Bls12_377> {
                 let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
                     &previous_pubkey_vars, // These are now the last epoch new pubkeys
                 )?;
-                let last_apk_bits = g2_to_bits(&last_apk)?;
+                let affine_x = last_apk.x.mul_by_inverse(&last_apk.z)?;
+                let affine_y = last_apk.y.mul_by_inverse(&last_apk.z)?;
+                let last_apk_affine = G2Var::new(affine_x, affine_y, Fq2Var::one());
+                let last_apk_bits = g2_to_bits(&last_apk_affine)?;
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
 
@@ -303,7 +306,6 @@ mod tests {
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
 
         #[test]
-        #[ignore]
         fn test_multiple_epochs() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
@@ -381,7 +383,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore]
         fn test_multiple_epochs_with_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
