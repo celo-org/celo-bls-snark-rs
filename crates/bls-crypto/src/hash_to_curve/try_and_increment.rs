@@ -71,6 +71,16 @@ where
         self.hash_with_attempt(domain, message, extra_data)
             .map(|res| res.0)
     }
+
+    fn hash_cip22(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+    ) -> Result<Self::Output, BLSError> {
+        self.hash_with_attempt_cip22(domain, message, extra_data)
+            .map(|res| res.0)
+    }
 }
 
 impl<'a, H, P> TryAndIncrement<'a, H, P>
@@ -79,7 +89,7 @@ where
     P: SWModelParameters,
 {
     /// Hash with attempt takes the input, appends a counter
-    pub fn hash_with_attempt(
+    pub fn hash_with_attempt_cip22(
         &self,
         domain: &[u8],
         message: &[u8],
@@ -98,6 +108,59 @@ where
 
             // produce a hash with sufficient length
             let candidate_hash = self.hasher.xof(domain, &msg, hash_bytes)?;
+
+            // handle the Celo deployed bit extraction logic
+            #[cfg(feature = "compat")]
+            let candidate_hash = {
+                use algebra::serialize::{Flags, SWFlags};
+
+                let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
+                let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
+                if positive_flag {
+                    candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
+                } else {
+                    candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
+                }
+                candidate_hash
+            };
+
+            if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
+                trace!(
+                    "succeeded hashing \"{}\" to curve in {} tries",
+                    hex::encode(message),
+                    c
+                );
+                end_timer!(hash_loop_time);
+
+                let scaled = p.scale_by_cofactor();
+                if scaled.is_zero() {
+                    continue;
+                }
+
+                return Ok((scaled, c as usize));
+            }
+        }
+        Err(BLSError::HashToCurveError)
+    }
+
+    /// Hash with attempt takes the input, appends a counter
+    pub fn hash_with_attempt(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+    ) -> Result<(GroupProjective<P>, usize), BLSError> {
+        let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
+        let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
+        let hash_bytes = hash_length(num_bytes);
+        let mut counter = [0; 1];
+        for c in 0..NUM_TRIES {
+            (&mut counter[..]).write_u8(c as u8)?;
+            let candidate_hash = self.hasher.hash(
+                domain,
+                &[&counter, extra_data, &message].concat(),
+                hash_bytes,
+            )?;
 
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]

@@ -58,4 +58,13 @@ pub trait HashToCurve {
         message: &[u8],
         extra_data: &[u8],
     ) -> Result<Self::Output, BLSError>;
+
+    /// Given a domain separator, a message and potentially some extra data, produces
+    /// a hash of them which is a curve point. Compatible with CIP22.
+    fn hash_cip22(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+    ) -> Result<Self::Output, BLSError>;
 }

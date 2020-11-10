@@ -59,7 +59,7 @@ pub mod test_helpers {
         .encode_inner_to_bytes()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
-            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &extra_data)
+            .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data)
             .unwrap();
 
         hash

@@ -1,6 +1,5 @@
-use crate::{
-    YToBitGadget,
-};
+use crate::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
+use crate::YToBitGadget;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     curves::{
@@ -36,7 +35,6 @@ use r1cs_std::{
 };
 use std::{borrow::Borrow, marker::PhantomData};
 use tracing::{debug, span, trace, Level};
-use crate::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
 
 // The deployed Celo version's hash-to-curve takes the sign bit from position 377.
 #[cfg(feature = "compat")]
@@ -131,19 +129,12 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 
         input.extend_from_slice(&crh_bits);
 
-
-
         // Hash to bits
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
         // We want 378 random bits for hashing to curve, so we get 512 from the hash and will
         // discard any unneeded ones. We do not generate constraints.
-        let xof_bits = hash_to_bits(
-            &input,
-            512,
-            personalization,
-            generate_constraints_for_hash,
-        )?;
+        let xof_bits = hash_to_bits(&input, 512, personalization, generate_constraints_for_hash)?;
 
         let hash = Self::hash_to_group(&xof_bits)?;
 
@@ -377,7 +368,7 @@ mod test {
     fn hash_to_group(input: &[u8]) {
         let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let (expected_hash, attempt) = try_and_increment
-            .hash_with_attempt(SIG_DOMAIN, input, &[])
+            .hash_with_attempt_cip22(SIG_DOMAIN, input, &[])
             .unwrap();
 
         let cs = ConstraintSystem::<bls12_377::Fq>::new_ref();

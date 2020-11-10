@@ -42,7 +42,16 @@ pub struct EpochData<E: PairingEngine> {
 
 /// Output type of EpochData.to_bits including bit representation and gadgets.
 type EpochDataToBits = (Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
-type InnerEpochDataToBits = (Vec<Bool>, Vec<Bool>, Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
+type InnerEpochDataToBits = (
+    Vec<Bool>,
+    Vec<Bool>,
+    Vec<Bool>,
+    FrVar,
+    FrVar,
+    FrVar,
+    FrVar,
+    Vec<G2Var>,
+);
 
 /// [`EpochData`] is constrained to a `ConstrainedEpochData` via [`EpochData.constrain`]
 ///
@@ -98,8 +107,16 @@ impl EpochData<Bls12_377> {
         let _enter = span.enter();
 
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
-        let (bits, extra_data_bits, combined_bits, index, epoch_entropy, parent_entropy, maximum_non_signers, pubkeys) =
-            self.to_bits_inner(previous_index.cs())?;
+        let (
+            bits,
+            extra_data_bits,
+            combined_bits,
+            index,
+            epoch_entropy,
+            parent_entropy,
+            maximum_non_signers,
+            pubkeys,
+        ) = self.to_bits_inner(previous_index.cs())?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
@@ -171,7 +188,6 @@ impl EpochData<Bls12_377> {
         ))
     }
 
-
     /// Encodes the inner epoch to bits (index and non-signers encoded as LE)
     pub fn to_bits_inner(
         &self,
@@ -190,16 +206,11 @@ impl EpochData<Bls12_377> {
         let parent_entropy = bytes_to_fr(cs, self.parent_entropy.as_deref())?;
         let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
 
-        let mut epoch_bits: Vec<Bool> = [
-            epoch_entropy_bits.clone(),
-            parent_entropy_bits.clone(),
-        ]
-            .concat();
+        let mut epoch_bits: Vec<Bool> =
+            [epoch_entropy_bits.clone(), parent_entropy_bits.clone()].concat();
 
-        let extra_data_bits: Vec<Bool> = [
-            index_bits.clone(),
-            maximum_non_signers_bits.clone(),
-        ].concat();
+        let extra_data_bits: Vec<Bool> =
+            [index_bits.clone(), maximum_non_signers_bits.clone()].concat();
 
         let mut combined_bits: Vec<Bool> = [
             index_bits,
@@ -207,8 +218,7 @@ impl EpochData<Bls12_377> {
             parent_entropy_bits,
             maximum_non_signers_bits,
         ]
-            .concat();
-
+        .concat();
 
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         for maybe_pk in self.public_keys.iter() {
@@ -303,7 +313,7 @@ impl EpochData<Bls12_377> {
                 .collect::<Result<Vec<_>, _>>()?;
 
             let (_, counter) = COMPOSITE_HASH_TO_G1
-                .hash_with_attempt(SIG_DOMAIN, &input_bytes, &input_extra_data_bytes)
+                .hash_with_attempt_cip22(SIG_DOMAIN, &input_bytes, &input_extra_data_bytes)
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
             counter
         };
@@ -377,7 +387,7 @@ mod tests {
         .encode_inner_to_bytes()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
-            .hash_with_attempt(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
+            .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
             .unwrap();
 
         // compare it with the one calculated in the circuit from its bytes
