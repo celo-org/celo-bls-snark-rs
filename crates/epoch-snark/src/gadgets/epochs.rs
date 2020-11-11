@@ -110,7 +110,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         let (
             first_epoch_bits,
             first_epoch_index,
-            _first_epoch_entropy,
+            first_epoch_entropy,
             _first_parent_entropy,
             initial_maximum_non_signers,
             initial_pubkey_vars,
@@ -127,6 +127,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             prepared_message_hashes,
         ) = self.verify_intermediate_epochs(
             first_epoch_index,
+            first_epoch_entropy,
             initial_pubkey_vars,
             initial_maximum_non_signers,
         )?;
@@ -154,6 +155,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     fn verify_intermediate_epochs(
         &self,
         first_epoch_index: FrVar,
+        first_epoch_randomness: Option<FrVar>,
         initial_pubkey_vars: Vec<G2Var>,
         initial_max_non_signers: FrVar,
     ) -> Result<
@@ -188,12 +190,14 @@ impl ValidatorSetUpdate<Bls12_377> {
         let mut previous_max_non_signers = initial_max_non_signers;
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
+        let mut previous_epoch_randomness = first_epoch_randomness;
         for (i, epoch) in self.epochs.iter().enumerate() {
             let span = span!(Level::TRACE, "index", i);
             let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
                 &previous_pubkey_vars,
                 &previous_epoch_index,
+                &previous_epoch_randomness,
                 &previous_max_non_signers,
                 self.num_validators,
                 self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
@@ -201,6 +205,12 @@ impl ValidatorSetUpdate<Bls12_377> {
 
             let index_bit = constrained_epoch.index.is_eq_zero()?.not();
 
+            // Update the randomness for the next iteration
+            previous_epoch_randomness = FrVar::conditionally_select(
+                &index_bit,
+                &constrained_epoch.epoch_entropy,
+                &previous_epoch_randomness,
+            )?;
             // Update the pubkeys for the next iteration
             previous_epoch_index = FrVar::conditionally_select(
                 &index_bit,
@@ -311,7 +321,7 @@ mod tests {
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
             let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
+                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
                     .epoch_data;
 
             let num_epochs = 4;
@@ -333,6 +343,8 @@ mod tests {
                 .map(|(epoch_index, epoch_validators)| {
                     generate_single_update::<Curve>(
                         epoch_index as u16 + 1,
+                        None,
+                        None,
                         faults,
                         epoch_validators,
                         bitmaps[epoch_index],
@@ -388,7 +400,7 @@ mod tests {
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
             let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
+                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
                     .epoch_data;
 
             let num_epochs = 4;
@@ -410,6 +422,8 @@ mod tests {
                 .map(|(epoch_index, epoch_validators)| {
                     generate_single_update::<Curve>(
                         epoch_index as u16 + 1,
+                        None,
+                        None,
                         faults,
                         epoch_validators,
                         bitmaps[epoch_index],
@@ -480,7 +494,7 @@ mod tests {
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
             let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
+                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
                     .epoch_data;
 
             let num_epochs = 4;
@@ -502,6 +516,8 @@ mod tests {
                 .map(|(epoch_index, epoch_validators)| {
                     generate_single_update::<Curve>(
                         epoch_index as u16 + 1,
+                        None,
+                        None,
                         faults,
                         epoch_validators,
                         bitmaps[epoch_index],

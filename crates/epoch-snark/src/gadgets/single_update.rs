@@ -8,12 +8,13 @@ use r1cs_core::SynthesisError;
 use r1cs_std::{
     bls12_377::{G1Var, G2Var, PairingVar},
     boolean::Boolean,
+    eq::EqGadget,
     fields::fp::FpVar,
     R1CSVar,
 };
 
 use super::{constrain_bool, EpochData};
-use bls_gadgets::BlsVerifyGadget;
+use bls_gadgets::{BlsVerifyGadget, FpUtils};
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
@@ -57,6 +58,10 @@ pub struct ConstrainedEpoch {
     pub aggregate_pk: G2Var,
     /// The epoch's index
     pub index: FrVar,
+    /// Unpredicatble value to add entropy to the epoch data,
+    pub epoch_entropy: FrVar,
+    /// Entropy value for the previous epoch.
+    pub parent_entropy: FrVar,
     /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
     pub bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
@@ -76,6 +81,7 @@ impl SingleUpdate<Bls12_377> {
         &self,
         previous_pubkeys: &[G2Var],
         previous_epoch_index: &FrVar,
+        previous_epoch_randomness: &Option<FrVar>,
         previous_max_non_signers: &FrVar,
         num_validators: u32,
         generate_constraints_for_hash: bool,
@@ -89,6 +95,8 @@ impl SingleUpdate<Bls12_377> {
         let epoch_data = self
             .epoch_data
             .constrain(previous_epoch_index, generate_constraints_for_hash)?;
+        let index_bit = epoch_data.index.is_eq_zero()?.not();
+        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit);
 
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
@@ -109,6 +117,8 @@ impl SingleUpdate<Bls12_377> {
             message_hash,
             aggregate_pk: aggregated_public_key,
             index: epoch_data.index,
+            epoch_entropy: epoch_data.epoch_entropy,
+            parent_entropy: epoch_data.parent_entropy,
             bits: epoch_data.bits,
             xof_bits: epoch_data.xof_bits,
             crh_bits: epoch_data.crh_bits,
@@ -125,14 +135,16 @@ pub mod test_helpers {
 
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
+        epoch_entropy: Option<Vec<u8>>,
+        parent_entropy: Option<Vec<u8>>,
         maximum_non_signers: u32,
         public_keys: &[E::G2Projective],
         bitmap: &[bool],
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
-            epoch_entropy: Some(vec![(index + 1) as u8; EpochData::<E>::ENTROPY_BYTES]),
-            parent_entropy: Some(vec![index as u8; EpochData::<E>::ENTROPY_BYTES]),
+            epoch_entropy: epoch_entropy,
+            parent_entropy: parent_entropy,
             maximum_non_signers,
             public_keys: to_option_iter(public_keys),
         };
@@ -168,13 +180,15 @@ mod tests {
     use super::{test_helpers::generate_single_update, *};
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
 
-    use algebra::UniformRand;
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
+    use algebra::{BigInteger, PrimeField, UniformRand};
+    use r1cs_core::{ConstraintLayer, ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::{
         alloc::{AllocVar, AllocationMode},
         bls12_377::G2Var,
         groups::CurveVar,
     };
+    use tracing_subscriber::layer::SubscriberExt;
+    use bls_gadgets::utils::bytes_le_to_bits_le;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
@@ -186,7 +200,15 @@ mod tests {
     #[test]
     fn test_enough_pubkeys_for_update() {
         let cs = ConstraintSystem::<Fr>::new_ref();
-        single_update_enforce(cs.clone(), 5, 5, 1, 2, 1, &[true, true, true, true, false]);
+
+        let mut layer = ConstraintLayer::default();
+        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+        let subscriber = tracing_subscriber::Registry::default().with(layer);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+//        let entropy = Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]);
+
+        single_update_enforce(cs.clone(), 5, 5, 1, None, 2, 1, &[true, true, true, true, false]);
 
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
@@ -196,7 +218,7 @@ mod tests {
     fn not_enough_pubkeys_for_update() {
         let cs = ConstraintSystem::<Fr>::new_ref();
         // 2 false in the bitmap when only 1 allowed
-        single_update_enforce(cs.clone(), 5, 5, 4, 5, 1, &[true, true, false, true, false]);
+        single_update_enforce(cs.clone(), 5, 5, 4, None, 5, 1, &[true, true, false, true, false]);
 
         print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
@@ -206,7 +228,7 @@ mod tests {
     #[should_panic]
     fn validator_number_cannot_change() {
         let cs = ConstraintSystem::<Fr>::new_ref();
-        single_update_enforce(cs, 5, 6, 0, 0, 0, &[]);
+        single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]);
     }
 
     fn single_update_enforce(
@@ -214,6 +236,7 @@ mod tests {
         prev_n_validators: usize,
         n_validators: usize,
         prev_index: u16,
+        prev_randomness: Option<Vec<u8>>,
         index: u16,
         maximum_non_signers: u32,
         bitmap: &[bool],
@@ -233,11 +256,30 @@ mod tests {
             .collect::<Vec<_>>();
         let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
         let prev_max_non_signers =
-            FrVar::new_witness(cs, || Ok(Fr::from(maximum_non_signers))).unwrap();
+            FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap();
+
+        let prev_randomness_var = match prev_randomness {
+            Some(v) => { 
+                let mut bits = bytes_le_to_bits_le(
+                    &prev_randomness.clone().unwrap(),
+                    EpochData::<Bls12_377>::ENTROPY_BYTES * 8,
+                );
+                let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
+                Some(FrVar::new_witness(cs, || Ok(Fr::from(bigint))).unwrap())
+            },
+            None => None,
+        };
+/*        let mut prev_randomness_bits = bytes_le_to_bits_le(
+            &prev_randomness.clone().unwrap(),
+            EpochData::<Bls12_377>::ENTROPY_BYTES * 8,
+        );
+        let prev_randomness_var = FrVar::new_witness(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&prev_randomness_bits)))).unwrap();*/
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
             index,
+            Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
+            prev_randomness,
             maximum_non_signers,
             &pubkeys::<Bls12_377>(n_validators),
             bitmap,
@@ -248,6 +290,7 @@ mod tests {
             .constrain(
                 &prev_validators,
                 &prev_index,
+                &prev_randomness_var,
                 &prev_max_non_signers,
                 prev_n_validators as u32,
                 false,
