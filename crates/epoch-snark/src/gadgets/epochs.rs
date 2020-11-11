@@ -155,7 +155,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     fn verify_intermediate_epochs(
         &self,
         first_epoch_index: FrVar,
-        first_epoch_randomness: Option<FrVar>,
+        first_epoch_entropy: FrVar,
         initial_pubkey_vars: Vec<G2Var>,
         initial_max_non_signers: FrVar,
     ) -> Result<
@@ -182,23 +182,29 @@ impl ValidatorSetUpdate<Bls12_377> {
             AllocationMode::Constant,
         )?;
 
+        // Skip entropy circuit logic if the first epoch does not 
+        // contain entropy. Done to support earlier versions of Celo.
+        // Assumes all epochs past a single version will contain entropy
+        let entropy_bit = first_epoch_entropy.is_eq_zero()?.not();
+
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
         let mut previous_epoch_index = first_epoch_index;
         let mut previous_pubkey_vars = initial_pubkey_vars;
         let mut previous_max_non_signers = initial_max_non_signers;
+        let mut previous_epoch_entropy = first_epoch_entropy;
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
-        let mut previous_epoch_randomness = first_epoch_randomness;
         for (i, epoch) in self.epochs.iter().enumerate() {
             let span = span!(Level::TRACE, "index", i);
             let _enter = span.enter();
             let constrained_epoch = epoch.constrain(
                 &previous_pubkey_vars,
                 &previous_epoch_index,
-                &previous_epoch_randomness,
+                &previous_epoch_entropy,
                 &previous_max_non_signers,
+                &entropy_bit,
                 self.num_validators,
                 self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
             )?;
@@ -206,10 +212,10 @@ impl ValidatorSetUpdate<Bls12_377> {
             let index_bit = constrained_epoch.index.is_eq_zero()?.not();
 
             // Update the randomness for the next iteration
-            previous_epoch_randomness = FrVar::conditionally_select(
+            previous_epoch_entropy = FrVar::conditionally_select(
                 &index_bit,
                 &constrained_epoch.epoch_entropy,
-                &previous_epoch_randomness,
+                &previous_epoch_entropy,
             )?;
             // Update the pubkeys for the next iteration
             previous_epoch_index = FrVar::conditionally_select(

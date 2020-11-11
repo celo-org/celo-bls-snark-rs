@@ -81,8 +81,9 @@ impl SingleUpdate<Bls12_377> {
         &self,
         previous_pubkeys: &[G2Var],
         previous_epoch_index: &FrVar,
-        previous_epoch_randomness: &Option<FrVar>,
+        previous_epoch_randomness: &FrVar,
         previous_max_non_signers: &FrVar,
+        constrain_entropy_bit: &Bool,
         num_validators: u32,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
@@ -96,7 +97,11 @@ impl SingleUpdate<Bls12_377> {
             .epoch_data
             .constrain(previous_epoch_index, generate_constraints_for_hash)?;
         let index_bit = epoch_data.index.is_eq_zero()?.not();
-        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit);
+
+        // Enforce equality with previous epoch's entropy if current
+        // epoch is not a dummy block and entropy was present in the
+        // first epoch
+        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit.and(&constrain_entropy_bit)?);
 
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
@@ -186,6 +191,7 @@ mod tests {
         alloc::{AllocVar, AllocationMode},
         bls12_377::G2Var,
         groups::CurveVar,
+        fields::FieldVar,
     };
     use tracing_subscriber::layer::SubscriberExt;
     use bls_gadgets::utils::bytes_le_to_bits_le;
@@ -259,21 +265,16 @@ mod tests {
             FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap();
 
         let prev_randomness_var = match prev_randomness {
-            Some(v) => { 
+            Some(ref v) => { 
                 let mut bits = bytes_le_to_bits_le(
                     &prev_randomness.clone().unwrap(),
                     EpochData::<Bls12_377>::ENTROPY_BYTES * 8,
                 );
                 let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
-                Some(FrVar::new_witness(cs, || Ok(Fr::from(bigint))).unwrap())
+                FrVar::new_witness(cs, || Ok(Fr::from(bigint))).unwrap()
             },
-            None => None,
+            None => FrVar::zero(),
         };
-/*        let mut prev_randomness_bits = bytes_le_to_bits_le(
-            &prev_randomness.clone().unwrap(),
-            EpochData::<Bls12_377>::ENTROPY_BYTES * 8,
-        );
-        let prev_randomness_var = FrVar::new_witness(cs, || Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&prev_randomness_bits)))).unwrap();*/
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
@@ -292,6 +293,7 @@ mod tests {
                 &prev_index,
                 &prev_randomness_var,
                 &prev_max_non_signers,
+                &Bool::FALSE,
                 prev_n_validators as u32,
                 false,
             )

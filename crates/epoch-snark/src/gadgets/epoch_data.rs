@@ -149,9 +149,16 @@ impl EpochData<Bls12_377> {
 
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
 
-        let epoch_entropy = bytes_to_fr(cs.clone(), self.epoch_entropy.as_deref())?;
+        let epoch_entropy = match &self.epoch_entropy {
+            Some(v) => bytes_to_fr(cs.clone(), Some(&v[..]))?,
+            None => FrVar::zero(), // allocate dummy value
+        };
         let epoch_entropy_bits = fr_to_bits(&epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
-        let parent_entropy = bytes_to_fr(cs, self.parent_entropy.as_deref())?;
+
+        let parent_entropy = match &self.parent_entropy {
+            Some(v) => bytes_to_fr(cs.clone(), Some(&v[..]))?,
+            None => FrVar::zero(), // allocate dummy value
+        };
         let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Bool> = [
