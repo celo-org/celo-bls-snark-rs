@@ -176,7 +176,6 @@ pub mod test_helpers {
             maximum_non_signers: 0u32,
             public_keys: to_option_iter(public_keys.as_slice()),
         };
-        println!("number: {}", EpochData::<E>::ENTROPY_BYTES);
 
         SingleUpdate::<E> {
             epoch_data,
@@ -284,7 +283,7 @@ mod tests {
         // generate the update via the helper
         let next_epoch = generate_single_update(
             index,
-            Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
+            Some(vec![0u8; 8 * EpochData::<Bls12_377>::ENTROPY_BYTES]),
             prev_randomness,
             maximum_non_signers,
             &pubkeys::<Bls12_377>(n_validators),

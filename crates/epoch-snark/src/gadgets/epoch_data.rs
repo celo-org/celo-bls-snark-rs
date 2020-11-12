@@ -214,6 +214,7 @@ impl EpochData<Bls12_377> {
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
         println!("A1");
 
+        println!("epoch entropy: {:?}", &self.epoch_entropy);
         let epoch_entropy = match &self.epoch_entropy {
             Some(v) => bytes_to_fr(cs.clone(), Some(&v))?,
             None => FrVar::zero(),
@@ -221,6 +222,7 @@ impl EpochData<Bls12_377> {
         println!("A2");
         let epoch_entropy_bits = fr_to_bits(&epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
         println!("A3");
+        println!("parent entropy: {:?}", &self.parent_entropy);
         let parent_entropy = match &self.parent_entropy {
             Some(v) => bytes_to_fr(cs, Some(&v))?,
             None => FrVar::zero(),
