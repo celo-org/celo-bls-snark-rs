@@ -91,24 +91,28 @@ impl SingleUpdate<Bls12_377> {
         let _enter = span.enter();
         // the number of validators across all epochs must be consistent
         assert_eq!(num_validators as usize, self.epoch_data.public_keys.len());
-
+        println!("4");
         // Get the constrained epoch data
         let epoch_data = self
             .epoch_data
             .constrain(previous_epoch_index, generate_constraints_for_hash)?;
+        println!("4.5");
         let index_bit = epoch_data.index.is_eq_zero()?.not();
 
         // Enforce equality with previous epoch's entropy if current
         // epoch is not a dummy block and entropy was present in the
         // first epoch
+        println!("3");
         previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit.and(&constrain_entropy_bit)?);
 
         // convert the bitmap to constraints
+        println!("2");
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
 
         // convert the bitmap to constraints
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
+        println!("1");
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
             previous_pubkeys,
             &signed_bitmap,
@@ -167,11 +171,12 @@ pub mod test_helpers {
             .collect::<Vec<_>>();
         let epoch_data = EpochData::<E> {
             index: Some(0),
-            epoch_entropy: Some(vec![0u8; EpochData::<E>::ENTROPY_BYTES]),
-            parent_entropy: Some(vec![0u8; EpochData::<E>::ENTROPY_BYTES]),
+            epoch_entropy: Some(vec![0u8; 8 * EpochData::<E>::ENTROPY_BYTES]),
+            parent_entropy: Some(vec![0u8; 8 * EpochData::<E>::ENTROPY_BYTES]),
             maximum_non_signers: 0u32,
             public_keys: to_option_iter(public_keys.as_slice()),
         };
+        println!("number: {}", EpochData::<E>::ENTROPY_BYTES);
 
         SingleUpdate::<E> {
             epoch_data,
