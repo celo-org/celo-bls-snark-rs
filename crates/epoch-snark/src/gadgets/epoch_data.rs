@@ -41,8 +41,7 @@ pub struct EpochData<E: PairingEngine> {
 }
 
 /// Output type of EpochData.to_bits including bit representation and gadgets.
-type EpochDataToBits = (Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
-type InnerEpochDataToBits = (
+type EpochDataToBits = (
     Vec<Bool>,
     Vec<Bool>,
     Vec<Bool>,
@@ -106,7 +105,6 @@ impl EpochData<Bls12_377> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
 
-        // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
         let (
             bits,
             extra_data_bits,
@@ -136,74 +134,12 @@ impl EpochData<Bls12_377> {
         })
     }
 
-    /// Encodes the epoch to bits (index and non-signers encoded as LE)
-    #[tracing::instrument(target = "r1cs")]
-    pub fn to_bits(
-        &self,
-        cs: ConstraintSystemRef<Bls12_377_Fq>,
-    ) -> Result<EpochDataToBits, SynthesisError> {
-        let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
-        let index_bits = fr_to_bits(&index, 16)?;
-
-        let maximum_non_signers =
-            FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
-
-        let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
-
-        let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
-        let epoch_entropy = match &self.epoch_entropy {
-            Some(v) => v,
-            None => &empty_entropy,
-        };
-        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
-        let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
-
-        let parent_entropy = match &self.parent_entropy {
-            Some(v) => v,
-            None => &empty_entropy,
-        };
-        let parent_entropy_var = bytes_to_fr(cs.clone(), Some(&parent_entropy))?;
-        let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
-
-        let mut epoch_bits: Vec<Bool> = [
-            index_bits,
-            epoch_entropy_bits,
-            parent_entropy_bits,
-            maximum_non_signers_bits,
-        ]
-        .concat();
-
-        let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
-        for maybe_pk in self.public_keys.iter() {
-            let pk_var = G2Var::new_variable_omit_prime_order_check(
-                index.cs(),
-                || maybe_pk.get(),
-                AllocationMode::Witness,
-            )?;
-
-            // extend our epoch bits by the pubkeys
-            let pk_bits = g2_to_bits(&pk_var)?;
-            epoch_bits.extend_from_slice(&pk_bits);
-
-            // save the allocated pubkeys
-            pubkey_vars.push(pk_var);
-        }
-
-        Ok((
-            epoch_bits,
-            index,
-            epoch_entropy_var,
-            parent_entropy_var,
-            maximum_non_signers,
-            pubkey_vars,
-        ))
-    }
-
     /// Encodes the inner epoch to bits (index and non-signers encoded as LE)
+    #[tracing::instrument(target = "r1cs")]
     pub fn to_bits_inner(
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
-    ) -> Result<InnerEpochDataToBits, SynthesisError> {
+    ) -> Result<EpochDataToBits, SynthesisError> {
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
         let index_bits = fr_to_bits(&index, 16)?;
 
@@ -471,10 +407,10 @@ mod tests {
 
         // calculate the bits from the epoch
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let ret = epoch.to_bits(cs).unwrap();
+        let ret = epoch.to_bits_inner(cs).unwrap();
 
         // compare with the result
-        let bits_inner = ret.0.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
+        let bits_inner = ret.2.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
         assert_eq!(bits_inner, bits);
         assert_ne!(bits_inner, bits_wrong);
     }
