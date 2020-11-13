@@ -145,8 +145,11 @@ impl EpochData<Bls12_377> {
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<EpochDataToBits, SynthesisError> {
+        println!("Z");
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+        println!("X");
         let index_bits = fr_to_bits(&index, 16)?;
+        println!("Y");
 
         let maximum_non_signers =
             FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
@@ -208,7 +211,9 @@ impl EpochData<Bls12_377> {
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<InnerEpochDataToBits, SynthesisError> {
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+        println!("before");
         let index_bits = fr_to_bits(&index, 16)?;
+        println!("after");
 
         let maximum_non_signers =
             FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;

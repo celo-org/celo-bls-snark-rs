@@ -87,12 +87,9 @@ fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVa
 
 /// Returns the bit representation of the Fr element in *little-endian* ordering.
 fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
-    println!("input value: {}", input.value()?);
-    println!("value: {:?}", input);
-    println!("length: {}", length);
+    println!("here");
     let input = input.to_bits_le()?;
     let result = input[0..length].to_vec(); 
-    println!("about to return");
     Ok(result)
 }
 

@@ -96,7 +96,9 @@ where
     info!("BLS");
     let empty_epochs =
         ValidatorSetUpdate::empty(num_validators, num_epochs, maximum_non_signers, vk);
+    println!("a");
     let epochs = validator_setup_fn(empty_epochs, rng)?;
+    println!("b");
 
     Ok(Parameters {
         epochs,
