@@ -210,13 +210,6 @@ mod tests {
     fn test_enough_pubkeys_for_update() {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let mut layer = ConstraintLayer::default();
-        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
-        let subscriber = tracing_subscriber::Registry::default().with(layer);
-        tracing::subscriber::set_global_default(subscriber).unwrap();
-
-        //        let entropy = Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]);
-
         single_update_enforce(
             cs.clone(),
             5,
