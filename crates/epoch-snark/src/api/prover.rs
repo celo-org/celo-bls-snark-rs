@@ -76,8 +76,10 @@ pub fn prove(
         num_validators,
         hash_helper,
     };
-    info!("BLS");
+
+    info!("proving");
     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
+    info!("proved");
 
     Ok(bls_proof)
 }

@@ -5,7 +5,7 @@ use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
-use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be};
+use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be, bytes_le_to_bits_le};
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -64,11 +64,10 @@ impl EpochBlock {
 
     /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
     /// group using `SIG_DOMAIN` as a domain separator
-    pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
+    pub fn hash_to_g1_cip22(&self) -> Result<G1Projective, EncodingError> {
         let (input, extra_data_input) = self.encode_inner_to_bytes_cip22()?;
-        let expected_hash: G1Projective = COMPOSITE_HASH_TO_G1
-            .hash(SIG_DOMAIN, &input, &extra_data_input)
-            .unwrap();
+        let expected_hash: G1Projective =
+            COMPOSITE_HASH_TO_G1.hash_cip22(SIG_DOMAIN, &input, &extra_data_input)?;
         Ok(expected_hash)
     }
 
@@ -130,8 +129,7 @@ impl EpochBlock {
             None => vec![0u8; Self::ENTROPY_BYTES * 8],
         };
         // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-        let mut entropy_bits = bytes_le_to_bits_be(&entropy_bytes, Self::ENTROPY_BYTES * 8);
-        entropy_bits.reverse();
+        let entropy_bits = bytes_le_to_bits_le(&entropy_bytes, Self::ENTROPY_BYTES * 8);
         entropy_bits
     }
 
@@ -205,8 +203,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
         .finalize()
         .as_ref()
         .to_vec();
-    let mut bits = bytes_le_to_bits_be(&hash, 256);
-    bits.reverse();
+    let bits = bytes_le_to_bits_le(&hash, 256);
     bits
 }
 

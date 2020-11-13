@@ -2,7 +2,7 @@ use algebra::{
     bls12_377::{Fq, FqParameters},
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
-use bls_crypto::PublicKey;
+use bls_crypto::{PublicKey, BLSError};
 use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
@@ -15,6 +15,8 @@ pub enum EncodingError {
     ZexeSerialization(#[from] SerializationError),
     #[error("I/O Error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("BLS Error: {0}")]
+    BLSError(#[from] BLSError),
 }
 
 /// The function assumes that the public key is not the point in infinity, which is true for

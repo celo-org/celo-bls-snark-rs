@@ -104,7 +104,6 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
-        // TODO(#185): Use the entropy values here.
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (
@@ -418,7 +417,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore]
         fn test_multiple_epochs_with_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
@@ -519,7 +517,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore]
         fn test_multiple_epochs_with_wrong_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;

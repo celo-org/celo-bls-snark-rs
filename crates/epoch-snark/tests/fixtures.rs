@@ -47,12 +47,12 @@ pub fn generate_test_data(
     for (i, signers_epoch) in signers.iter().enumerate() {
         let block: EpochBlock = generate_block(
             i + 1,
-            &[3u8; EpochBlock::ENTROPY_BYTES],
-            &[4u8; EpochBlock::ENTROPY_BYTES],
+            &[(i+2) as u8; EpochBlock::ENTROPY_BYTES],
+            &[(i+1) as u8; EpochBlock::ENTROPY_BYTES],
             faults,
             &pubkeys[i],
         );
-        let hash = block.hash_to_g1().unwrap();
+        let hash = block.hash_to_g1_cip22().unwrap();
 
         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
         let bitmap_epoch = &bitmaps[i];
