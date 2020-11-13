@@ -191,13 +191,12 @@ mod tests {
 
     use algebra::{BigInteger, PrimeField, UniformRand};
     use bls_gadgets::utils::bytes_le_to_bits_le;
-    use r1cs_core::{ConstraintLayer, ConstraintSystem, ConstraintSystemRef};
+    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
     use r1cs_std::{
         alloc::{AllocVar, AllocationMode},
         bls12_377::G2Var,
         groups::CurveVar,
     };
-    use tracing_subscriber::layer::SubscriberExt;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
