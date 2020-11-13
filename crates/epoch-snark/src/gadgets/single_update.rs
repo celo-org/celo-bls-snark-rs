@@ -100,7 +100,7 @@ impl SingleUpdate<Bls12_377> {
         // Enforce equality with previous epoch's entropy if current
         // epoch is not a dummy block and entropy was present in the
         // first epoch
-//        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit.and(&constrain_entropy_bit)?);
+        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit.and(&constrain_entropy_bit)?);
 
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
