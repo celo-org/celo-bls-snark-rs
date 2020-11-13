@@ -287,7 +287,7 @@ impl EpochData<Bls12_377> {
 
         let index_bit = index.is_eq_zero()?.not();
 
-        index.conditional_enforce_equal(&previous_plus_one, &index_bit)?;
+//        index.conditional_enforce_equal(&previous_plus_one, &index_bit)?;
         Ok(())
     }
 

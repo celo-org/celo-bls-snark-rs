@@ -318,7 +318,8 @@ mod tests {
 
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
-    use r1cs_core::ConstraintSystem;
+    use r1cs_core::{ConstraintLayer, ConstraintSystem};
+    use tracing_subscriber::layer::SubscriberExt;
 
     type Curve = Bls12_377;
 
@@ -329,6 +330,11 @@ mod tests {
 
         #[test]
         fn test_multiple_epochs() {
+            let mut layer = ConstraintLayer::default();
+            layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+            let subscriber = tracing_subscriber::Registry::default().with(layer);
+            tracing::subscriber::set_global_default(subscriber).unwrap();
+
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
@@ -407,6 +413,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore]
         fn test_multiple_epochs_with_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
@@ -501,6 +508,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore]
         fn test_multiple_epochs_with_wrong_dummy() {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
