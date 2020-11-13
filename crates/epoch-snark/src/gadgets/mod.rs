@@ -56,7 +56,7 @@ pub mod test_helpers {
             epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_inner_to_bytes()
+        .encode_inner_to_bytes_cip22()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data)
@@ -88,7 +88,7 @@ fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVa
 /// Returns the bit representation of the Fr element in *little-endian* ordering.
 fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
     let input = input.to_bits_le()?;
-    let result = input[0..length].to_vec(); 
+    let result = input[0..length].to_vec();
     Ok(result)
 }
 

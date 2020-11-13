@@ -137,6 +137,7 @@ impl EpochData<Bls12_377> {
     }
 
     /// Encodes the epoch to bits (index and non-signers encoded as LE)
+    #[tracing::instrument(target = "r1cs")]
     pub fn to_bits(
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
@@ -404,7 +405,7 @@ mod tests {
             epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_inner_to_bytes()
+        .encode_inner_to_bytes_cip22()
         .unwrap();
         let (hash, _) = COMPOSITE_HASH_TO_G1
             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
@@ -454,7 +455,7 @@ mod tests {
             epoch.maximum_non_signers,
             pubkeys.clone(),
         )
-        .encode_to_bits()
+        .encode_to_bits_cip22()
         .unwrap();
 
         // calculate wrong bits
@@ -465,7 +466,7 @@ mod tests {
             epoch.maximum_non_signers,
             pubkeys,
         )
-        .encode_to_bits_with_aggregated_pk()
+        .encode_to_bits_with_aggregated_pk_cip22()
         .unwrap();
 
         // calculate the bits from the epoch

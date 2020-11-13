@@ -65,24 +65,38 @@ impl EpochBlock {
     /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
     /// group using `SIG_DOMAIN` as a domain separator
     pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
-        let (input, extra_data_input) = self.encode_inner_to_bytes()?;
-        let expected_hash: G1Projective =
-            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &extra_data_input).unwrap();
+        let (input, extra_data_input) = self.encode_inner_to_bytes_cip22()?;
+        let expected_hash: G1Projective = COMPOSITE_HASH_TO_G1
+            .hash(SIG_DOMAIN, &input, &extra_data_input)
+            .unwrap();
         Ok(expected_hash)
     }
 
     /// Encodes the block to bytes and then hashes it with Blake2
-    pub fn blake2(&self) -> Result<Vec<bool>, EncodingError> {
-        Ok(hash_to_bits(&self.encode_to_bytes()?))
+    pub fn blake2_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+        Ok(hash_to_bits(&self.encode_to_bytes_cip22()?))
     }
 
     /// Encodes the block appended with the aggregate signature to bytes and then hashes it with Blake2
-    pub fn blake2_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
-        Ok(hash_to_bits(&self.encode_to_bytes_with_aggregated_pk()?))
+    pub fn blake2_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+        Ok(hash_to_bits(
+            &self.encode_to_bytes_with_aggregated_pk_cip22()?,
+        ))
     }
 
     /// Encodes the block to LE bits
     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
+        let mut epoch_bits = vec![];
+        epoch_bits.extend_from_slice(&encode_u16(self.index)?);
+        epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
+        for added_public_key in &self.new_public_keys {
+            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+        }
+        Ok(epoch_bits)
+    }
+
+    /// Encodes the block to LE bits
+    pub fn encode_to_bits_cip22(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         if self.epoch_entropy.is_some() {
@@ -110,30 +124,25 @@ impl EpochBlock {
         Ok(epoch_bits)
     }
 
+    pub fn encode_entropy_cip22(entropy: Option<&Vec<u8>>) -> Vec<bool> {
+        let entropy_bytes = match entropy {
+            Some(entropy) => entropy.clone(),
+            None => vec![0u8; Self::ENTROPY_BYTES * 8],
+        };
+        // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
+        let mut entropy_bits = bytes_le_to_bits_be(&entropy_bytes, Self::ENTROPY_BYTES * 8);
+        entropy_bits.reverse();
+        entropy_bits
+    }
+
     /// Encodes the block to LE bits
-    pub fn encode_inner_to_bits(&self) -> Result<(Vec<bool>, Vec<bool>), EncodingError> {
+    pub fn encode_inner_to_bits_cip22(&self) -> Result<(Vec<bool>, Vec<bool>), EncodingError> {
         let mut epoch_bits = vec![];
         let mut extra_data_bits = vec![];
         extra_data_bits.extend_from_slice(&encode_u16(self.index)?);
         extra_data_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
-        if self.epoch_entropy.is_some() {
-            // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_le_to_bits_be(
-                self.epoch_entropy.as_ref().unwrap(),
-                Self::ENTROPY_BYTES * 8,
-            );
-            bits.reverse();
-            epoch_bits.extend_from_slice(&bits);
-        }
-        if self.parent_entropy.is_some() {
-            // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_le_to_bits_be(
-                self.parent_entropy.as_ref().unwrap(),
-                Self::ENTROPY_BYTES * 8,
-            );
-            bits.reverse();
-            epoch_bits.extend_from_slice(&bits);
-        }
+        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
+        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
         }
@@ -141,11 +150,16 @@ impl EpochBlock {
     }
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bits
-    pub fn encode_to_bits_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
-        let mut epoch_bits = self.encode_to_bits()?;
+    pub fn encode_to_bits_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+        let mut epoch_bits = self.encode_to_bits_cip22()?;
         let aggregated_pk = PublicKey::aggregate(&self.new_public_keys);
         epoch_bits.extend_from_slice(encode_public_key(&aggregated_pk)?.as_slice());
         Ok(epoch_bits)
+    }
+
+    /// Encodes the block to LE bytes
+    pub fn encode_to_bytes_cip22(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(bits_be_to_bytes_le(&self.encode_to_bits_cip22()?))
     }
 
     /// Encodes the block to LE bytes
@@ -154,14 +168,19 @@ impl EpochBlock {
     }
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
-    pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
-        Ok(bits_be_to_bytes_le(&self.encode_to_bits_with_aggregated_pk()?))
+    pub fn encode_to_bytes_with_aggregated_pk_cip22(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(bits_be_to_bytes_le(
+            &self.encode_to_bits_with_aggregated_pk_cip22()?,
+        ))
     }
 
     /// Encodes an inner block to LE bytes
-    pub fn encode_inner_to_bytes(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
-        let (inner_bits, extra_data_bits) = self.encode_inner_to_bits()?;
-        Ok((bits_be_to_bytes_le(&inner_bits), bits_be_to_bytes_le(&extra_data_bits)))
+    pub fn encode_inner_to_bytes_cip22(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
+        let (inner_bits, extra_data_bits) = self.encode_inner_to_bits_cip22()?;
+        Ok((
+            bits_be_to_bytes_le(&inner_bits),
+            bits_be_to_bytes_le(&extra_data_bits),
+        ))
     }
 }
 
@@ -171,8 +190,8 @@ pub fn hash_first_last_epoch_block(
     first: &EpochBlock,
     last: &EpochBlock,
 ) -> Result<Vec<bool>, EncodingError> {
-    let h1 = first.blake2()?;
-    let h2 = last.blake2_with_aggregated_pk()?;
+    let h1 = first.blake2_cip22()?;
+    let h2 = last.blake2_with_aggregated_pk_cip22()?;
     Ok([h1, h2].concat())
 }
 
@@ -213,7 +232,7 @@ mod tests {
             pubkeys,
         );
         assert_eq!(
-            hex::encode(epoch.encode_to_bytes()?),
+            hex::encode(epoch.encode_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITH_ENTROPY
         );
         Ok(())
@@ -226,7 +245,7 @@ mod tests {
             .collect::<Vec<_>>();
         let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
         assert_eq!(
-            hex::encode(epoch.encode_to_bytes()?),
+            hex::encode(epoch.encode_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITHOUT_ENTROPY
         );
         Ok(())

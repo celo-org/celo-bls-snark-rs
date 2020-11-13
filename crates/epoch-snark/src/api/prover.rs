@@ -94,11 +94,9 @@ fn generate_hash_helper(
         .iter()
         .map(|transition| {
             let block = &transition.block;
-            let (epoch_bytes, _) = block.encode_inner_to_bytes().unwrap();
+            let (epoch_bytes, _) = block.encode_inner_to_bytes_cip22().unwrap();
 
-            let crh_bytes = composite_hasher
-                .crh(&[], &epoch_bytes, 0)
-                .unwrap();
+            let crh_bytes = composite_hasher.crh(&[], &epoch_bytes, 0).unwrap();
             // The verifier should run both the crh and the xof here to generate a
             // valid statement for the verify
             bytes_le_to_bits_be(&crh_bytes, 384)

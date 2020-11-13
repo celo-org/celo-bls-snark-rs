@@ -15,8 +15,8 @@ use groth16::{Proof, VerifyingKey};
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
+    bls12_377::{Fq2Var, G1Var, G2Var, PairingVar},
     bls12_377::{G1PreparedVar, G2PreparedVar},
-    bls12_377::{G1Var, G2Var, PairingVar, Fq2Var},
     fields::fp::FpVar,
     pairing::PairingVar as _,
     prelude::*,
@@ -28,7 +28,7 @@ type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Contains the initial epoch block, followed by a list of epoch block transitions. The
 /// aggregated signature is calculated over all epoch blokc changes. Providing the hash helper
 /// will not constrain the CRH->XOF calculation.
@@ -46,7 +46,7 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub hash_helper: Option<HashToBitsHelper<E>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// The proof and verifying key which will be used to verify the CRH->XOF conversion
 pub struct HashToBitsHelper<E: PairingEngine> {
     /// The Groth16 proof satisfying the CRH->XOF conversion
@@ -96,6 +96,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
+    #[tracing::instrument(target = "r1cs")]
     fn enforce(
         &self,
         cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
@@ -151,6 +152,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     /// and generates the witness data necessary for the final BLS Sig
     /// verification and witness compression
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(target = "r1cs")]
     fn verify_intermediate_epochs(
         &self,
         first_epoch_index: FrVar,
@@ -181,7 +183,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             AllocationMode::Constant,
         )?;
 
-        // Skip entropy circuit logic if the first epoch does not 
+        // Skip entropy circuit logic if the first epoch does not
         // contain entropy. Done to support earlier versions of Celo.
         // Assumes all epochs past a single version will contain entropy
         let entropy_bit = first_epoch_entropy.is_eq_zero()?.not();
@@ -286,6 +288,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     }
 
     // Verify the aggregate signature
+    #[tracing::instrument(target = "r1cs")]
     fn verify_signature(
         &self,
         pubkeys: &[G2PreparedVar],
@@ -322,18 +325,25 @@ mod tests {
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
 
         #[test]
+        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs() {
             let mut layer = ConstraintLayer::default();
-            layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+            layer.mode = r1cs_core::TracingMode::All;
             let subscriber = tracing_subscriber::Registry::default().with(layer);
             tracing::subscriber::set_global_default(subscriber).unwrap();
 
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
+            let initial_epoch = generate_single_update::<Curve>(
+                0,
+                None,
+                None,
+                faults,
+                &initial_validator_set.1,
+                &[],
+            )
+            .epoch_data;
 
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -411,9 +421,15 @@ mod tests {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
+            let initial_epoch = generate_single_update::<Curve>(
+                0,
+                None,
+                None,
+                faults,
+                &initial_validator_set.1,
+                &[],
+            )
+            .epoch_data;
 
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -506,9 +522,15 @@ mod tests {
             let faults: u32 = 2;
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
+            let initial_epoch = generate_single_update::<Curve>(
+                0,
+                None,
+                None,
+                faults,
+                &initial_validator_set.1,
+                &[],
+            )
+            .epoch_data;
 
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
