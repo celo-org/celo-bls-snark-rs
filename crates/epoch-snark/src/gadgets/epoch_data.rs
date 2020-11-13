@@ -114,7 +114,7 @@ impl EpochData<Bls12_377> {
             parent_entropy,
             maximum_non_signers,
             pubkeys,
-        ) = self.to_bits_inner(previous_index.cs())?;
+        ) = self.to_bits(previous_index.cs())?;
         Self::enforce_next_epoch(previous_index, &index)?;
 
         // Hash to G1
@@ -136,7 +136,7 @@ impl EpochData<Bls12_377> {
 
     /// Encodes the inner epoch to bits (index and non-signers encoded as LE)
     #[tracing::instrument(target = "r1cs")]
-    pub fn to_bits_inner(
+    pub fn to_bits(
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<EpochDataToBits, SynthesisError> {
@@ -349,7 +349,7 @@ mod tests {
 
         // compare it with the one calculated in the circuit from its bytes
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let (bits, extra_data_bits, _, _, _, _, _, _) = epoch.to_bits_inner(cs.clone()).unwrap();
+        let (bits, extra_data_bits, _, _, _, _, _, _) = epoch.to_bits(cs.clone()).unwrap();
         let ret = EpochData::hash_bits_to_g1(&bits, &extra_data_bits, true).unwrap();
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
@@ -407,7 +407,7 @@ mod tests {
 
         // calculate the bits from the epoch
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let ret = epoch.to_bits_inner(cs).unwrap();
+        let ret = epoch.to_bits(cs).unwrap();
 
         // compare with the result
         let bits_inner = ret.2.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();

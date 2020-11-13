@@ -115,7 +115,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             _,
             initial_maximum_non_signers,
             initial_pubkey_vars,
-        ) = self.initial_epoch.to_bits_inner(cs)?;
+        ) = self.initial_epoch.to_bits(cs)?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification

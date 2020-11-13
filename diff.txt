@@ -1,0 +1,820 @@
+diff --git a/crates/bls-snark-sys/src/snark/epoch_block.rs b/crates/bls-snark-sys/src/snark/epoch_block.rs
+index 2a4cc49..889c143 100644
+--- a/crates/bls-snark-sys/src/snark/epoch_block.rs
++++ b/crates/bls-snark-sys/src/snark/epoch_block.rs
+@@ -14,7 +14,7 @@ use std::{
+ const PUBKEY_BYTES: usize = 96;
+ 
+ #[no_mangle]
+-pub extern "C" fn encode_inner_epoch_block_to_bytes(
++pub extern "C" fn encode_epoch_block_to_bytes_cip22(
+     in_epoch_index: c_ushort,
+     in_epoch_entropy: *const u8,
+     in_parent_entropy: *const u8,
+@@ -46,7 +46,7 @@ pub extern "C" fn encode_inner_epoch_block_to_bytes(
+             added_public_keys,
+         );
+         let (mut encoded_inner, mut encoded_extra_data) =
+-            epoch_block.encode_inner_to_bytes()?;
++            epoch_block.encode_inner_to_bytes_cip22()?;
+         encoded_inner.shrink_to_fit();
+         encoded_extra_data.shrink_to_fit();
+         unsafe {
+@@ -61,6 +61,43 @@ pub extern "C" fn encode_inner_epoch_block_to_bytes(
+     })
+ }
+ 
++#[no_mangle]
++pub extern "C" fn encode_epoch_block_to_bytes(
++    in_epoch_index: c_ushort,
++    in_maximum_non_signers: c_uint,
++    in_added_public_keys: *const *const PublicKey,
++    in_added_public_keys_len: c_int,
++    out_bytes: *mut *mut u8,
++    out_len: *mut c_int,
++) -> bool {
++    convert_result_to_bool::<_, EncodingError, _>(|| {
++        let added_public_keys_ptrs = unsafe {
++            slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
++        };
++        let added_public_keys = added_public_keys_ptrs
++            .to_vec()
++            .into_iter()
++            .map(|pk| unsafe { &*pk }.clone())
++            .collect::<Vec<PublicKey>>();
++
++        let epoch_block = EpochBlock::new(
++            in_epoch_index as u16,
++            None,
++            None,
++            in_maximum_non_signers as u32,
++            added_public_keys,
++        );
++        let mut encoded = epoch_block.encode_to_bytes()?;
++        encoded.shrink_to_fit();
++        unsafe {
++            *out_bytes = encoded.as_mut_ptr();
++            *out_len = encoded.len() as c_int;
++        }
++        std::mem::forget(encoded);
++        Ok(())
++    })
++}
++
+ /// Data structure received from consumers of the FFI interface describing
+ /// an epoch block.
+ #[repr(C)]
+diff --git a/crates/epoch-snark/src/api/prover.rs b/crates/epoch-snark/src/api/prover.rs
+index 0ac64c5..98bf59d 100644
+--- a/crates/epoch-snark/src/api/prover.rs
++++ b/crates/epoch-snark/src/api/prover.rs
+@@ -76,8 +76,10 @@ pub fn prove(
+         num_validators,
+         hash_helper,
+     };
+-    info!("BLS");
++
++    info!("proving");
+     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
++    info!("proved");
+ 
+     Ok(bls_proof)
+ }
+@@ -94,11 +96,9 @@ fn generate_hash_helper(
+         .iter()
+         .map(|transition| {
+             let block = &transition.block;
+-            let (epoch_bytes, _) = block.encode_inner_to_bytes().unwrap();
++            let (epoch_bytes, _) = block.encode_inner_to_bytes_cip22().unwrap();
+ 
+-            let crh_bytes = composite_hasher
+-                .crh(&[], &epoch_bytes, 0)
+-                .unwrap();
++            let crh_bytes = composite_hasher.crh(&[], &epoch_bytes, 0).unwrap();
+             // The verifier should run both the crh and the xof here to generate a
+             // valid statement for the verify
+             bytes_le_to_bits_be(&crh_bytes, 384)
+diff --git a/crates/epoch-snark/src/encoding.rs b/crates/epoch-snark/src/encoding.rs
+index ff41da4..2765b24 100644
+--- a/crates/epoch-snark/src/encoding.rs
++++ b/crates/epoch-snark/src/encoding.rs
+@@ -2,7 +2,7 @@ use algebra::{
+     bls12_377::{Fq, FqParameters},
+     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
+ };
+-use bls_crypto::PublicKey;
++use bls_crypto::{PublicKey, BLSError};
+ use bls_gadgets::utils::bytes_le_to_bits_be;
+ use byteorder::{LittleEndian, WriteBytesExt};
+ use thiserror::Error;
+@@ -15,6 +15,8 @@ pub enum EncodingError {
+     ZexeSerialization(#[from] SerializationError),
+     #[error("I/O Error: {0}")]
+     IoError(#[from] std::io::Error),
++    #[error("BLS Error: {0}")]
++    BLSError(#[from] BLSError),
+ }
+ 
+ /// The function assumes that the public key is not the point in infinity, which is true for
+diff --git a/crates/epoch-snark/src/epoch_block.rs b/crates/epoch-snark/src/epoch_block.rs
+index 3e92f60..78f927a 100644
+--- a/crates/epoch-snark/src/epoch_block.rs
++++ b/crates/epoch-snark/src/epoch_block.rs
+@@ -5,7 +5,7 @@ use bls_crypto::{
+     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
+     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
+ };
+-use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be};
++use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be, bytes_le_to_bits_le};
+ 
+ /// A header as parsed after being fetched from the Celo Blockchain
+ /// It contains information about the new epoch, as well as an aggregated
+@@ -64,25 +64,38 @@ impl EpochBlock {
+ 
+     /// Encodes the block to bytes and then proceeds to hash it to BLS12-377's G1
+     /// group using `SIG_DOMAIN` as a domain separator
+-    pub fn hash_to_g1(&self) -> Result<G1Projective, EncodingError> {
+-        let (input, extra_data_input) = self.encode_inner_to_bytes()?;
++    pub fn hash_to_g1_cip22(&self) -> Result<G1Projective, EncodingError> {
++        let (input, extra_data_input) = self.encode_inner_to_bytes_cip22()?;
+         let expected_hash: G1Projective =
+-            COMPOSITE_HASH_TO_G1.hash(SIG_DOMAIN, &input, &extra_data_input).unwrap();
++            COMPOSITE_HASH_TO_G1.hash_cip22(SIG_DOMAIN, &input, &extra_data_input)?;
+         Ok(expected_hash)
+     }
+ 
+     /// Encodes the block to bytes and then hashes it with Blake2
+-    pub fn blake2(&self) -> Result<Vec<bool>, EncodingError> {
+-        Ok(hash_to_bits(&self.encode_to_bytes()?))
++    pub fn blake2_cip22(&self) -> Result<Vec<bool>, EncodingError> {
++        Ok(hash_to_bits(&self.encode_to_bytes_cip22()?))
+     }
+ 
+     /// Encodes the block appended with the aggregate signature to bytes and then hashes it with Blake2
+-    pub fn blake2_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
+-        Ok(hash_to_bits(&self.encode_to_bytes_with_aggregated_pk()?))
++    pub fn blake2_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
++        Ok(hash_to_bits(
++            &self.encode_to_bytes_with_aggregated_pk_cip22()?,
++        ))
+     }
+ 
+     /// Encodes the block to LE bits
+     pub fn encode_to_bits(&self) -> Result<Vec<bool>, EncodingError> {
++        let mut epoch_bits = vec![];
++        epoch_bits.extend_from_slice(&encode_u16(self.index)?);
++        epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
++        for added_public_key in &self.new_public_keys {
++            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
++        }
++        Ok(epoch_bits)
++    }
++
++    /// Encodes the block to LE bits
++    pub fn encode_to_bits_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+         let mut epoch_bits = vec![];
+         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
+         if self.epoch_entropy.is_some() {
+@@ -110,30 +123,24 @@ impl EpochBlock {
+         Ok(epoch_bits)
+     }
+ 
++    pub fn encode_entropy_cip22(entropy: Option<&Vec<u8>>) -> Vec<bool> {
++        let entropy_bytes = match entropy {
++            Some(entropy) => entropy.clone(),
++            None => vec![0u8; Self::ENTROPY_BYTES * 8],
++        };
++        // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
++        let entropy_bits = bytes_le_to_bits_le(&entropy_bytes, Self::ENTROPY_BYTES * 8);
++        entropy_bits
++    }
++
+     /// Encodes the block to LE bits
+-    pub fn encode_inner_to_bits(&self) -> Result<(Vec<bool>, Vec<bool>), EncodingError> {
++    pub fn encode_inner_to_bits_cip22(&self) -> Result<(Vec<bool>, Vec<bool>), EncodingError> {
+         let mut epoch_bits = vec![];
+         let mut extra_data_bits = vec![];
+         extra_data_bits.extend_from_slice(&encode_u16(self.index)?);
+         extra_data_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
+-        if self.epoch_entropy.is_some() {
+-            // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
+-            let mut bits = bytes_le_to_bits_be(
+-                self.epoch_entropy.as_ref().unwrap(),
+-                Self::ENTROPY_BYTES * 8,
+-            );
+-            bits.reverse();
+-            epoch_bits.extend_from_slice(&bits);
+-        }
+-        if self.parent_entropy.is_some() {
+-            // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
+-            let mut bits = bytes_le_to_bits_be(
+-                self.parent_entropy.as_ref().unwrap(),
+-                Self::ENTROPY_BYTES * 8,
+-            );
+-            bits.reverse();
+-            epoch_bits.extend_from_slice(&bits);
+-        }
++        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
++        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
+         for added_public_key in &self.new_public_keys {
+             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+         }
+@@ -141,27 +148,37 @@ impl EpochBlock {
+     }
+ 
+     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bits
+-    pub fn encode_to_bits_with_aggregated_pk(&self) -> Result<Vec<bool>, EncodingError> {
+-        let mut epoch_bits = self.encode_to_bits()?;
++    pub fn encode_to_bits_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
++        let mut epoch_bits = self.encode_to_bits_cip22()?;
+         let aggregated_pk = PublicKey::aggregate(&self.new_public_keys);
+         epoch_bits.extend_from_slice(encode_public_key(&aggregated_pk)?.as_slice());
+         Ok(epoch_bits)
+     }
+ 
++    /// Encodes the block to LE bytes
++    pub fn encode_to_bytes_cip22(&self) -> Result<Vec<u8>, EncodingError> {
++        Ok(bits_be_to_bytes_le(&self.encode_to_bits_cip22()?))
++    }
++
+     /// Encodes the block to LE bytes
+     pub fn encode_to_bytes(&self) -> Result<Vec<u8>, EncodingError> {
+         Ok(bits_be_to_bytes_le(&self.encode_to_bits()?))
+     }
+ 
+     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
+-    pub fn encode_to_bytes_with_aggregated_pk(&self) -> Result<Vec<u8>, EncodingError> {
+-        Ok(bits_be_to_bytes_le(&self.encode_to_bits_with_aggregated_pk()?))
++    pub fn encode_to_bytes_with_aggregated_pk_cip22(&self) -> Result<Vec<u8>, EncodingError> {
++        Ok(bits_be_to_bytes_le(
++            &self.encode_to_bits_with_aggregated_pk_cip22()?,
++        ))
+     }
+ 
+     /// Encodes an inner block to LE bytes
+-    pub fn encode_inner_to_bytes(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
+-        let (inner_bits, extra_data_bits) = self.encode_inner_to_bits()?;
+-        Ok((bits_be_to_bytes_le(&inner_bits), bits_be_to_bytes_le(&extra_data_bits)))
++    pub fn encode_inner_to_bytes_cip22(&self) -> Result<(Vec<u8>, Vec<u8>), EncodingError> {
++        let (inner_bits, extra_data_bits) = self.encode_inner_to_bits_cip22()?;
++        Ok((
++            bits_be_to_bytes_le(&inner_bits),
++            bits_be_to_bytes_le(&extra_data_bits),
++        ))
+     }
+ }
+ 
+@@ -171,8 +188,8 @@ pub fn hash_first_last_epoch_block(
+     first: &EpochBlock,
+     last: &EpochBlock,
+ ) -> Result<Vec<bool>, EncodingError> {
+-    let h1 = first.blake2()?;
+-    let h2 = last.blake2_with_aggregated_pk()?;
++    let h1 = first.blake2_cip22()?;
++    let h2 = last.blake2_with_aggregated_pk_cip22()?;
+     Ok([h1, h2].concat())
+ }
+ 
+@@ -186,8 +203,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
+         .finalize()
+         .as_ref()
+         .to_vec();
+-    let mut bits = bytes_le_to_bits_be(&hash, 256);
+-    bits.reverse();
++    let bits = bytes_le_to_bits_le(&hash, 256);
+     bits
+ }
+ 
+@@ -213,7 +229,7 @@ mod tests {
+             pubkeys,
+         );
+         assert_eq!(
+-            hex::encode(epoch.encode_to_bytes()?),
++            hex::encode(epoch.encode_to_bytes_cip22()?),
+             EXPECTED_ENCODING_WITH_ENTROPY
+         );
+         Ok(())
+@@ -226,7 +242,7 @@ mod tests {
+             .collect::<Vec<_>>();
+         let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
+         assert_eq!(
+-            hex::encode(epoch.encode_to_bytes()?),
++            hex::encode(epoch.encode_to_bytes_cip22()?),
+             EXPECTED_ENCODING_WITHOUT_ENTROPY
+         );
+         Ok(())
+diff --git a/crates/epoch-snark/src/gadgets/epoch_data.rs b/crates/epoch-snark/src/gadgets/epoch_data.rs
+index 1da01cb..2027dab 100644
+--- a/crates/epoch-snark/src/gadgets/epoch_data.rs
++++ b/crates/epoch-snark/src/gadgets/epoch_data.rs
+@@ -41,8 +41,7 @@ pub struct EpochData<E: PairingEngine> {
+ }
+ 
+ /// Output type of EpochData.to_bits including bit representation and gadgets.
+-type EpochDataToBits = (Vec<Bool>, FrVar, FrVar, FrVar, FrVar, Vec<G2Var>);
+-type InnerEpochDataToBits = (
++type EpochDataToBits = (
+     Vec<Bool>,
+     Vec<Bool>,
+     Vec<Bool>,
+@@ -106,7 +105,6 @@ impl EpochData<Bls12_377> {
+         let span = span!(Level::TRACE, "EpochData");
+         let _enter = span.enter();
+ 
+-        // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
+         let (
+             bits,
+             extra_data_bits,
+@@ -136,73 +134,12 @@ impl EpochData<Bls12_377> {
+         })
+     }
+ 
+-    /// Encodes the epoch to bits (index and non-signers encoded as LE)
+-    pub fn to_bits(
+-        &self,
+-        cs: ConstraintSystemRef<Bls12_377_Fq>,
+-    ) -> Result<EpochDataToBits, SynthesisError> {
+-        let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+-        let index_bits = fr_to_bits(&index, 16)?;
+-
+-        let maximum_non_signers =
+-            FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
+-
+-        let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
+-
+-        let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
+-        let epoch_entropy = match &self.epoch_entropy {
+-            Some(v) => v,
+-            None => &empty_entropy,
+-        };
+-        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
+-        let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
+-
+-        let parent_entropy = match &self.parent_entropy {
+-            Some(v) => v,
+-            None => &empty_entropy,
+-        };
+-        let parent_entropy_var = bytes_to_fr(cs.clone(), Some(&parent_entropy))?;
+-        let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
+-
+-        let mut epoch_bits: Vec<Bool> = [
+-            index_bits,
+-            epoch_entropy_bits,
+-            parent_entropy_bits,
+-            maximum_non_signers_bits,
+-        ]
+-        .concat();
+-
+-        let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
+-        for maybe_pk in self.public_keys.iter() {
+-            let pk_var = G2Var::new_variable_omit_prime_order_check(
+-                index.cs(),
+-                || maybe_pk.get(),
+-                AllocationMode::Witness,
+-            )?;
+-
+-            // extend our epoch bits by the pubkeys
+-            let pk_bits = g2_to_bits(&pk_var)?;
+-            epoch_bits.extend_from_slice(&pk_bits);
+-
+-            // save the allocated pubkeys
+-            pubkey_vars.push(pk_var);
+-        }
+-
+-        Ok((
+-            epoch_bits,
+-            index,
+-            epoch_entropy_var,
+-            parent_entropy_var,
+-            maximum_non_signers,
+-            pubkey_vars,
+-        ))
+-    }
+-
+     /// Encodes the inner epoch to bits (index and non-signers encoded as LE)
++    #[tracing::instrument(target = "r1cs")]
+     pub fn to_bits_inner(
+         &self,
+         cs: ConstraintSystemRef<Bls12_377_Fq>,
+-    ) -> Result<InnerEpochDataToBits, SynthesisError> {
++    ) -> Result<EpochDataToBits, SynthesisError> {
+         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+         let index_bits = fr_to_bits(&index, 16)?;
+ 
+@@ -404,7 +341,7 @@ mod tests {
+             epoch.maximum_non_signers,
+             pubkeys,
+         )
+-        .encode_inner_to_bytes()
++        .encode_inner_to_bytes_cip22()
+         .unwrap();
+         let (hash, _) = COMPOSITE_HASH_TO_G1
+             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
+@@ -454,7 +391,7 @@ mod tests {
+             epoch.maximum_non_signers,
+             pubkeys.clone(),
+         )
+-        .encode_to_bits()
++        .encode_to_bits_cip22()
+         .unwrap();
+ 
+         // calculate wrong bits
+@@ -465,15 +402,15 @@ mod tests {
+             epoch.maximum_non_signers,
+             pubkeys,
+         )
+-        .encode_to_bits_with_aggregated_pk()
++        .encode_to_bits_with_aggregated_pk_cip22()
+         .unwrap();
+ 
+         // calculate the bits from the epoch
+         let cs = ConstraintSystem::<Fr>::new_ref();
+-        let ret = epoch.to_bits(cs).unwrap();
++        let ret = epoch.to_bits_inner(cs).unwrap();
+ 
+         // compare with the result
+-        let bits_inner = ret.0.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
++        let bits_inner = ret.2.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
+         assert_eq!(bits_inner, bits);
+         assert_ne!(bits_inner, bits_wrong);
+     }
+diff --git a/crates/epoch-snark/src/gadgets/epochs.rs b/crates/epoch-snark/src/gadgets/epochs.rs
+index ed9372d..941d77e 100644
+--- a/crates/epoch-snark/src/gadgets/epochs.rs
++++ b/crates/epoch-snark/src/gadgets/epochs.rs
+@@ -15,8 +15,8 @@ use groth16::{Proof, VerifyingKey};
+ use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+ use r1cs_std::{
+     alloc::AllocationMode,
++    bls12_377::{Fq2Var, G1Var, G2Var, PairingVar},
+     bls12_377::{G1PreparedVar, G2PreparedVar},
+-    bls12_377::{G1Var, G2Var, PairingVar, Fq2Var},
+     fields::fp::FpVar,
+     pairing::PairingVar as _,
+     prelude::*,
+@@ -28,7 +28,7 @@ type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
+ type FrVar = FpVar<Fr>;
+ type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
+ 
+-#[derive(Clone)]
++#[derive(Clone, Debug)]
+ /// Contains the initial epoch block, followed by a list of epoch block transitions. The
+ /// aggregated signature is calculated over all epoch blokc changes. Providing the hash helper
+ /// will not constrain the CRH->XOF calculation.
+@@ -46,7 +46,7 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
+     pub hash_helper: Option<HashToBitsHelper<E>>,
+ }
+ 
+-#[derive(Clone)]
++#[derive(Clone, Debug)]
+ /// The proof and verifying key which will be used to verify the CRH->XOF conversion
+ pub struct HashToBitsHelper<E: PairingEngine> {
+     /// The Groth16 proof satisfying the CRH->XOF conversion
+@@ -96,6 +96,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
+ }
+ 
+ impl ValidatorSetUpdate<Bls12_377> {
++    #[tracing::instrument(target = "r1cs")]
+     fn enforce(
+         &self,
+         cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
+@@ -103,17 +104,18 @@ impl ValidatorSetUpdate<Bls12_377> {
+         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
+         let _enter = span.enter();
+ 
+-        // TODO(#185): Use the entropy values here.
+         debug!("converting initial EpochData to_bits");
+         // Constrain the initial epoch and get its bits
+         let (
++            _,
++            _,
+             first_epoch_bits,
+             first_epoch_index,
+             first_epoch_entropy,
+-            _first_parent_entropy,
++            _,
+             initial_maximum_non_signers,
+             initial_pubkey_vars,
+-        ) = self.initial_epoch.to_bits(cs)?;
++        ) = self.initial_epoch.to_bits_inner(cs)?;
+ 
+         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
+         // from each one, to be used for the batch verification
+@@ -151,6 +153,7 @@ impl ValidatorSetUpdate<Bls12_377> {
+     /// and generates the witness data necessary for the final BLS Sig
+     /// verification and witness compression
+     #[allow(clippy::type_complexity)]
++    #[tracing::instrument(target = "r1cs")]
+     fn verify_intermediate_epochs(
+         &self,
+         first_epoch_index: FrVar,
+@@ -181,7 +184,7 @@ impl ValidatorSetUpdate<Bls12_377> {
+             AllocationMode::Constant,
+         )?;
+ 
+-        // Skip entropy circuit logic if the first epoch does not 
++        // Skip entropy circuit logic if the first epoch does not
+         // contain entropy. Done to support earlier versions of Celo.
+         // Assumes all epochs past a single version will contain entropy
+         let entropy_bit = first_epoch_entropy.is_eq_zero()?.not();
+@@ -286,6 +289,7 @@ impl ValidatorSetUpdate<Bls12_377> {
+     }
+ 
+     // Verify the aggregate signature
++    #[tracing::instrument(target = "r1cs")]
+     fn verify_signature(
+         &self,
+         pubkeys: &[G2PreparedVar],
+@@ -322,18 +326,25 @@ mod tests {
+         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
+ 
+         #[test]
++        #[tracing::instrument(target = "r1cs")]
+         fn test_multiple_epochs() {
+             let mut layer = ConstraintLayer::default();
+-            layer.mode = r1cs_core::TracingMode::OnlyConstraints;
++            layer.mode = r1cs_core::TracingMode::All;
+             let subscriber = tracing_subscriber::Registry::default().with(layer);
+             tracing::subscriber::set_global_default(subscriber).unwrap();
+ 
+             let faults: u32 = 2;
+             let num_validators = 3 * faults + 1;
+             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+-            let initial_epoch =
+-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
+-                    .epoch_data;
++            let initial_epoch = generate_single_update::<Curve>(
++                0,
++                None,
++                None,
++                faults,
++                &initial_validator_set.1,
++                &[],
++            )
++            .epoch_data;
+ 
+             let num_epochs = 4;
+             // no more than `faults` 0s exist in the bitmap
+@@ -406,14 +417,19 @@ mod tests {
+         }
+ 
+         #[test]
+-        #[ignore]
+         fn test_multiple_epochs_with_dummy() {
+             let faults: u32 = 2;
+             let num_validators = 3 * faults + 1;
+             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+-            let initial_epoch =
+-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
+-                    .epoch_data;
++            let initial_epoch = generate_single_update::<Curve>(
++                0,
++                None,
++                None,
++                faults,
++                &initial_validator_set.1,
++                &[],
++            )
++            .epoch_data;
+ 
+             let num_epochs = 4;
+             // no more than `faults` 0s exist in the bitmap
+@@ -501,14 +517,19 @@ mod tests {
+         }
+ 
+         #[test]
+-        #[ignore]
+         fn test_multiple_epochs_with_wrong_dummy() {
+             let faults: u32 = 2;
+             let num_validators = 3 * faults + 1;
+             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+-            let initial_epoch =
+-                generate_single_update::<Curve>(0, None, None, faults, &initial_validator_set.1, &[])
+-                    .epoch_data;
++            let initial_epoch = generate_single_update::<Curve>(
++                0,
++                None,
++                None,
++                faults,
++                &initial_validator_set.1,
++                &[],
++            )
++            .epoch_data;
+ 
+             let num_epochs = 4;
+             // no more than `faults` 0s exist in the bitmap
+diff --git a/crates/epoch-snark/src/gadgets/mod.rs b/crates/epoch-snark/src/gadgets/mod.rs
+index 2d78a25..adb9a03 100644
+--- a/crates/epoch-snark/src/gadgets/mod.rs
++++ b/crates/epoch-snark/src/gadgets/mod.rs
+@@ -56,7 +56,7 @@ pub mod test_helpers {
+             epoch.maximum_non_signers,
+             pubkeys,
+         )
+-        .encode_inner_to_bytes()
++        .encode_inner_to_bytes_cip22()
+         .unwrap();
+         let (hash, _) = COMPOSITE_HASH_TO_G1
+             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data)
+@@ -88,7 +88,7 @@ fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVa
+ /// Returns the bit representation of the Fr element in *little-endian* ordering.
+ fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
+     let input = input.to_bits_le()?;
+-    let result = input[0..length].to_vec(); 
++    let result = input[0..length].to_vec();
+     Ok(result)
+ }
+ 
+diff --git a/crates/epoch-snark/src/gadgets/single_update.rs b/crates/epoch-snark/src/gadgets/single_update.rs
+index 24adb22..d4320be 100644
+--- a/crates/epoch-snark/src/gadgets/single_update.rs
++++ b/crates/epoch-snark/src/gadgets/single_update.rs
+@@ -77,6 +77,7 @@ impl SingleUpdate<Bls12_377> {
+     /// # Panics
+     ///
+     /// - If `num_validators != self.epoch_data.public_keys.len()`
++    #[tracing::instrument(target = "r1cs")]
+     pub fn constrain(
+         &self,
+         previous_pubkeys: &[G2Var],
+@@ -100,7 +101,10 @@ impl SingleUpdate<Bls12_377> {
+         // Enforce equality with previous epoch's entropy if current
+         // epoch is not a dummy block and entropy was present in the
+         // first epoch
+-        previous_epoch_index.conditional_enforce_equal(&epoch_data.parent_entropy, &index_bit.and(&constrain_entropy_bit)?);
++        previous_epoch_randomness.conditional_enforce_equal(
++            &epoch_data.parent_entropy,
++            &index_bit.and(&constrain_entropy_bit)?,
++        )?;
+ 
+         // convert the bitmap to constraints
+         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
+@@ -182,19 +186,17 @@ pub mod test_helpers {
+ #[cfg(test)]
+ mod tests {
+     use super::{test_helpers::generate_single_update, *};
+-    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+     use crate::gadgets::bytes_to_fr;
++    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+ 
+     use algebra::{BigInteger, PrimeField, UniformRand};
+-    use r1cs_core::{ConstraintLayer, ConstraintSystem, ConstraintSystemRef};
++    use bls_gadgets::utils::bytes_le_to_bits_le;
++    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
+     use r1cs_std::{
+         alloc::{AllocVar, AllocationMode},
+         bls12_377::G2Var,
+         groups::CurveVar,
+-        fields::FieldVar,
+     };
+-    use tracing_subscriber::layer::SubscriberExt;
+-    use bls_gadgets::utils::bytes_le_to_bits_le;
+ 
+     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
+         let rng = &mut rand::thread_rng();
+@@ -207,14 +209,17 @@ mod tests {
+     fn test_enough_pubkeys_for_update() {
+         let cs = ConstraintSystem::<Fr>::new_ref();
+ 
+-        let mut layer = ConstraintLayer::default();
+-        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+-        let subscriber = tracing_subscriber::Registry::default().with(layer);
+-        tracing::subscriber::set_global_default(subscriber).unwrap();
+-
+-//        let entropy = Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]);
+-
+-        single_update_enforce(cs.clone(), 5, 5, 1, None, 2, 1, &[true, true, true, true, false]);
++        single_update_enforce(
++            cs.clone(),
++            5,
++            5,
++            1,
++            None,
++            2,
++            1,
++            &[true, true, true, true, false],
++        )
++        .unwrap();
+ 
+         print_unsatisfied_constraints(cs.clone());
+         assert!(cs.is_satisfied().unwrap());
+@@ -224,7 +229,17 @@ mod tests {
+     fn not_enough_pubkeys_for_update() {
+         let cs = ConstraintSystem::<Fr>::new_ref();
+         // 2 false in the bitmap when only 1 allowed
+-        single_update_enforce(cs.clone(), 5, 5, 4, None, 5, 1, &[true, true, false, true, false]);
++        single_update_enforce(
++            cs.clone(),
++            5,
++            5,
++            4,
++            None,
++            5,
++            1,
++            &[true, true, false, true, false],
++        )
++        .unwrap();
+ 
+         print_unsatisfied_constraints(cs.clone());
+         assert!(!cs.is_satisfied().unwrap());
+@@ -234,7 +249,7 @@ mod tests {
+     #[should_panic]
+     fn validator_number_cannot_change() {
+         let cs = ConstraintSystem::<Fr>::new_ref();
+-        single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]);
++        single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]).unwrap();
+     }
+ 
+     fn single_update_enforce(
+@@ -246,7 +261,7 @@ mod tests {
+         index: u16,
+         maximum_non_signers: u32,
+         bitmap: &[bool],
+-    ) -> ConstrainedEpoch {
++    ) -> Result<ConstrainedEpoch, SynthesisError> {
+         // convert to constraints
+         let prev_validators = pubkeys::<Bls12_377>(n_validators);
+         let prev_validators = prev_validators
+@@ -257,23 +272,23 @@ mod tests {
+                     || Ok(*element),
+                     AllocationMode::Witness,
+                 )
+-                .unwrap()
+             })
+-            .collect::<Vec<_>>();
+-        let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index))).unwrap();
++            .collect::<Result<Vec<_>, _>>()?;
++        let prev_index = FrVar::new_witness(cs.clone(), || Ok(Fr::from(prev_index)))?;
+         let prev_max_non_signers =
+-            FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers))).unwrap();
++            FrVar::new_witness(cs.clone(), || Ok(Fr::from(maximum_non_signers)))?;
+ 
+-        let prev_randomness_var = match prev_randomness {
+-            Some(ref v) => { 
+-                let mut bits = bytes_le_to_bits_le(
+-                    &prev_randomness.clone().unwrap(),
+-                    EpochData::<Bls12_377>::ENTROPY_BYTES * 8,
+-                );
++        let prev_randomness_var = match prev_randomness.as_ref() {
++            Some(v) => {
++                let bits =
++                    bytes_le_to_bits_le(&v.clone(), EpochData::<Bls12_377>::ENTROPY_BYTES * 8);
+                 let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
+-                FrVar::new_witness(cs, || Ok(Fr::from(bigint))).unwrap()
+-            },
+-            None => bytes_to_fr(cs, Some(&vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES][..])).unwrap(),
++                FrVar::new_witness(cs, || Ok(Fr::from(bigint)))?
++            }
++            None => bytes_to_fr(
++                cs,
++                Some(&vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES][..]),
++            )?,
+         };
+ 
+         // generate the update via the helper
+@@ -287,16 +302,14 @@ mod tests {
+         );
+ 
+         // enforce
+-        next_epoch
+-            .constrain(
+-                &prev_validators,
+-                &prev_index,
+-                &prev_randomness_var,
+-                &prev_max_non_signers,
+-                &Bool::FALSE,
+-                prev_n_validators as u32,
+-                false,
+-            )
+-            .unwrap()
++        Ok(next_epoch.constrain(
++            &prev_validators,
++            &prev_index,
++            &prev_randomness_var,
++            &prev_max_non_signers,
++            &Bool::FALSE,
++            prev_n_validators as u32,
++            false,
++        )?)
+     }
+ }
+diff --git a/crates/epoch-snark/tests/fixtures.rs b/crates/epoch-snark/tests/fixtures.rs
+index a33d7e4..7350b57 100644
+--- a/crates/epoch-snark/tests/fixtures.rs
++++ b/crates/epoch-snark/tests/fixtures.rs
+@@ -47,12 +47,12 @@ pub fn generate_test_data(
+     for (i, signers_epoch) in signers.iter().enumerate() {
+         let block: EpochBlock = generate_block(
+             i + 1,
+-            &[3u8; EpochBlock::ENTROPY_BYTES],
+-            &[4u8; EpochBlock::ENTROPY_BYTES],
++            &[(i+2) as u8; EpochBlock::ENTROPY_BYTES],
++            &[(i+1) as u8; EpochBlock::ENTROPY_BYTES],
+             faults,
+             &pubkeys[i],
+         );
+-        let hash = block.hash_to_g1().unwrap();
++        let hash = block.hash_to_g1_cip22().unwrap();
+ 
+         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
+         let bitmap_epoch = &bitmaps[i];
