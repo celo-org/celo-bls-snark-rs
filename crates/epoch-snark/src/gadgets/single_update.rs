@@ -188,6 +188,7 @@ pub mod test_helpers {
 mod tests {
     use super::{test_helpers::generate_single_update, *};
     use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::gadgets::bytes_to_fr;
 
     use algebra::{BigInteger, PrimeField, UniformRand};
     use r1cs_core::{ConstraintLayer, ConstraintSystem, ConstraintSystemRef};
@@ -277,13 +278,13 @@ mod tests {
                 let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
                 FrVar::new_witness(cs, || Ok(Fr::from(bigint))).unwrap()
             },
-            None => FrVar::zero(),
+            None => bytes_to_fr(cs, Some(&vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES][..])).unwrap(),
         };
 
         // generate the update via the helper
         let next_epoch = generate_single_update(
             index,
-            Some(vec![0u8; 8 * EpochData::<Bls12_377>::ENTROPY_BYTES]),
+            Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
             prev_randomness,
             maximum_non_signers,
             &pubkeys::<Bls12_377>(n_validators),

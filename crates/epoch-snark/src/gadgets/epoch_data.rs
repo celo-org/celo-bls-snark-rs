@@ -153,17 +153,20 @@ impl EpochData<Bls12_377> {
 
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
 
+        let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
         let epoch_entropy = match &self.epoch_entropy {
-            Some(v) => bytes_to_fr(cs.clone(), Some(&v[..]))?,
-            None => FrVar::zero(), // allocate dummy value
+            Some(v) => v,
+            None => &empty_entropy,
         };
-        let epoch_entropy_bits = fr_to_bits(&epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
+        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
+        let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
 
         let parent_entropy = match &self.parent_entropy {
-            Some(v) => bytes_to_fr(cs.clone(), Some(&v[..]))?,
-            None => FrVar::zero(), // allocate dummy value
+            Some(v) => v,
+            None => &empty_entropy,
         };
-        let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
+        let parent_entropy_var = bytes_to_fr(cs.clone(), Some(&parent_entropy))?;
+        let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Bool> = [
             index_bits,
@@ -192,8 +195,8 @@ impl EpochData<Bls12_377> {
         Ok((
             epoch_bits,
             index,
-            epoch_entropy,
-            parent_entropy,
+            epoch_entropy_var,
+            parent_entropy_var,
             maximum_non_signers,
             pubkey_vars,
         ))
@@ -214,22 +217,20 @@ impl EpochData<Bls12_377> {
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
         println!("A1");
 
-        println!("epoch entropy: {:?}", &self.epoch_entropy);
+        let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
         let epoch_entropy = match &self.epoch_entropy {
-            Some(v) => bytes_to_fr(cs.clone(), Some(&v))?,
-            None => FrVar::zero(),
-        }; 
-        println!("A2");
-        let epoch_entropy_bits = fr_to_bits(&epoch_entropy, 8 * Self::ENTROPY_BYTES)?;
-        println!("A3");
-        println!("parent entropy: {:?}", &self.parent_entropy);
-        let parent_entropy = match &self.parent_entropy {
-            Some(v) => bytes_to_fr(cs, Some(&v))?,
-            None => FrVar::zero(),
+            Some(v) => v,
+            None => &empty_entropy,
         };
-        println!("A4");
-        let parent_entropy_bits = fr_to_bits(&parent_entropy, 8 * Self::ENTROPY_BYTES)?;
-        println!("B");
+        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
+        let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
+
+        let parent_entropy = match &self.parent_entropy {
+            Some(v) => v,
+            None => &empty_entropy,
+        };
+        let parent_entropy_var = bytes_to_fr(cs.clone(), Some(&parent_entropy))?;
+        let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Bool> =
             [epoch_entropy_bits.clone(), parent_entropy_bits.clone()].concat();
@@ -267,8 +268,8 @@ impl EpochData<Bls12_377> {
             extra_data_bits,
             combined_bits,
             index,
-            epoch_entropy,
-            parent_entropy,
+            epoch_entropy_var,
+            parent_entropy_var,
             maximum_non_signers,
             pubkey_vars,
         ))
