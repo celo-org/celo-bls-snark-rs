@@ -105,7 +105,6 @@ impl EpochData<Bls12_377> {
     ) -> Result<ConstrainedEpochData, SynthesisError> {
         let span = span!(Level::TRACE, "EpochData");
         let _enter = span.enter();
-        println!("c");
 
         // TODO(#185): Add a constraint that the parent_entropy match the previous epoch's entropy.
         let (
@@ -118,10 +117,7 @@ impl EpochData<Bls12_377> {
             maximum_non_signers,
             pubkeys,
         ) = self.to_bits_inner(previous_index.cs())?;
-        println!("b");
         Self::enforce_next_epoch(previous_index, &index)?;
-
-        println!("a");
 
         // Hash to G1
         let (message_hash, crh_bits, xof_bits) =
@@ -145,11 +141,8 @@ impl EpochData<Bls12_377> {
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<EpochDataToBits, SynthesisError> {
-        println!("Z");
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
-        println!("X");
         let index_bits = fr_to_bits(&index, 16)?;
-        println!("Y");
 
         let maximum_non_signers =
             FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
@@ -211,16 +204,12 @@ impl EpochData<Bls12_377> {
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<InnerEpochDataToBits, SynthesisError> {
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
-        println!("before");
         let index_bits = fr_to_bits(&index, 16)?;
-        println!("after");
 
         let maximum_non_signers =
             FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
-        println!("A");
 
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
-        println!("A1");
 
         let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
         let epoch_entropy = match &self.epoch_entropy {

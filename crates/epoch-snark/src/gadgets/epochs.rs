@@ -86,13 +86,9 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
         info!("generating constraints");
-        println!("0");
         let epoch_bits = self.enforce(cs)?;
-        println!("1");
         let x = epoch_bits.first_epoch_bits[0].cs();
-        println!("2");
         epoch_bits.verify(self.hash_helper, x)?;
-        println!("3");
         info!("constraints generated");
 
         Ok(())
@@ -110,7 +106,6 @@ impl ValidatorSetUpdate<Bls12_377> {
         // TODO(#185): Use the entropy values here.
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
-        println!("Z");
         let (
             first_epoch_bits,
             first_epoch_index,
@@ -175,7 +170,6 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "verify_intermediate_epochs");
         let _enter = span.enter();
 
-        println!("A");
         let dummy_pk = G2Var::new_variable_omit_prime_order_check(
             first_epoch_index.cs(),
             || Ok(G2Projective::prime_subgroup_generator()),
@@ -187,7 +181,6 @@ impl ValidatorSetUpdate<Bls12_377> {
             AllocationMode::Constant,
         )?;
 
-        println!("B");
         // Skip entropy circuit logic if the first epoch does not 
         // contain entropy. Done to support earlier versions of Celo.
         // Assumes all epochs past a single version will contain entropy
