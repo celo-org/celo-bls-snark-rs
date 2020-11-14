@@ -129,8 +129,7 @@ impl EpochBlock {
             None => vec![0u8; Self::ENTROPY_BYTES * 8],
         };
         // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-        let entropy_bits = bytes_le_to_bits_le(&entropy_bytes, Self::ENTROPY_BYTES * 8);
-        entropy_bits
+        bytes_le_to_bits_le(&entropy_bytes, Self::ENTROPY_BYTES * 8)
     }
 
     /// Encodes the block to LE bits
@@ -203,8 +202,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
         .finalize()
         .as_ref()
         .to_vec();
-    let bits = bytes_le_to_bits_le(&hash, 256);
-    bits
+    bytes_le_to_bits_le(&hash, 256)
 }
 
 #[cfg(test)]

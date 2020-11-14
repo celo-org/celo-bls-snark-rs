@@ -78,6 +78,7 @@ impl SingleUpdate<Bls12_377> {
     ///
     /// - If `num_validators != self.epoch_data.public_keys.len()`
     #[tracing::instrument(target = "r1cs")]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn constrain(
         &self,
         previous_pubkeys: &[G2Var],
@@ -151,8 +152,8 @@ pub mod test_helpers {
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
-            epoch_entropy: epoch_entropy,
-            parent_entropy: parent_entropy,
+            epoch_entropy,
+            parent_entropy,
             maximum_non_signers,
             public_keys: to_option_iter(public_keys),
         };
@@ -252,6 +253,7 @@ mod tests {
         single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]).unwrap();
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     fn single_update_enforce(
         cs: ConstraintSystemRef<Fr>,
         prev_n_validators: usize,

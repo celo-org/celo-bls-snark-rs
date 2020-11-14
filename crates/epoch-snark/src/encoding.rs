@@ -2,7 +2,7 @@ use algebra::{
     bls12_377::{Fq, FqParameters},
     FpParameters, PrimeField, ProjectiveCurve, ToBytes,
 };
-use bls_crypto::{PublicKey, BLSError};
+use bls_crypto::{BLSError, PublicKey};
 use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;

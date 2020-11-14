@@ -76,7 +76,7 @@ mod tests {
     use super::*;
     use crate::gadgets::pack;
     use bls_crypto::hashers::{DirectHasher, Hasher};
-    use bls_gadgets::utils::{bytes_le_to_bits_le, bits_le_to_bytes_le};
+    use bls_gadgets::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
 
     use algebra::{bw6_761::FrParameters as BW6_761FrParameters, Bls12_377};
     use groth16::{

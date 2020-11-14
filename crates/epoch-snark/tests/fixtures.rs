@@ -47,8 +47,8 @@ pub fn generate_test_data(
     for (i, signers_epoch) in signers.iter().enumerate() {
         let block: EpochBlock = generate_block(
             i + 1,
-            &[(i+2) as u8; EpochBlock::ENTROPY_BYTES],
-            &[(i+1) as u8; EpochBlock::ENTROPY_BYTES],
+            &[(i + 2) as u8; EpochBlock::ENTROPY_BYTES],
+            &[(i + 1) as u8; EpochBlock::ENTROPY_BYTES],
             faults,
             &pubkeys[i],
         );

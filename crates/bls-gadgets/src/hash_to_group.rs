@@ -386,7 +386,10 @@ mod test {
 
         let hash =
             HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
-                counter, &input, &extra_input, true,
+                counter,
+                &input,
+                &extra_input,
+                true,
             )
             .unwrap()
             .0;

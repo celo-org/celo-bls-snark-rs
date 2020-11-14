@@ -326,8 +326,15 @@ mod tests {
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
 
         #[tracing::instrument(target = "r1cs")]
-        fn test_epochs(faults: u32, num_epochs: usize, initial_entropy: Entropy, entropy: Vec<(Entropy, Entropy)>, bitmaps: Vec<Vec<bool>>, include_dummy_epochs: bool) -> bool {
-            let num_validators = 3*faults + 1;
+        fn test_epochs(
+            faults: u32,
+            num_epochs: usize,
+            initial_entropy: Entropy,
+            entropy: Vec<(Entropy, Entropy)>,
+            bitmaps: Vec<Vec<bool>>,
+            include_dummy_epochs: bool,
+        ) -> bool {
+            let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
             let initial_epoch = generate_single_update::<Curve>(
                 0,
@@ -347,16 +354,18 @@ mod tests {
                 .iter()
                 .zip(entropy)
                 .enumerate()
-                .map(|(epoch_index, (epoch_validators, (parent_entropy, entropy) ))| {
-                    generate_single_update::<Curve>(
-                        epoch_index as u16 + 1,
-                        entropy,
-                        parent_entropy,
-                        faults,
-                        epoch_validators,
-                        &bitmaps[epoch_index],
-                    )
-                })
+                .map(
+                    |(epoch_index, (epoch_validators, (parent_entropy, entropy)))| {
+                        generate_single_update::<Curve>(
+                            epoch_index as u16 + 1,
+                            entropy,
+                            parent_entropy,
+                            faults,
+                            epoch_validators,
+                            &bitmaps[epoch_index],
+                        )
+                    },
+                )
                 .collect::<Vec<_>>();
 
             // The i-th validator set, signs on the i+1th epoch's G1 hash
@@ -433,10 +442,17 @@ mod tests {
                 vec![true, true, true, true, true, true, true],
             ];
             let initial_entropy = None;
-            let entropy = vec![(None, None), (None, None), (None, None), (None, None)]; 
+            let entropy = vec![(None, None), (None, None), (None, None), (None, None)];
             let include_dummy_epochs = false;
 
-            assert!(test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
@@ -453,10 +469,17 @@ mod tests {
                 vec![true, true, true, true, true, true, true],
             ];
             let initial_entropy = None;
-            let entropy = vec![(None, None), (None, None), (None, None), (None, None)]; 
+            let entropy = vec![(None, None), (None, None), (None, None), (None, None)];
             let include_dummy_epochs = true;
 
-            assert!(test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
@@ -474,14 +497,33 @@ mod tests {
             ];
             let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
             let entropy = vec![
-                (Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]))
-            ]; 
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
             let include_dummy_epochs = false;
 
-            assert!(test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
@@ -499,15 +541,34 @@ mod tests {
             ];
             let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
             let entropy = vec![
-                (Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES])), 
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
                 // parent entropy does not match previous entropy
-                (Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]))
-            ]; 
+                (
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
             let include_dummy_epochs = false;
 
-            assert!(!test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(!test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
@@ -525,17 +586,36 @@ mod tests {
             ];
             let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
             let entropy = vec![
-                (Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES])), 
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
                 // parent entropy does not match previous entropy
-                (Some(vec![6u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]))
-            ]; 
+                (
+                    Some(vec![6u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
             // dummy blocks inserted just before the last epoch
             // epoch blocks should verify as if the dummy blocks were not there
             let include_dummy_epochs = true;
 
-            assert!(!test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(!test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
@@ -554,15 +634,34 @@ mod tests {
             // all entropy should be ignored
             let initial_entropy = None;
             let entropy = vec![
-                (Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES])), 
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
                 // parent entropy does not match previous entropy
-                (Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES])), 
-                (Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]), Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]))
-            ]; 
+                (
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
             let include_dummy_epochs = false;
 
-            assert!(test_epochs(num_faults, num_epochs, initial_entropy, entropy, bitmaps, include_dummy_epochs));
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
     }
 }

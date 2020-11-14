@@ -45,7 +45,10 @@ pub fn bytes_le_to_bits_be(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 }
 
 pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
-    bytes_le_to_bits_be(bytes, bits_to_take).into_iter().rev().collect()
+    bytes_le_to_bits_be(bytes, bits_to_take)
+        .into_iter()
+        .rev()
+        .collect()
 }
 
 #[cfg(any(test, feature = "test-helpers"))]

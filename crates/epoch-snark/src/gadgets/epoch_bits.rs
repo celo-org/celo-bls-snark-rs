@@ -147,7 +147,7 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 mod tests {
     use super::*;
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
-    use bls_gadgets::utils::{test_helpers::print_unsatisfied_constraints, bytes_le_to_bits_be};
+    use bls_gadgets::utils::{bytes_le_to_bits_be, test_helpers::print_unsatisfied_constraints};
 
     use r1cs_core::ConstraintSystem;
     use rand::RngCore;
