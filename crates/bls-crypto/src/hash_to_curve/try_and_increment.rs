@@ -288,6 +288,23 @@ mod test {
             assert_eq!(expected_hash, bytes);
         }
     }
+
+    pub fn test_hash_to_group_cip22<
+        P: SWModelParameters,
+        H: HashToCurve<Output = GroupProjective<P>>,
+    >(
+        hasher: &H,
+        rng: &mut impl Rng,
+        expected_hashes: Vec<Vec<u8>>,
+    ) {
+        for expected_hash in expected_hashes.into_iter() {
+            let (domain, msg, extra_data) = generate_test_data(rng);
+            let g = hasher.hash_cip22(&domain, &msg, &extra_data).unwrap();
+            let mut bytes = vec![];
+            g.into_affine().serialize(&mut bytes).unwrap();
+            assert_eq!(expected_hash, bytes);
+        }
+    }
 }
 
 #[cfg(all(test, feature = "compat"))]
@@ -424,6 +441,53 @@ mod compat_tests {
             &*COMPOSITE_HASHER,
         );
         super::test::test_hash_to_group(&hasher, &mut rng, expected_hashes)
+    }
+
+    /// Tests against hashes that were generated from commit 67aa80c1ce5ac5a4e2fe3377ba8b869e982a4f96,
+    /// the version deployed before the Donut hardfork.
+    #[test]
+    fn test_hash_to_curve_g1_test_vectors() {
+        let mut rng = XorShiftRng::from_seed(RNG_SEED);
+        let expected_hashes = vec![
+            "a7e17c99126acf78536e64fffe88e1032d834b483584fe5757b1deafa493c97a132572c7825ca4f617f6bcef93b93980",
+            "21e328cfedb263f8c815131cc42f0357ab0ba903d855a11de6e7bcd7e61375a818d1b093bcf9fce224536714efad5c00",
+            "fcc8bc80a528b32762ad3b3f72d40b069083b833ad4b6e135040414e2634657e1cf1ec070235ba1425f350df8c585d01",
+            "9b99c3cee5f7c486f962b1391b4108cd464b05bc24b2e488e9aa04f848467315ed70d83d3abfa63150564ad0c549c400",
+            "9df1b6ba0e8d2a42866d78a90b5fdf56cea80b2ec588774ceb7cc4f414d7b49ca55f81169535a4c3a4c7c39148af3e01",
+            "f365f54ba587b863d5d5ecef6a2932f4eb225c0cd2c4e727c3fa5b1a30fbcfa8e2a2e0d7a68476ee10d90b3b8846b480",
+            "1cb6008bca08b85df6f9a87ca141533145ed88abb0bbace96f4b1ca42d15ba888d4948c21548207a0abd22d5c234d180",
+            "1c529f631ddaffde7cbe62bbb8d48cc8dbe59b8548dc69b156d0568c7aae898d8051a3ef31ad17c60a85ad82203a9b81",
+            "de54da7a8813a30c267d662d428e28520a159b51a9e226ceb663d460d9065b66a9586cb8b3a9ba0ef0e27c626f20dc80",
+            "b68e1db4b648801676a79ac199eaf003757bf2a96cdbb804bfefe0484afdc0cc299d50d660221d1de374e92c44291280",
+        ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
+
+        let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(
+            &*COMPOSITE_HASHER,
+        );
+        super::test::test_hash_to_group(&hasher, &mut rng, expected_hashes)
+    }
+
+    /// Tests expected hashes after the Donut hardfork.
+    #[test]
+    fn test_hash_to_curve_g1_test_vectors_cip22() {
+        let mut rng = XorShiftRng::from_seed(RNG_SEED);
+        let expected_hashes = vec![
+            "c24b44bf3aef0949a25f614a89fd20e457b89e4c5d63923b7a63748443275ad47210e7fb8eff38d5582e7d301ee1d400",
+            "30caf0778a1d5a30f53c42cc58bbf0b0b9ec0c969e01d805b47f0d556025dbd395af2a506cc6fda3c41e361290c76d01",
+            "d9a4b28b8159977581a16ccfa69d1e93b220ccfeafa90a391cbc93c5beedd89953a8df8dcd99be80620fba1b5a191281",
+            "e9a2f008d68a446bed6580a7fea89fcce8a9d71d4e876b9929f3813e46f2000f2dc2b26a52c538198469a920cff15201",
+            "3d5c112c90df69a5034eaa1dafb067b2091f5f2696206b91cdcf36158497c7bd53e8adae87fff795307497d45dfa9900",
+            "c3e18aa19af6c99621b6954e08f786708427a1c87beca919775ae25e5da4599050a95ef12ef74b1f0b6ea512503c6800",
+            "241d9d821c503e48bfc2c93a5b59567f235a173a8c3648cb79292993c955c4eee02cba05dd5007b2400c9c251b64fb00",
+            "ab7a89228341fce8deb3d86ff0bb9611b1baf2a1d9d0b64710f42cfe6a7c4f789a36308c3fb70e41630396a2c7aa2601",
+            "161e32f9621de279b2e3572d5e07c17c33f5e9bf7a532a382e16c2a323a624799f2b187212d12d8eb5fb3032695f0480",
+            "acbb3071d0899488ba69ce1592f49c20dada7598690f8393cca80d4abeca0dc6dec112c70228328d68f8f34d3795d100",
+        ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
+
+        let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(
+            &*COMPOSITE_HASHER,
+        );
+        super::test::test_hash_to_group_cip22(&hasher, &mut rng, expected_hashes)
     }
 }
 
