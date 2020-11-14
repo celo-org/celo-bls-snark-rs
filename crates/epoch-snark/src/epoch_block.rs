@@ -5,7 +5,7 @@ use bls_crypto::{
     hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
-use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_be, bytes_le_to_bits_le};
+use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_le};
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -98,24 +98,8 @@ impl EpochBlock {
     pub fn encode_to_bits_cip22(&self) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
-        if self.epoch_entropy.is_some() {
-            // Add the bits of the epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_le_to_bits_be(
-                self.epoch_entropy.as_ref().unwrap(),
-                Self::ENTROPY_BYTES * 8,
-            );
-            bits.reverse();
-            epoch_bits.extend_from_slice(&bits);
-        }
-        if self.parent_entropy.is_some() {
-            // Add the bits of the parent epoch entropy, interpreted as a little-endian number, in little-endian ordering.
-            let mut bits = bytes_le_to_bits_be(
-                self.parent_entropy.as_ref().unwrap(),
-                Self::ENTROPY_BYTES * 8,
-            );
-            bits.reverse();
-            epoch_bits.extend_from_slice(&bits);
-        }
+        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
+        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
@@ -211,8 +195,8 @@ mod tests {
     use algebra::{bls12_377, ProjectiveCurve};
 
     static EXPECTED_ENCODING_WITH_ENTROPY: &str = "fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790707fb550377dff3559f3b7fb5fc24c7c2eefe4cc03671f91f365e72833f7bb93a96aa0d8d8282d6eb8182080732030759651007c8fe4e374025453bb529f88719b6bdb57f501a57e31503e2071f065c5011d84a3a23096c8fe85c771be8084fbab85bae9fbafc99abfddff1266e2737927671e38fb889c2f3b4799b9df9d4c5503c5c6466971c3c500019c0381a9b38c02e07b241fa713a09ada95fa448cdb5cdbbeaa0f28f58b81f20189832f2b0ee8201c1585b144f62f3c8ef30524dc5f2dd44ddf7f4dd6fcedfe9730139fcb3b39f3c0d947e47cd939caccfdee64aa1a2836364a8b1b2e0608e01c084c9d651400df23f9389d00d5d4aed42762dce6daf6557d40a95f0c940f481c7c59714007e1a8288c25b27fe1719c2f20e1fe6aa16efafe6bb2e66ff7bf8499f85cdec99907ce3e22e7cbce5166ee772753d540b1b1515adc70314000e74060ea2ca300f81ec9c7e904a8a676a53e11e336d7b6afea034afd62a07c40e2e0cb8a033a084745612c91fd0b8fe37c0109f7570b75d3f75f93357fbbff25ccc4e7f24ece3c70f611395f768e3273bf3b99aa068a8d8dd2e2868b010238070253671905c0f7483e4e274035b52bf58918b7b9b67d551f50ea1703e50312075f561cd041382a0a6389ec5f781ce70b48b8bf5aa89bbeff9aacf9dbfd2f61263e977772e681b38fc8f9b2739499fbddc95435506c6c9416375c0c10c03910983acb2800be47f2713a01aaa95da94fc4b8cdb5edabfa8052bf18281f9038f8b2e2800ec25151184b64ffc2e3385f40c2fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce179030000000f0dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfffffffffffffffffffffffffffffff3f8007";
-
-    static EXPECTED_ENCODING_WITHOUT_ENTROPY: &str = "fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790707fb550377dff3559f3b7fb5fc24c7c2eefe4cc03671f91f365e72833f7bb93a96aa0d8d8282d6eb8182080732030759651007c8fe4e374025453bb529f88719b6bdb57f501a57e31503e2071f065c5011d84a3a23096c8fe85c771be8084fbab85bae9fbafc99abfddff1266e2737927671e38fb889c2f3b4799b9df9d4c5503c5c6466971c3c500019c0381a9b38c02e07b241fa713a09ada95fa448cdb5cdbbeaa0f28f58b81f20189832f2b0ee8201c1585b144f62f3c8ef30524dc5f2dd44ddf7f4dd6fcedfe9730139fcb3b39f3c0d947e47cd939caccfdee64aa1a2836364a8b1b2e0608e01c084c9d651400df23f9389d00d5d4aed42762dce6daf6557d40a95f0c940f481c7c59714007e1a8288c25b27fe1719c2f20e1fe6aa16efafe6bb2e66ff7bf8499f85cdec99907ce3e22e7cbce5166ee772753d540b1b1515adc70314000e74060ea2ca300f81ec9c7e904a8a676a53e11e336d7b6afea034afd62a07c40e2e0cb8a033a084745612c91fd0b8fe37c0109f7570b75d3f75f93357fbbff25ccc4e7f24ece3c70f611395f768e3273bf3b99aa068a8d8dd2e2868b010238070253671905c0f7483e4e274035b52bf58918b7b9b67d551f50ea1703e50312075f561cd041382a0a6389ec5f781ce70b48b8bf5aa89bbeff9aacf9dbfd2f61263e977772e681b38fc8f9b2739499fbddc95435506c6c9416375c0c10c03910983acb2800be47f2713a01aaa95da94fc4b8cdb5edabfa8052bf18281f9038f8b2e2800ec25151184b64ffc2e3385f40c2fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce179030000000308007";
+    static EXPECTED_ENCODING_WITHOUT_ENTROPY: &str = "fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790707fb550377dff3559f3b7fb5fc24c7c2eefe4cc03671f91f365e72833f7bb93a96aa0d8d8282d6eb8182080732030759651007c8fe4e374025453bb529f88719b6bdb57f501a57e31503e2071f065c5011d84a3a23096c8fe85c771be8084fbab85bae9fbafc99abfddff1266e2737927671e38fb889c2f3b4799b9df9d4c5503c5c6466971c3c500019c0381a9b38c02e07b241fa713a09ada95fa448cdb5cdbbeaa0f28f58b81f20189832f2b0ee8201c1585b144f62f3c8ef30524dc5f2dd44ddf7f4dd6fcedfe9730139fcb3b39f3c0d947e47cd939caccfdee64aa1a2836364a8b1b2e0608e01c084c9d651400df23f9389d00d5d4aed42762dce6daf6557d40a95f0c940f481c7c59714007e1a8288c25b27fe1719c2f20e1fe6aa16efafe6bb2e66ff7bf8499f85cdec99907ce3e22e7cbce5166ee772753d540b1b1515adc70314000e74060ea2ca300f81ec9c7e904a8a676a53e11e336d7b6afea034afd62a07c40e2e0cb8a033a084745612c91fd0b8fe37c0109f7570b75d3f75f93357fbbff25ccc4e7f24ece3c70f611395f768e3273bf3b99aa068a8d8dd2e2868b010238070253671905c0f7483e4e274035b52bf58918b7b9b67d551f50ea1703e50312075f561cd041382a0a6389ec5f781ce70b48b8bf5aa89bbeff9aacf9dbfd2f61263e977772e681b38fc8f9b2739499fbddc95435506c6c9416375c0c10c03910983acb2800be47f2713a01aaa95da94fc4b8cdb5edabfa8052bf18281f9038f8b2e2800ec25151184b64ffc2e3385f40c2fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790300000003000000000000000000000000000000000000000000000000000000000000000008007";
+    static EXPECTED_ENCODING_BEFORE_DONUT: &str = "fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce1790707fb550377dff3559f3b7fb5fc24c7c2eefe4cc03671f91f365e72833f7bb93a96aa0d8d8282d6eb8182080732030759651007c8fe4e374025453bb529f88719b6bdb57f501a57e31503e2071f065c5011d84a3a23096c8fe85c771be8084fbab85bae9fbafc99abfddff1266e2737927671e38fb889c2f3b4799b9df9d4c5503c5c6466971c3c500019c0381a9b38c02e07b241fa713a09ada95fa448cdb5cdbbeaa0f28f58b81f20189832f2b0ee8201c1585b144f62f3c8ef30524dc5f2dd44ddf7f4dd6fcedfe9730139fcb3b39f3c0d947e47cd939caccfdee64aa1a2836364a8b1b2e0608e01c084c9d651400df23f9389d00d5d4aed42762dce6daf6557d40a95f0c940f481c7c59714007e1a8288c25b27fe1719c2f20e1fe6aa16efafe6bb2e66ff7bf8499f85cdec99907ce3e22e7cbce5166ee772753d540b1b1515adc70314000e74060ea2ca300f81ec9c7e904a8a676a53e11e336d7b6afea034afd62a07c40e2e0cb8a033a084745612c91fd0b8fe37c0109f7570b75d3f75f93357fbbff25ccc4e7f24ece3c70f611395f768e3273bf3b99aa068a8d8dd2e2868b010238070253671905c0f7483e4e274035b52bf58918b7b9b67d551f50ea1703e50312075f561cd041382a0a6389ec5f781ce70b48b8bf5aa89bbeff9aacf9dbfd2f61263e977772e681b38fc8f9b2739499fbddc95435506c6c9416375c0c10c03910983acb2800be47f2713a01aaa95da94fc4b8cdb5edabfa8052bf18281f9038f8b2e2800ec25151184b64ffc2e3385f40c2fdd542ddf4fdd764cddfee7f0933f1b9bc93330f9c7d44ce979da3ccdcef4ea6aa816263a3b4b8e1628000ce81c0d4594601f03d928fd309504ded4a7d22c66dae6d5fd50794fac540f980c4c197150774108e8ac25822fb171ec7f90212eeaf16eaa6efbf266bfe76ff4b9889cfe59d9c79e0ec2372beec1c65e67e7732550d141b1ba5c50d170304700e04a6ce320a80ef917c9c4e806a6a57ea13316e736dfbaa3ea0d42f06ca07240ebeac38a083705414c612d9bff038ce179030000000308007";
 
     #[test]
     fn encode_to_bytes() -> Result<(), EncodingError> {
@@ -242,6 +226,21 @@ mod tests {
         assert_eq!(
             hex::encode(epoch.encode_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITHOUT_ENTROPY
+        );
+        Ok(())
+    }
+
+    #[test]
+    /// Tests against encodings that were generated from commit 67aa80c1ce5ac5a4e2fe3377ba8b869e982a4f96,
+    /// the version deployed before the Donut hardfork.
+    fn encode_to_bytes_before_donut() -> Result<(), EncodingError> {
+        let pubkeys = (0..10)
+            .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
+            .collect::<Vec<_>>();
+        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys);
+        assert_eq!(
+            hex::encode(epoch.encode_to_bytes()?),
+            EXPECTED_ENCODING_BEFORE_DONUT
         );
         Ok(())
     }
