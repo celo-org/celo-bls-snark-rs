@@ -66,9 +66,7 @@ pub mod test_helpers {
     }
 }
 
-pub(super) fn pack<F: PrimeField, P: FpParameters>(
-    values: &[bool],
-) -> Result<Vec<F>, SynthesisError> {
+pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Result<Vec<F>, SynthesisError> {
     values
         .chunks(P::CAPACITY as usize)
         .map(|c| {

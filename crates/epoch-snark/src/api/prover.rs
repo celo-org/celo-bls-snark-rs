@@ -1,4 +1,4 @@
-use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, CPCurve};
+use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, BWCurve};
 use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
@@ -20,12 +20,12 @@ use tracing::{info, span, Level};
 /// epoch. The proof can then be verified only with constant amount of data (the first and last
 /// epochs)
 pub fn prove(
-    parameters: &Parameters<CPCurve, BLSCurve>,
+    parameters: &Parameters<BWCurve, BLSCurve>,
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
     max_transitions: usize,
-) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
+) -> Result<Groth16Proof<BWCurve>, SynthesisError> {
     info!(
         "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
         transitions.len(),

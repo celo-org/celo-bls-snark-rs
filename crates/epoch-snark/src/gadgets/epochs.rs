@@ -87,8 +87,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let epoch_bits = self.enforce(cs)?;
-        let x = epoch_bits.first_epoch_bits[0].cs();
-        epoch_bits.verify(self.hash_helper, x)?;
+        let cs = epoch_bits.first_epoch_bits[0].cs();
+        epoch_bits.verify(self.hash_helper, cs)?;
         info!("constraints generated");
 
         Ok(())
@@ -323,7 +323,23 @@ mod tests {
     // let's run our tests with 7 validators and 2 faulty ones
     mod epoch_batch_verification {
         use super::*;
+        use crate::epoch_block::hash_first_last_epoch_block;
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
+        use crate::{BWField, BWFrParams, EpochBlock};
+        use bls_crypto::PublicKey;
+
+        fn epoch_data_to_block(data: &EpochData<Curve>) -> EpochBlock {
+            EpochBlock::new(
+                data.index.unwrap(),
+                data.epoch_entropy.clone(),
+                data.parent_entropy.clone(),
+                data.maximum_non_signers,
+                data.public_keys
+                    .iter()
+                    .map(|p| PublicKey::from(p.unwrap()))
+                    .collect(),
+            )
+        }
 
         #[tracing::instrument(target = "r1cs")]
         fn test_epochs(
@@ -414,15 +430,26 @@ mod tests {
             let aggregated_signature = sum(&asigs);
 
             let valset = ValidatorSetUpdate::<Curve> {
-                initial_epoch,
-                epochs,
+                initial_epoch: initial_epoch.clone(),
+                epochs: epochs.clone(),
                 num_validators,
                 aggregated_signature: Some(aggregated_signature),
                 hash_helper: None,
             };
 
             let cs = ConstraintSystem::<Fr>::new_ref();
-            valset.enforce(cs.clone()).unwrap();
+            let epoch_bits = valset.enforce(cs.clone()).unwrap();
+            epoch_bits.verify(None, cs.clone()).unwrap();
+            let hash = hash_first_last_epoch_block(
+                &epoch_data_to_block(&initial_epoch),
+                &epoch_data_to_block(&epochs[epochs.len() - 1].epoch_data),
+            )
+            .unwrap();
+            let public_inputs = crate::gadgets::pack::<BWField, BWFrParams>(&hash).unwrap();
+            assert_eq!(
+                cs.borrow().unwrap().instance_assignment[1..].to_vec(),
+                public_inputs
+            );
 
             print_unsatisfied_constraints(cs.clone());
             cs.is_satisfied().unwrap()
