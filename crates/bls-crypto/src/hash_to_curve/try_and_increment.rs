@@ -243,7 +243,6 @@ mod test {
         hash_to_curve_test::<<Parameters as Bls12Parameters>::G2Parameters, _>(h)
     }
 
-    #[allow(unused)]
     fn hash_to_curve_test<P: SWModelParameters, X: Hasher<Error = BLSError>>(h: X) {
         let hasher = TryAndIncrement::<X, P>::new(&h);
         let mut rng = rand::thread_rng();
