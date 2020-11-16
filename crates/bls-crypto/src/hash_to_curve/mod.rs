@@ -162,6 +162,7 @@ mod test {
         }
     }
 
+    #[allow(dead_code)]
     pub fn test_hash_to_group_cip22<
         P: SWModelParameters,
         H: HashToCurve<Output = GroupProjective<P>>,
@@ -371,22 +372,10 @@ mod compat_tests {
 
 #[cfg(all(test, not(feature = "compat")))]
 mod non_compat_tests {
-    use super::*;
+    use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
-    use crate::hashers::{
-        composite::{CompositeHasher, COMPOSITE_HASHER, CRH},
-        DirectHasher, Hasher,
-    };
-    use algebra::{
-        bls12_377::Parameters,
-        curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-        curves::models::{bls12::Bls12Parameters, SWModelParameters},
-        AffineCurve, CanonicalSerialize, ConstantSerializedSize, Field, FpParameters, FromBytes,
-        ProjectiveCurve, SquareRootField, Zero,
-    };
-    use bench_utils::{end_timer, start_timer};
-    use byteorder::WriteBytesExt;
-    use log::trace;
+    use crate::hashers::composite::COMPOSITE_HASHER;
+    use algebra::{bls12_377::Parameters, curves::models::bls12::Bls12Parameters};
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
