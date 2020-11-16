@@ -216,7 +216,7 @@ mod tests {
             _,
             <Parameters as Bls12Parameters>::G1Parameters,
         >::new(&*COMPOSITE_HASHER);
-        for cip22 in vec![false, true] {
+        for cip22 in &[false, true] {
             test_batch_verify_with_hasher(&try_and_increment_composite, true, cip22);
             let try_and_increment_composite_cip22 = TryAndIncrementCIP22::<
                 _,
