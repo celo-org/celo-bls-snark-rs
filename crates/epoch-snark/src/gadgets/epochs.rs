@@ -15,8 +15,8 @@ use groth16::{Proof, VerifyingKey};
 use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
     alloc::AllocationMode,
+    bls12_377::{Fq2Var, G1Var, G2Var, PairingVar},
     bls12_377::{G1PreparedVar, G2PreparedVar},
-    bls12_377::{G1Var, G2Var, PairingVar},
     fields::fp::FpVar,
     pairing::PairingVar as _,
     prelude::*,
@@ -28,7 +28,7 @@ type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Contains the initial epoch block, followed by a list of epoch block transitions. The
 /// aggregated signature is calculated over all epoch blokc changes. Providing the hash helper
 /// will not constrain the CRH->XOF calculation.
@@ -46,7 +46,7 @@ pub struct ValidatorSetUpdate<E: PairingEngine> {
     pub hash_helper: Option<HashToBitsHelper<E>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// The proof and verifying key which will be used to verify the CRH->XOF conversion
 pub struct HashToBitsHelper<E: PairingEngine> {
     /// The Groth16 proof satisfying the CRH->XOF conversion
@@ -87,9 +87,8 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let epoch_bits = self.enforce(cs)?;
-        let x = epoch_bits.first_epoch_bits[0].cs();
-        epoch_bits.verify(self.hash_helper, x)?;
-
+        let cs = epoch_bits.first_epoch_bits.cs();
+        epoch_bits.verify(self.hash_helper, cs)?;
         info!("constraints generated");
 
         Ok(())
@@ -97,6 +96,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
+    #[tracing::instrument(target = "r1cs")]
     fn enforce(
         &self,
         cs: ConstraintSystemRef<<Bls12_377_Parameters as Bls12Parameters>::Fp>,
@@ -106,8 +106,16 @@ impl ValidatorSetUpdate<Bls12_377> {
 
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
-        let (first_epoch_bits, first_epoch_index, initial_maximum_non_signers, initial_pubkey_vars) =
-            self.initial_epoch.to_bits(cs)?;
+        let (
+            _,
+            _,
+            first_epoch_bits,
+            first_epoch_index,
+            first_epoch_entropy,
+            _,
+            initial_maximum_non_signers,
+            initial_pubkey_vars,
+        ) = self.initial_epoch.to_bits(cs)?;
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
@@ -120,6 +128,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             prepared_message_hashes,
         ) = self.verify_intermediate_epochs(
             first_epoch_index,
+            first_epoch_entropy,
             initial_pubkey_vars,
             initial_maximum_non_signers,
         )?;
@@ -144,9 +153,11 @@ impl ValidatorSetUpdate<Bls12_377> {
     /// and generates the witness data necessary for the final BLS Sig
     /// verification and witness compression
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(target = "r1cs")]
     fn verify_intermediate_epochs(
         &self,
         first_epoch_index: FrVar,
+        first_epoch_entropy: FrVar,
         initial_pubkey_vars: Vec<G2Var>,
         initial_max_non_signers: FrVar,
     ) -> Result<
@@ -173,12 +184,18 @@ impl ValidatorSetUpdate<Bls12_377> {
             AllocationMode::Constant,
         )?;
 
+        // Skip entropy circuit logic if the first epoch does not
+        // contain entropy. Done to support earlier versions of Celo.
+        // Assumes all epochs past a single version will contain entropy
+        let entropy_bit = first_epoch_entropy.is_eq_zero()?.not();
+
         let mut prepared_aggregated_public_keys = vec![];
         let mut prepared_message_hashes = vec![];
         let mut last_epoch_bits = vec![];
         let mut previous_epoch_index = first_epoch_index;
         let mut previous_pubkey_vars = initial_pubkey_vars;
         let mut previous_max_non_signers = initial_max_non_signers;
+        let mut previous_epoch_entropy = first_epoch_entropy;
         let mut all_crh_bits = vec![];
         let mut all_xof_bits = vec![];
         for (i, epoch) in self.epochs.iter().enumerate() {
@@ -187,13 +204,21 @@ impl ValidatorSetUpdate<Bls12_377> {
             let constrained_epoch = epoch.constrain(
                 &previous_pubkey_vars,
                 &previous_epoch_index,
+                &previous_epoch_entropy,
                 &previous_max_non_signers,
+                &entropy_bit,
                 self.num_validators,
                 self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
             )?;
 
             let index_bit = constrained_epoch.index.is_eq_zero()?.not();
 
+            // Update the randomness for the next iteration
+            previous_epoch_entropy = FrVar::conditionally_select(
+                &index_bit,
+                &constrained_epoch.epoch_entropy,
+                &previous_epoch_entropy,
+            )?;
             // Update the pubkeys for the next iteration
             previous_epoch_index = FrVar::conditionally_select(
                 &index_bit,
@@ -239,7 +264,10 @@ impl ValidatorSetUpdate<Bls12_377> {
                 let last_apk = BlsGadget::enforce_aggregated_all_pubkeys(
                     &previous_pubkey_vars, // These are now the last epoch new pubkeys
                 )?;
-                let last_apk_bits = g2_to_bits(&last_apk)?;
+                let affine_x = last_apk.x.mul_by_inverse(&last_apk.z)?;
+                let affine_y = last_apk.y.mul_by_inverse(&last_apk.z)?;
+                let last_apk_affine = G2Var::new(affine_x, affine_y, Fq2Var::one());
+                let last_apk_bits = g2_to_bits(&last_apk_affine)?;
                 last_epoch_bits = constrained_epoch.bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
 
@@ -261,6 +289,7 @@ impl ValidatorSetUpdate<Bls12_377> {
     }
 
     // Verify the aggregate signature
+    #[tracing::instrument(target = "r1cs")]
     fn verify_signature(
         &self,
         pubkeys: &[G2PreparedVar],
@@ -289,271 +318,377 @@ mod tests {
     use r1cs_core::ConstraintSystem;
 
     type Curve = Bls12_377;
+    type Entropy = Option<Vec<u8>>;
 
     // let's run our tests with 7 validators and 2 faulty ones
     mod epoch_batch_verification {
         use super::*;
+        use crate::epoch_block::hash_first_last_epoch_block;
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
+        use crate::{BWField, BWFrParams, EpochBlock};
+        use bls_crypto::PublicKey;
+
+        fn epoch_data_to_block(data: &EpochData<Curve>) -> EpochBlock {
+            EpochBlock::new(
+                data.index.unwrap(),
+                data.epoch_entropy.clone(),
+                data.parent_entropy.clone(),
+                data.maximum_non_signers,
+                data.public_keys
+                    .iter()
+                    .map(|p| PublicKey::from(p.unwrap()))
+                    .collect(),
+            )
+        }
+
+        #[tracing::instrument(target = "r1cs")]
+        fn test_epochs(
+            faults: u32,
+            num_epochs: usize,
+            initial_entropy: Entropy,
+            entropy: Vec<(Entropy, Entropy)>,
+            bitmaps: Vec<Vec<bool>>,
+            include_dummy_epochs: bool,
+        ) -> bool {
+            let num_validators = 3 * faults + 1;
+            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
+            let initial_epoch = generate_single_update::<Curve>(
+                0,
+                initial_entropy,
+                None, // parent entropy of initial epoch should be ignored
+                faults,
+                &initial_validator_set.1,
+                &[],
+            )
+            .epoch_data;
+
+            // Generate validators for each of the epochs
+            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
+            // Generate `num_epochs` epochs
+            let mut epochs = validators
+                .1
+                .iter()
+                .zip(entropy)
+                .enumerate()
+                .map(
+                    |(epoch_index, (epoch_validators, (parent_entropy, entropy)))| {
+                        generate_single_update::<Curve>(
+                            epoch_index as u16 + 1,
+                            entropy,
+                            parent_entropy,
+                            faults,
+                            epoch_validators,
+                            &bitmaps[epoch_index],
+                        )
+                    },
+                )
+                .collect::<Vec<_>>();
+
+            // The i-th validator set, signs on the i+1th epoch's G1 hash
+            let mut signers = vec![initial_validator_set.0];
+            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
+
+            // Filter the private keys which had a 1 in the boolean per epoch
+            let mut signers_filtered = Vec::new();
+            for i in 0..signers.len() {
+                let mut epoch_signers_filtered = Vec::new();
+                let epoch_signers = &signers[i];
+                let epoch_bitmap = &bitmaps[i];
+                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
+                    if epoch_bitmap[j] {
+                        epoch_signers_filtered.push(*epoch_signer);
+                    }
+                }
+                signers_filtered.push(epoch_signers_filtered);
+            }
+
+            use crate::gadgets::test_helpers::hash_epoch;
+            let epoch_hashes = epochs
+                .iter()
+                .map(|update| hash_epoch(&update.epoch_data))
+                .collect::<Vec<G1Projective>>();
+
+            // dummy sig is the same as the message, since sk is 1.
+            let dummy_message = G1Projective::prime_subgroup_generator();
+            let dummy_sig = dummy_message;
+
+            let mut asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
+
+            if include_dummy_epochs {
+                epochs = [
+                    &epochs[0..3],
+                    &[
+                        generate_dummy_update(num_validators),
+                        generate_dummy_update(num_validators),
+                    ],
+                    &[epochs[3].clone()],
+                ]
+                .concat();
+
+                asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
+            }
+            let aggregated_signature = sum(&asigs);
+
+            let valset = ValidatorSetUpdate::<Curve> {
+                initial_epoch: initial_epoch.clone(),
+                epochs: epochs.clone(),
+                num_validators,
+                aggregated_signature: Some(aggregated_signature),
+                hash_helper: None,
+            };
+
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            let epoch_bits = valset.enforce(cs.clone()).unwrap();
+            epoch_bits.verify(None, cs.clone()).unwrap();
+            let hash = hash_first_last_epoch_block(
+                &epoch_data_to_block(&initial_epoch),
+                &epoch_data_to_block(&epochs[epochs.len() - 1].epoch_data),
+            )
+            .unwrap();
+            let public_inputs = crate::gadgets::pack::<BWField, BWFrParams>(&hash).unwrap();
+            assert_eq!(
+                cs.borrow().unwrap().instance_assignment[1..].to_vec(),
+                public_inputs
+            );
+
+            print_unsatisfied_constraints(cs.clone());
+            cs.is_satisfied().unwrap()
+        }
 
         #[test]
+        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs() {
-            let faults: u32 = 2;
-            let num_validators = 3 * faults + 1;
-            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
-
+            let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
             // (i.e. at most `faults` validators who do not sign on the next validator set)
-            let bitmaps = &[
-                &[true, true, false, true, true, true, true],
-                &[true, true, false, true, true, true, true],
-                &[true, true, true, true, false, false, true],
-                &[true, true, true, true, true, true, true],
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
             ];
-            // Generate validators for each of the epochs
-            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
-            // Generate `num_epochs` epochs
-            let epochs = validators
-                .1
-                .iter()
-                .enumerate()
-                .map(|(epoch_index, epoch_validators)| {
-                    generate_single_update::<Curve>(
-                        epoch_index as u16 + 1,
-                        faults,
-                        epoch_validators,
-                        bitmaps[epoch_index],
-                    )
-                })
-                .collect::<Vec<_>>();
+            let initial_entropy = None;
+            let entropy = vec![(None, None), (None, None), (None, None), (None, None)];
+            let include_dummy_epochs = false;
 
-            // The i-th validator set, signs on the i+1th epoch's G1 hash
-            let mut signers = vec![initial_validator_set.0];
-            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
-
-            // Filter the private keys which had a 1 in the boolean per epoch
-            let mut signers_filtered = Vec::new();
-            for i in 0..signers.len() {
-                let mut epoch_signers_filtered = Vec::new();
-                let epoch_signers = &signers[i];
-                let epoch_bitmap = bitmaps[i];
-                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
-                    if epoch_bitmap[j] {
-                        epoch_signers_filtered.push(*epoch_signer);
-                    }
-                }
-                signers_filtered.push(epoch_signers_filtered);
-            }
-
-            use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
-
-            let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
-            let aggregated_signature = sum(&asigs);
-
-            let valset = ValidatorSetUpdate::<Curve> {
-                initial_epoch,
-                epochs,
-                num_validators,
-                aggregated_signature: Some(aggregated_signature),
-                hash_helper: None,
-            };
-
-            let cs = ConstraintSystem::<Fr>::new_ref();
-            valset.enforce(cs.clone()).unwrap();
-
-            print_unsatisfied_constraints(cs.clone());
-            assert!(cs.is_satisfied().unwrap());
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
+        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_dummy() {
-            let faults: u32 = 2;
-            let num_validators = 3 * faults + 1;
-            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
-
+            let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
             // (i.e. at most `faults` validators who do not sign on the next validator set)
-            let bitmaps = &[
-                &[true, true, false, true, true, true, true],
-                &[true, true, false, true, true, true, true],
-                &[true, true, true, true, false, false, true],
-                &[true, true, true, true, true, true, true],
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
             ];
-            // Generate validators for each of the epochs
-            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
-            // Generate `num_epochs` epochs
-            let epochs = validators
-                .1
-                .iter()
-                .enumerate()
-                .map(|(epoch_index, epoch_validators)| {
-                    generate_single_update::<Curve>(
-                        epoch_index as u16 + 1,
-                        faults,
-                        epoch_validators,
-                        bitmaps[epoch_index],
-                    )
-                })
-                .collect::<Vec<_>>();
+            let initial_entropy = None;
+            let entropy = vec![(None, None), (None, None), (None, None), (None, None)];
+            let include_dummy_epochs = true;
 
-            // The i-th validator set, signs on the i+1th epoch's G1 hash
-            let mut signers = vec![initial_validator_set.0];
-            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
-
-            // Filter the private keys which had a 1 in the boolean per epoch
-            let mut signers_filtered = Vec::new();
-            for i in 0..signers.len() {
-                let mut epoch_signers_filtered = Vec::new();
-                let epoch_signers = &signers[i];
-                let epoch_bitmap = bitmaps[i];
-                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
-                    if epoch_bitmap[j] {
-                        epoch_signers_filtered.push(*epoch_signer);
-                    }
-                }
-                signers_filtered.push(epoch_signers_filtered);
-            }
-
-            use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
-
-            // dummy sig is the same as the message, since sk is 1.
-            let dummy_message = G1Projective::prime_subgroup_generator();
-            let dummy_sig = dummy_message;
-
-            let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
-
-            let epochs = [
-                &epochs[0..3],
-                &[
-                    generate_dummy_update(num_validators),
-                    generate_dummy_update(num_validators),
-                ],
-                &[epochs[3].clone()],
-            ]
-            .concat();
-            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
-            let aggregated_signature = sum(&asigs);
-
-            let valset = ValidatorSetUpdate::<Curve> {
-                initial_epoch,
-                epochs,
-                num_validators,
-                aggregated_signature: Some(aggregated_signature),
-                hash_helper: None,
-            };
-
-            let cs = ConstraintSystem::<Fr>::new_ref();
-            valset.enforce(cs.clone()).unwrap();
-
-            print_unsatisfied_constraints(cs.clone());
-            assert!(cs.is_satisfied().unwrap());
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
 
         #[test]
-        fn test_multiple_epochs_with_wrong_dummy() {
-            let faults: u32 = 2;
-            let num_validators = 3 * faults + 1;
-            let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
-            let initial_epoch =
-                generate_single_update::<Curve>(0, faults, &initial_validator_set.1, &[])
-                    .epoch_data;
-
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_entropy() {
+            let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
             // (i.e. at most `faults` validators who do not sign on the next validator set)
-            let bitmaps = &[
-                &[true, true, false, true, true, true, true],
-                &[true, true, false, true, true, true, true],
-                &[true, true, true, true, false, false, true],
-                &[true, true, true, true, true, true, true],
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
             ];
-            // Generate validators for each of the epochs
-            let validators = keygen_batch::<Curve>(num_epochs, num_validators as usize);
-            // Generate `num_epochs` epochs
-            let epochs = validators
-                .1
-                .iter()
-                .enumerate()
-                .map(|(epoch_index, epoch_validators)| {
-                    generate_single_update::<Curve>(
-                        epoch_index as u16 + 1,
-                        faults,
-                        epoch_validators,
-                        bitmaps[epoch_index],
-                    )
-                })
-                .collect::<Vec<_>>();
+            let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
+            let entropy = vec![
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
+            let include_dummy_epochs = false;
 
-            // The i-th validator set, signs on the i+1th epoch's G1 hash
-            let mut signers = vec![initial_validator_set.0];
-            signers.extend_from_slice(&validators.0[..validators.1.len() - 1]);
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
+        }
 
-            // Filter the private keys which had a 1 in the boolean per epoch
-            let mut signers_filtered = Vec::new();
-            for i in 0..signers.len() {
-                let mut epoch_signers_filtered = Vec::new();
-                let epoch_signers = &signers[i];
-                let epoch_bitmap = bitmaps[i];
-                for (j, epoch_signer) in epoch_signers.iter().enumerate() {
-                    if epoch_bitmap[j] {
-                        epoch_signers_filtered.push(*epoch_signer);
-                    }
-                }
-                signers_filtered.push(epoch_signers_filtered);
-            }
+        #[test]
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_wrong_entropy() {
+            let num_faults = 2;
+            let num_epochs = 4;
+            // no more than `faults` 0s exist in the bitmap
+            // (i.e. at most `faults` validators who do not sign on the next validator set)
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
+            ];
+            let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
+            let entropy = vec![
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                // parent entropy does not match previous entropy
+                (
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
+            let include_dummy_epochs = false;
 
-            use crate::gadgets::test_helpers::hash_epoch;
-            let epoch_hashes = epochs
-                .iter()
-                .map(|update| hash_epoch(&update.epoch_data))
-                .collect::<Vec<G1Projective>>();
+            assert!(!test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
+        }
 
-            // dummy sig is the same as the message, since sk is 1.
-            let dummy_message = G1Projective::prime_subgroup_generator();
-            let dummy_sig = dummy_message;
+        #[test]
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_wrong_entropy_dummy() {
+            let num_faults = 2;
+            let num_epochs = 4;
+            // no more than `faults` 0s exist in the bitmap
+            // (i.e. at most `faults` validators who do not sign on the next validator set)
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
+            ];
+            let initial_entropy = Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]);
+            let entropy = vec![
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                // parent entropy does not match previous entropy
+                (
+                    Some(vec![6u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
+            // dummy blocks inserted just before the last epoch
+            // epoch blocks should verify as if the dummy blocks were not there
+            let include_dummy_epochs = true;
 
-            let asigs = sign_batch::<Bls12_377>(&signers_filtered, &epoch_hashes);
+            assert!(!test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
+        }
 
-            let epochs = [
-                &epochs[0..3],
-                &[
-                    generate_dummy_update(num_validators),
-                    generate_dummy_update(num_validators),
-                ],
-                &[epochs[3].clone()],
-            ]
-            .concat();
-            let asigs = [&asigs[0..3], &[dummy_sig, dummy_sig], &[asigs[3]]].concat();
-            let aggregated_signature = sum(&asigs);
+        #[test]
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_no_initial_entropy() {
+            let num_faults = 2;
+            let num_epochs = 4;
+            // no more than `faults` 0s exist in the bitmap
+            // (i.e. at most `faults` validators who do not sign on the next validator set)
+            let bitmaps = vec![
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, false, true, true, true, true],
+                vec![true, true, true, true, false, false, true],
+                vec![true, true, true, true, true, true, true],
+            ];
+            // all entropy should be ignored
+            let initial_entropy = None;
+            let entropy = vec![
+                (
+                    Some(vec![1u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![2u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![3u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                // parent entropy does not match previous entropy
+                (
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+                (
+                    Some(vec![4u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                    Some(vec![5u8; EpochData::<Curve>::ENTROPY_BYTES]),
+                ),
+            ];
+            let include_dummy_epochs = false;
 
-            let valset = ValidatorSetUpdate::<Curve> {
-                initial_epoch,
-                epochs,
-                num_validators,
-                aggregated_signature: Some(aggregated_signature),
-                hash_helper: None,
-            };
-
-            let cs = ConstraintSystem::<Fr>::new_ref();
-            valset.enforce(cs.clone()).unwrap();
-
-            print_unsatisfied_constraints(cs.clone());
-            assert!(cs.is_satisfied().unwrap());
+            assert!(test_epochs(
+                num_faults,
+                num_epochs,
+                initial_entropy,
+                entropy,
+                bitmaps,
+                include_dummy_epochs
+            ));
         }
     }
 }

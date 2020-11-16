@@ -43,6 +43,7 @@ path = "examples/pop_csv.rs"
 crate-type = ["lib", "staticlib"]
 
 [features]
+default = [ "compat" ]
 test-helpers = []
 compat = []
 

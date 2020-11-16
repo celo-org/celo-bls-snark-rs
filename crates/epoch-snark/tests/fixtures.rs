@@ -22,7 +22,13 @@ pub fn generate_test_data(
         .iter()
         .map(|pk| PublicKey::from(*pk))
         .collect::<Vec<_>>();
-    let first_epoch = generate_block(0, faults, &initial_pubkeys);
+    let first_epoch = generate_block(
+        0,
+        &[1u8; EpochBlock::ENTROPY_BYTES],
+        &[2u8; EpochBlock::ENTROPY_BYTES],
+        faults,
+        &initial_pubkeys,
+    );
 
     // Generate keys for the validators of each epoch
     let validators = keygen_batch::<Bls12_377>(num_epochs, num_validators as usize);
@@ -39,8 +45,14 @@ pub fn generate_test_data(
     // sign each state transition
     let mut transitions = vec![];
     for (i, signers_epoch) in signers.iter().enumerate() {
-        let block: EpochBlock = generate_block(i + 1, faults, &pubkeys[i]);
-        let hash = block.hash_to_g1().unwrap();
+        let block: EpochBlock = generate_block(
+            i + 1,
+            &[(i + 2) as u8; EpochBlock::ENTROPY_BYTES],
+            &[(i + 1) as u8; EpochBlock::ENTROPY_BYTES],
+            faults,
+            &pubkeys[i],
+        );
+        let hash = block.hash_to_g1_cip22().unwrap();
 
         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
         let bitmap_epoch = &bitmaps[i];
@@ -67,9 +79,17 @@ pub fn generate_test_data(
     (first_epoch, transitions, last_epoch)
 }
 
-fn generate_block(index: usize, non_signers: usize, pubkeys: &[PublicKey]) -> EpochBlock {
+fn generate_block(
+    index: usize,
+    epoch_entropy: &[u8],
+    parent_entropy: &[u8],
+    non_signers: usize,
+    pubkeys: &[PublicKey],
+) -> EpochBlock {
     EpochBlock {
         index: index as u16,
+        epoch_entropy: Some(epoch_entropy.to_vec()),
+        parent_entropy: Some(parent_entropy.to_vec()),
         maximum_non_signers: non_signers as u32,
         new_public_keys: pubkeys.to_vec(),
     }

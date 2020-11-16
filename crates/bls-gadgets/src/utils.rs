@@ -1,5 +1,5 @@
-/// Converts the provided bits to LE bytes
-pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
+/// Converts the provided big endian bits to LE bytes
+pub fn bits_be_to_bytes_le(bits: &[bool]) -> Vec<u8> {
     let reversed_bits = {
         let mut tmp = bits.to_owned();
         tmp.reverse();
@@ -20,9 +20,13 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
+pub fn bits_le_to_bytes_le(bits: &[bool]) -> Vec<u8> {
+    bits_be_to_bytes_le(&bits.iter().cloned().rev().collect::<Vec<_>>())
+}
+
 /// If bytes is a little endian representation of a number, this returns the bits
 /// of the number in descending order
-pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
+pub fn bytes_le_to_bits_be(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
     let mut bits = vec![];
     for b in bytes {
         let mut byte = *b;
@@ -35,6 +39,13 @@ pub fn bytes_to_bits(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
     bits.into_iter()
         .take(bits_to_take)
         .collect::<Vec<bool>>()
+        .into_iter()
+        .rev()
+        .collect()
+}
+
+pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
+    bytes_le_to_bits_be(bytes, bits_to_take)
         .into_iter()
         .rev()
         .collect()
