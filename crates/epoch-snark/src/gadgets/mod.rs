@@ -54,6 +54,7 @@ pub mod test_helpers {
             epoch.epoch_entropy.as_ref().map(|v| v.to_vec()),
             epoch.parent_entropy.as_ref().map(|v| v.to_vec()),
             epoch.maximum_non_signers,
+            pubkeys.len(),
             pubkeys,
         )
         .encode_inner_to_bytes_cip22()

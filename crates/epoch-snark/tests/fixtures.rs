@@ -27,6 +27,7 @@ pub fn generate_test_data(
         &[1u8; EpochBlock::ENTROPY_BYTES],
         &[2u8; EpochBlock::ENTROPY_BYTES],
         faults,
+        num_validators,
         &initial_pubkeys,
     );
 
@@ -50,6 +51,7 @@ pub fn generate_test_data(
             &[(i + 2) as u8; EpochBlock::ENTROPY_BYTES],
             &[(i + 1) as u8; EpochBlock::ENTROPY_BYTES],
             faults,
+            num_validators,
             &pubkeys[i],
         );
         let hash = block.hash_to_g1_cip22().unwrap();
@@ -84,6 +86,7 @@ fn generate_block(
     epoch_entropy: &[u8],
     parent_entropy: &[u8],
     non_signers: usize,
+    max_validators: usize,
     pubkeys: &[PublicKey],
 ) -> EpochBlock {
     EpochBlock {
@@ -91,6 +94,7 @@ fn generate_block(
         epoch_entropy: Some(epoch_entropy.to_vec()),
         parent_entropy: Some(parent_entropy.to_vec()),
         maximum_non_signers: non_signers as u32,
+        maximum_validators: max_validators,
         new_public_keys: pubkeys.to_vec(),
     }
 }

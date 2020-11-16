@@ -334,6 +334,7 @@ mod tests {
                 data.epoch_entropy.clone(),
                 data.parent_entropy.clone(),
                 data.maximum_non_signers,
+                data.public_keys.len(),
                 data.public_keys
                     .iter()
                     .map(|p| PublicKey::from(p.unwrap()))
