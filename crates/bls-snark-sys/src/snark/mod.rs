@@ -69,6 +69,7 @@ mod tests {
             parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
             pubkeys_num: 4,
+            maximum_validators: 4,
             pubkeys: &first_pubkeys[0] as *const u8,
         };
 
@@ -78,6 +79,7 @@ mod tests {
             parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
             pubkeys_num: 4,
+            maximum_validators: 4,
             pubkeys: &last_pubkeys[0] as *const u8,
         };
 
@@ -141,6 +143,7 @@ mod tests {
             parent_entropy: &first_parent_entropy[0] as *const u8,
             maximum_non_signers: 1,
             pubkeys_num: 4,
+            maximum_validators: 4,
             pubkeys: &first_pubkeys[0] as *const u8,
         };
 
@@ -153,6 +156,7 @@ mod tests {
             parent_entropy: &last_parent_entropy[0] as *const u8,
             maximum_non_signers: 1,
             pubkeys_num: 4,
+            maximum_validators: 4,
             pubkeys: &last_pubkeys[0] as *const u8,
         };
 

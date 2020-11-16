@@ -1,6 +1,6 @@
 use algebra::{
     bls12_377::{Fq, FqParameters},
-    FpParameters, PrimeField, ProjectiveCurve, ToBytes,
+    FpParameters, PrimeField, ProjectiveCurve, ToBytes, Zero,
 };
 use bls_crypto::{BLSError, PublicKey};
 use bls_gadgets::utils::bytes_le_to_bits_be;
@@ -29,8 +29,9 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingEr
     let y_c0_big = y.c0.into_repr();
     let y_c1_big = y.c1.into_repr();
 
+    let zero = Fq::zero().into_repr();
     let half = Fq::modulus_minus_one_div_two();
-    let is_over_half = y_c1_big > half || (y_c1_big == half && y_c0_big > half);
+    let is_over_half = y_c1_big > half || (y_c1_big == zero && y_c0_big > half);
 
     let mut bits = vec![];
     let mut x_bytes_c0 = vec![];

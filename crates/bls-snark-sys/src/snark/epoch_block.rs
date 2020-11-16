@@ -19,6 +19,7 @@ pub extern "C" fn encode_epoch_block_to_bytes_cip22(
     in_epoch_entropy: *const u8,
     in_parent_entropy: *const u8,
     in_maximum_non_signers: c_uint,
+    in_maximum_validators: c_uint,
     in_added_public_keys: *const *const PublicKey,
     in_added_public_keys_len: c_int,
     out_bytes: *mut *mut u8,
@@ -43,6 +44,7 @@ pub extern "C" fn encode_epoch_block_to_bytes_cip22(
             epoch_entropy,
             parent_entropy,
             in_maximum_non_signers as u32,
+            in_maximum_validators as usize,
             added_public_keys,
         );
         let (mut encoded_inner, mut encoded_extra_data) =
@@ -85,6 +87,7 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             None,
             None,
             in_maximum_non_signers as u32,
+            added_public_keys.len(),
             added_public_keys,
         );
         let mut encoded = epoch_block.encode_to_bytes()?;
@@ -114,6 +117,8 @@ pub struct EpochBlockFFI {
     pub pubkeys_num: usize,
     /// Maximum number of non signers for that epoch
     pub maximum_non_signers: u32,
+    /// Maximum number of validators
+    pub maximum_validators: usize,
 }
 
 impl TryFrom<&EpochBlockFFI> for EpochBlock {
@@ -128,6 +133,7 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: src.maximum_non_signers,
+            maximum_validators: src.maximum_validators,
             new_public_keys: pubkeys,
         })
     }
@@ -223,6 +229,7 @@ mod tests {
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: 19,
+            maximum_validators: pubkeys.len(),
             new_public_keys: pubkeys,
         };
         let src = block;
@@ -232,6 +239,7 @@ mod tests {
             epoch_entropy: &src.epoch_entropy.as_ref().unwrap()[0],
             parent_entropy: &src.parent_entropy.as_ref().unwrap()[0],
             maximum_non_signers: src.maximum_non_signers,
+            maximum_validators: src.new_public_keys.len(),
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,
         };
@@ -250,6 +258,7 @@ mod tests {
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: 19,
+            maximum_validators: pubkeys.len(),
             new_public_keys: pubkeys,
         };
         let src = block;
@@ -259,6 +268,7 @@ mod tests {
             epoch_entropy: std::ptr::null(),
             parent_entropy: std::ptr::null(),
             maximum_non_signers: src.maximum_non_signers,
+            maximum_validators: src.new_public_keys.len(),
             pubkeys_num: src.new_public_keys.len(),
             pubkeys: &serialized_pubkeys[0] as *const u8,
         };
