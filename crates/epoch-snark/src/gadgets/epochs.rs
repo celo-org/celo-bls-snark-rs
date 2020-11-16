@@ -87,7 +87,7 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         let _enter = span.enter();
         info!("generating constraints");
         let epoch_bits = self.enforce(cs)?;
-        let cs = epoch_bits.first_epoch_bits[0].cs();
+        let cs = epoch_bits.first_epoch_bits.cs();
         epoch_bits.verify(self.hash_helper, cs)?;
         info!("constraints generated");
 
