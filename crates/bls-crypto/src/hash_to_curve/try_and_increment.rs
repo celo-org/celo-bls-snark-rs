@@ -17,6 +17,7 @@ use algebra::{
     AffineCurve, ConstantSerializedSize, Zero,
 };
 
+use crate::hash_to_curve::hash_length;
 use once_cell::sync::Lazy;
 
 const NUM_TRIES: u8 = 255;
@@ -130,14 +131,4 @@ where
         }
         Err(BLSError::HashToCurveError)
     }
-}
-
-/// Given `n` bytes, it returns the value rounded to the nearest multiple of 256 bits (in bytes)
-/// e.g. 1. given 48 = 384 bits, it will return 64 bytes (= 512 bits)
-///      2. given 96 = 768 bits, it will return 96 bytes (no rounding needed since 768 is already a
-///         multiple of 256)
-fn hash_length(n: usize) -> usize {
-    let bits = (n * 8) as f64 / 256.0;
-    let rounded_bits = bits.ceil() * 256.0;
-    rounded_bits as usize / 8
 }
