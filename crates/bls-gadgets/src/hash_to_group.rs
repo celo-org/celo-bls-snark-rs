@@ -346,7 +346,7 @@ mod test {
     use crate::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::bls12_377;
-    use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
+    use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
     use r1cs_core::ConstraintSystem;
     use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
@@ -368,7 +368,7 @@ mod test {
     }
 
     fn hash_to_group(input: &[u8], extra_input: &[u8]) {
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
         let (expected_hash, attempt) = try_and_increment
             .hash_with_attempt_cip22(SIG_DOMAIN, input, extra_input)
             .unwrap();

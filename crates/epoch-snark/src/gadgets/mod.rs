@@ -33,7 +33,7 @@ pub mod test_helpers {
     use super::*;
     use crate::epoch_block::EpochBlock;
     use bls_crypto::{
-        hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PublicKey, SIG_DOMAIN,
+        hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PublicKey, SIG_DOMAIN,
     };
 
     use algebra::{bls12_377::G1Projective, Bls12_377};
@@ -58,7 +58,7 @@ pub mod test_helpers {
         )
         .encode_inner_to_bytes_cip22()
         .unwrap();
-        let (hash, _) = COMPOSITE_HASH_TO_G1
+        let (hash, _) = COMPOSITE_HASH_TO_G1_CIP22
             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data)
             .unwrap();
 

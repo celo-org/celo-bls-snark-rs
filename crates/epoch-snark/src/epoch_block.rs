@@ -2,7 +2,7 @@ use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
 use algebra::bls12_377::G1Projective;
 use blake2s_simd::Params;
 use bls_crypto::{
-    hash_to_curve::{try_and_increment::COMPOSITE_HASH_TO_G1, HashToCurve},
+    hash_to_curve::{try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_le};
@@ -67,7 +67,7 @@ impl EpochBlock {
     pub fn hash_to_g1_cip22(&self) -> Result<G1Projective, EncodingError> {
         let (input, extra_data_input) = self.encode_inner_to_bytes_cip22()?;
         let expected_hash: G1Projective =
-            COMPOSITE_HASH_TO_G1.hash_cip22(SIG_DOMAIN, &input, &extra_data_input)?;
+            COMPOSITE_HASH_TO_G1_CIP22.hash(SIG_DOMAIN, &input, &extra_data_input)?;
         Ok(expected_hash)
     }
 

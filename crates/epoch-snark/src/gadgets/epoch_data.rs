@@ -4,7 +4,7 @@ use algebra::{
     curves::bls12::Bls12Parameters,
     One, PairingEngine,
 };
-use bls_crypto::{hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, SIG_DOMAIN};
+use bls_crypto::{hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, SIG_DOMAIN};
 use bls_gadgets::{FpUtils, HashToGroupGadget};
 use r1cs_core::{ConstraintSystemRef, SynthesisError};
 use r1cs_std::{
@@ -269,7 +269,7 @@ impl EpochData<Bls12_377> {
                 .map(|b| b.value())
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let (_, counter) = COMPOSITE_HASH_TO_G1
+            let (_, counter) = COMPOSITE_HASH_TO_G1_CIP22
                 .hash_with_attempt_cip22(SIG_DOMAIN, &input_bytes, &input_extra_data_bytes)
                 .map_err(|_| SynthesisError::Unsatisfiable)?;
             counter
@@ -343,7 +343,7 @@ mod tests {
         )
         .encode_inner_to_bytes_cip22()
         .unwrap();
-        let (hash, _) = COMPOSITE_HASH_TO_G1
+        let (hash, _) = COMPOSITE_HASH_TO_G1_CIP22
             .hash_with_attempt_cip22(SIG_DOMAIN, &epoch_bytes, &extra_data_bytes)
             .unwrap();
 
