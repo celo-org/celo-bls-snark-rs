@@ -7,7 +7,7 @@ use algebra::PairingEngine;
 use r1cs_core::SynthesisError;
 use rand::Rng;
 
-use super::{BLSCurve, CPCurve, CPFrParams};
+use super::{BLSCurve, BWCurve, BWFrParams};
 
 use groth16::{generate_random_parameters, Parameters as Groth16Parameters};
 use tracing::{info, span, Level};
@@ -33,7 +33,7 @@ pub fn trusted_setup<R: Rng>(
     maximum_non_signers: usize,
     rng: &mut R,
     hashes_in_bls12_377: bool,
-) -> Result<Parameters<CPCurve, BLSCurve>> {
+) -> Result<Parameters<BWCurve, BLSCurve>> {
     setup(
         num_validators,
         num_epochs,
@@ -86,7 +86,7 @@ where
 
     let (vk, hash_to_bits) = if hashes_in_bls12_377 {
         info!("CRH->XOF");
-        let empty_hash_to_bits = HashToBits::empty::<CPFrParams>(num_epochs);
+        let empty_hash_to_bits = HashToBits::empty::<BWFrParams>(num_epochs);
         let hash_to_bits = hash_to_bits_setup(empty_hash_to_bits, rng)?;
         (Some(hash_to_bits.vk.clone()), Some(hash_to_bits))
     } else {

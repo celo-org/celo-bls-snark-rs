@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use super::HashToCurve;
 use crate::hashers::{
     composite::{CompositeHasher, COMPOSITE_HASHER, CRH},
-    DirectHasher, Hasher,
+    Hasher,
 };
 use crate::BLSError;
 
@@ -23,25 +23,19 @@ use once_cell::sync::Lazy;
 const NUM_TRIES: u8 = 255;
 
 /// Composite (Bowe-Hopwood CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
-pub static COMPOSITE_HASH_TO_G1: Lazy<
-    TryAndIncrement<CompositeHasher<CRH>, <Parameters as Bls12Parameters>::G1Parameters>,
-> = Lazy::new(|| TryAndIncrement::new(&*COMPOSITE_HASHER));
-
-/// Direct (Blake2s CRH, Blake2x XOF) Try-and-Increment hasher for BLS 12-377.
-/// Equivalent to Blake2xs.
-pub static DIRECT_HASH_TO_G1: Lazy<
-    TryAndIncrement<DirectHasher, <Parameters as Bls12Parameters>::G1Parameters>,
-> = Lazy::new(|| TryAndIncrement::new(&DirectHasher));
+pub static COMPOSITE_HASH_TO_G1_CIP22: Lazy<
+    TryAndIncrementCIP22<CompositeHasher<CRH>, <Parameters as Bls12Parameters>::G1Parameters>,
+> = Lazy::new(|| TryAndIncrementCIP22::new(&*COMPOSITE_HASHER));
 
 /// A try-and-increment method for hashing to G1 and G2. See page 521 in
 /// https://link.springer.com/content/pdf/10.1007/3-540-45682-1_30.pdf.
 #[derive(Clone)]
-pub struct TryAndIncrement<'a, H, P> {
+pub struct TryAndIncrementCIP22<'a, H, P> {
     hasher: &'a H,
     curve_params: PhantomData<P>,
 }
 
-impl<'a, H, P> TryAndIncrement<'a, H, P>
+impl<'a, H, P> TryAndIncrementCIP22<'a, H, P>
 where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
@@ -49,14 +43,14 @@ where
     /// Instantiates a new Try-and-increment hasher with the provided hashing method
     /// and curve parameters based on the type
     pub fn new(h: &'a H) -> Self {
-        TryAndIncrement {
+        TryAndIncrementCIP22 {
             hasher: h,
             curve_params: PhantomData,
         }
     }
 }
 
-impl<'a, H, P> HashToCurve for TryAndIncrement<'a, H, P>
+impl<'a, H, P> HashToCurve for TryAndIncrementCIP22<'a, H, P>
 where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
@@ -69,18 +63,18 @@ where
         message: &[u8],
         extra_data: &[u8],
     ) -> Result<Self::Output, BLSError> {
-        self.hash_with_attempt(domain, message, extra_data)
+        self.hash_with_attempt_cip22(domain, message, extra_data)
             .map(|res| res.0)
     }
 }
 
-impl<'a, H, P> TryAndIncrement<'a, H, P>
+impl<'a, H, P> TryAndIncrementCIP22<'a, H, P>
 where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
     /// Hash with attempt takes the input, appends a counter
-    pub fn hash_with_attempt(
+    pub fn hash_with_attempt_cip22(
         &self,
         domain: &[u8],
         message: &[u8],
@@ -89,14 +83,16 @@ where
         let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
+        let inner_hash = self.hasher.crh(domain, &message, hash_bytes)?;
         let mut counter = [0; 1];
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
-            let candidate_hash = self.hasher.hash(
-                domain,
-                &[&counter, extra_data, &message].concat(),
-                hash_bytes,
-            )?;
+
+            // concatenate the message with the counter
+            let msg = &[&counter, extra_data, &inner_hash].concat();
+
+            // produce a hash with sufficient length
+            let candidate_hash = self.hasher.xof(domain, &msg, hash_bytes)?;
 
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
