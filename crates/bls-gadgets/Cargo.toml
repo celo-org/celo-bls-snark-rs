@@ -1,6 +1,6 @@
 [package]
 name = "bls-gadgets"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Georgios Konstantopoulos <me@gakonst.com>", "Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@clabs.co>"]
 edition = "2018"
 

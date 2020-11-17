@@ -1,7 +1,5 @@
-use crate::{
-    utils::{bits_to_bytes, bytes_to_bits},
-    YToBitGadget,
-};
+use crate::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
+use crate::YToBitGadget;
 use algebra::{
     bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters},
     curves::{
@@ -106,6 +104,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
     pub fn enforce_hash_to_group(
         counter: UInt8<Bls12_377_Fq>,
         message: &[UInt8<Bls12_377_Fq>],
+        extra_data: &[UInt8<Bls12_377_Fq>],
         generate_constraints_for_hash: bool,
     ) -> Result<
         (
@@ -118,23 +117,24 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         let span = span!(Level::TRACE, "enforce_hash_to_group",);
         let _enter = span.enter();
 
-        // combine the counter with the message
-        let mut input = vec![counter];
-        input.extend_from_slice(message);
         // compress the input
-        let crh_bits = Self::pedersen_hash(&input)?;
+        let crh_bits = Self::pedersen_hash(&message)?;
+
+        // combine the counter with the inner hash
+        let mut input = counter.to_bits_le()?;
+
+        for v in extra_data {
+            input.extend_from_slice(&v.to_bits_le()?);
+        }
+
+        input.extend_from_slice(&crh_bits);
 
         // Hash to bits
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
         // We want 378 random bits for hashing to curve, so we get 512 from the hash and will
         // discard any unneeded ones. We do not generate constraints.
-        let xof_bits = hash_to_bits(
-            &crh_bits,
-            512,
-            personalization,
-            generate_constraints_for_hash,
-        )?;
+        let xof_bits = hash_to_bits(&input, 512, personalization, generate_constraints_for_hash)?;
 
         let hash = Self::hash_to_group(&xof_bits)?;
 
@@ -161,13 +161,12 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             )?;
 
         let mut crh_bits = pedersen_hash.x.to_bits_le().unwrap();
-        crh_bits.reverse();
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
         loop {
             if crh_bits.len() % 8 == 0 {
                 break;
             }
-            crh_bits.insert(0, Boolean::constant(false));
+            crh_bits.push(Boolean::constant(false));
         }
         Ok(crh_bits)
     }
@@ -199,9 +198,7 @@ pub fn hash_to_bits<F: PrimeField>(
     let _enter = span.enter();
     let xof_bits = if generate_constraints_for_hash {
         trace!("generating hash with constraints");
-        // Reverse the message to LE
-        let mut message = message.to_vec();
-        message.reverse();
+        let message = message.to_vec();
         // Blake2s outputs 256 bit hashes so the desired output hash length
         // must be a multiple of that.
         assert_eq!(hash_length % 256, 0, "invalid hash length size");
@@ -213,6 +210,7 @@ pub fn hash_to_bits<F: PrimeField>(
             trace!(blake_iteration = i);
             // calculate the hash (Vec<Boolean>)
             let blake2s_parameters = blake2xs_params(hash_length, i.into(), personalization);
+
             let xof_result =
                 evaluate_blake2s_with_parameters(&message, &blake2s_parameters.parameters())?;
             // convert hash result to LE bits
@@ -223,7 +221,6 @@ pub fn hash_to_bits<F: PrimeField>(
                 .collect::<Vec<Boolean<F>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
-        xof_bits.reverse();
         xof_bits
     } else {
         trace!("generating hash without constraints");
@@ -234,9 +231,9 @@ pub fn hash_to_bits<F: PrimeField>(
                 .iter()
                 .map(|m| m.value())
                 .collect::<Result<Vec<_>, _>>()?;
-            let message = bits_to_bytes(&message);
+            let message = bits_le_to_bytes_le(&message);
             let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
-            bytes_to_bits(&hash_result, 512)
+            bytes_le_to_bits_le(&hash_result, 512)
         };
 
         bits.iter()
@@ -256,9 +253,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
         let span = span!(Level::TRACE, "HashToGroupGadget",);
         let _enter = span.enter();
-        let mut xof_bits = xof_bits.to_vec();
+        let xof_bits = xof_bits.to_vec();
 
-        xof_bits.reverse();
         let x_bits = &xof_bits[..X_BITS];
         let sign_bit = &xof_bits[SIGN_BIT_POSITION];
         trace!("getting G1 point from bits");
@@ -331,15 +327,15 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             Borrow<GroupProjective<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>>,
     {
         // get the cofactor's bits
-        let mut x_bits = BitIteratorBE::new(P::G1Parameters::COFACTOR)
+        let mut cofactor_bits = BitIteratorBE::new(P::G1Parameters::COFACTOR)
             .map(Boolean::constant)
             .collect::<Vec<Boolean<Bls12_377_Fq>>>();
 
         // Zexe's mul_bits requires that inputs _MUST_ be in LE form, so we have to reverse
-        x_bits.reverse();
+        cofactor_bits.reverse();
 
         // return p * cofactor
-        let scaled = p.scalar_mul_le(x_bits.iter())?;
+        let scaled = p.scalar_mul_le(cofactor_bits.iter())?;
         Ok(scaled)
     }
 }
@@ -350,7 +346,7 @@ mod test {
     use crate::utils::test_helpers::print_unsatisfied_constraints;
 
     use algebra::bls12_377;
-    use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
+    use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
     use r1cs_core::ConstraintSystem;
     use r1cs_std::bits::uint8::UInt8;
     use rand::{thread_rng, RngCore};
@@ -363,16 +359,18 @@ mod test {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
+            let mut extra_input = vec![0; *length];
+            rng.fill_bytes(&mut extra_input);
             // check that they get hashed properly
             dbg!(length);
-            hash_to_group(&input);
+            hash_to_group(&input, &extra_input);
         }
     }
 
-    fn hash_to_group(input: &[u8]) {
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+    fn hash_to_group(input: &[u8], extra_input: &[u8]) {
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
         let (expected_hash, attempt) = try_and_increment
-            .hash_with_attempt(SIG_DOMAIN, input, &[])
+            .hash_with_attempt_cip22(SIG_DOMAIN, input, extra_input)
             .unwrap();
 
         let cs = ConstraintSystem::<bls12_377::Fq>::new_ref();
@@ -381,10 +379,17 @@ mod test {
             .iter()
             .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
             .collect::<Vec<_>>();
+        let extra_input = extra_input
+            .iter()
+            .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
+            .collect::<Vec<_>>();
 
         let hash =
             HashToGroupGadget::<bls12_377::Parameters, bls12_377::Fq>::enforce_hash_to_group(
-                counter, &input, true,
+                counter,
+                &input,
+                &extra_input,
+                true,
             )
             .unwrap()
             .0;
