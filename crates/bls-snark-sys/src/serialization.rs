@@ -69,6 +69,15 @@ pub extern "C" fn serialize_public_key(
 }
 
 #[no_mangle]
+pub extern "C" fn serialize_public_key_uncompressed(
+    in_public_key: *const PublicKey,
+    out_bytes: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    serialize_uncompressed(in_public_key, out_bytes, out_len)
+}
+
+#[no_mangle]
 pub extern "C" fn deserialize_signature(
     in_signature_bytes: *const u8,
     in_signature_bytes_len: c_int,
@@ -111,6 +120,26 @@ fn serialize<T: CanonicalSerialize>(
         let obj = unsafe { &*in_obj };
         let mut obj_bytes = vec![];
         obj.serialize(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_bytes = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+        }
+        std::mem::forget(obj_bytes);
+
+        Ok(())
+    })
+}
+
+fn serialize_uncompressed<T: CanonicalSerialize>(
+    in_obj: *const T,
+    out_bytes: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let obj = unsafe { &*in_obj };
+        let mut obj_bytes = vec![];
+        obj.serialize_uncompressed(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_bytes = obj_bytes.as_mut_ptr();
