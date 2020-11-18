@@ -38,10 +38,12 @@ pub mod test_helpers {
 
     use algebra::{bls12_377::G1Projective, Bls12_377};
 
+    /// Maps a slice to a vector of Option values
     pub fn to_option_iter<T: Copy>(it: &[T]) -> Vec<Option<T>> {
         it.iter().map(|t| Some(*t)).collect()
     }
 
+    /// Generate hashed point of epoch data without generating constraints
     pub fn hash_epoch(epoch: &EpochData<Bls12_377>) -> G1Projective {
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
@@ -67,6 +69,7 @@ pub mod test_helpers {
     }
 }
 
+/// Returns a vector of field elements given a big-endian slice of booleans
 pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Result<Vec<F>, SynthesisError> {
     values
         .chunks(P::CAPACITY as usize)
@@ -77,6 +80,7 @@ pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Result<Vec<F>, S
         .collect::<Result<Vec<_>, _>>()
 }
 
+/// Returns a constrained field element given a list of bytes in little endian order
 fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVar, SynthesisError> {
     FrVar::new_witness(cs, || {
         let bits = bytes_le_to_bits_be(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
@@ -105,6 +109,7 @@ fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
     Ok(output)
 }
 
+/// Constrains booleans to be witness variables
 fn constrain_bool<F: PrimeField>(
     input: &[Option<bool>],
     cs: ConstraintSystemRef<F>,

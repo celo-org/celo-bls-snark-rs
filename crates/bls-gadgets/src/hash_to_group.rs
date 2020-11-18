@@ -123,6 +123,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         // combine the counter with the inner hash
         let mut input = counter.to_bits_le()?;
 
+        // add extra data to input
         for v in extra_data {
             input.extend_from_slice(&v.to_bits_le()?);
         }
@@ -245,9 +246,9 @@ pub fn hash_to_bits<F: PrimeField>(
 }
 
 impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
-    // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
-    // decodes the G1 point and then multiplies it by the curve's cofactor to
-    // get the hash
+    /// Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
+    /// decodes the G1 point and then multiplies it by the curve's cofactor to
+    /// get the hash
     fn hash_to_group(
         xof_bits: &[Boolean<Bls12_377_Fq>],
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
@@ -308,6 +309,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
+        // Check point equal to itself after being compressed
         for (a, b) in compressed_point.iter().zip(x_bits.iter()) {
             a.enforce_equal(&b)?;
         }
@@ -319,6 +321,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         Ok(scaled_point)
     }
 
+    /// Checks that the result is equal to the given point
+    /// multiplied by the cofactor in g1
     fn scale_by_cofactor_g1(
         p: &G1Var<Bls12_377_Parameters>,
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError>
