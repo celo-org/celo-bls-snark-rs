@@ -23,7 +23,9 @@ pub trait YToBitGadget<P: Bls12Parameters> {
 }
 
 pub trait FpUtils<F: PrimeField> {
+    /// Checks the result is 1 if the provided field element is equal to zero, else 0
     fn is_eq_zero(&self) -> Result<Boolean<F>, SynthesisError>;
+    /// Checks the result is 1 if el > half, else 0.
     fn normalize(&self) -> Result<Boolean<F>, SynthesisError>;
 }
 
@@ -120,7 +122,6 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
         }
     }
 
-    // Returns 1 if el > half, else 0.
     fn normalize(&self) -> Result<Boolean<F>, SynthesisError> {
         let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
         match self {

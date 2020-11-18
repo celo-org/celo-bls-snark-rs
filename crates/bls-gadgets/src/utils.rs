@@ -20,6 +20,7 @@ pub fn bits_be_to_bytes_le(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
+/// Converts the provided little endian bits to LE bytes
 pub fn bits_le_to_bytes_le(bits: &[bool]) -> Vec<u8> {
     bits_be_to_bytes_le(&bits.iter().cloned().rev().collect::<Vec<_>>())
 }
@@ -44,6 +45,7 @@ pub fn bytes_le_to_bits_be(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
+/// Converts the provided little endian bytes to LE bits
 pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
     bytes_le_to_bits_be(bytes, bits_to_take)
         .into_iter()

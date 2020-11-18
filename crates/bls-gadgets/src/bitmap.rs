@@ -3,6 +3,8 @@ use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
 use r1cs_std::{fields::fp::FpVar, prelude::*};
 
 pub trait Bitmap<F: PrimeField> {
+    /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
+    /// present in the provided bitmap
     fn enforce_maximum_occurrences_in_bitmap(
         &self,
         max_occurrences: &FpVar<F>,
@@ -11,8 +13,6 @@ pub trait Bitmap<F: PrimeField> {
 }
 
 impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
-    /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
-    /// present in the provided bitmap
     fn enforce_maximum_occurrences_in_bitmap(
         &self,
         max_occurrences: &FpVar<F>,

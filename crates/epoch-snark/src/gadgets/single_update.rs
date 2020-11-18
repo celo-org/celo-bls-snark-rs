@@ -58,7 +58,7 @@ pub struct ConstrainedEpoch {
     pub aggregate_pk: G2Var,
     /// The epoch's index
     pub index: FrVar,
-    /// Unpredicatble value to add entropy to the epoch data,
+    /// Unpredictable value to add entropy to the epoch data,
     pub epoch_entropy: FrVar,
     /// Entropy value for the previous epoch.
     pub parent_entropy: FrVar,
@@ -85,7 +85,7 @@ impl SingleUpdate<Bls12_377> {
         previous_epoch_index: &FrVar,
         previous_epoch_randomness: &FrVar,
         previous_max_non_signers: &FrVar,
-        constrain_entropy_bit: &Bool,
+        constrain_entropy_bit: &Bool, // True if entropy present in first epoch block
         num_validators: u32,
         generate_constraints_for_hash: bool,
     ) -> Result<ConstrainedEpoch, SynthesisError> {
@@ -97,6 +97,7 @@ impl SingleUpdate<Bls12_377> {
         let epoch_data = self
             .epoch_data
             .constrain(previous_epoch_index, generate_constraints_for_hash)?;
+        // False (0) if a dummy epoch for padding
         let index_bit = epoch_data.index.is_eq_zero()?.not();
 
         // Enforce equality with previous epoch's entropy if current
@@ -110,7 +111,6 @@ impl SingleUpdate<Bls12_377> {
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
 
-        // convert the bitmap to constraints
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(

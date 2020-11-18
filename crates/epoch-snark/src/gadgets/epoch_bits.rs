@@ -55,6 +55,8 @@ impl EpochBits {
         Ok(())
     }
 
+    /// Generates constrained hash outputs on the first and last
+    /// epoch bits
     fn verify_edges(&self) -> Result<Vec<FrVar>, SynthesisError> {
         // Verify the edges
         let mut xof_bits = vec![];
@@ -133,6 +135,9 @@ impl EpochBits {
     }
 }
 
+/// Returns a vector of vectors of constrained booleans
+/// all of the same size given a vector of constrained
+/// booleans
 fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
     iter.chunks(chunk_size as usize)
         .map(|b| {

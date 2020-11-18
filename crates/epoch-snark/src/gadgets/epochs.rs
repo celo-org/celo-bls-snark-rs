@@ -24,6 +24,7 @@ use r1cs_std::{
 };
 use tracing::{debug, info, span, Level};
 
+// Initialize BLS verification gadget
 type BlsGadget = BlsVerifyGadget<Bls12_377, Fr, PairingVar>;
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
@@ -80,14 +81,16 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
 }
 
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
-    // Enforce that the signatures over the epochs have been calculated
-    // correctly, and then compress the public inputs
+    /// Enforce that the signatures over the epochs have been calculated
+    /// correctly, and then compress the public inputs
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
         info!("generating constraints");
+        // Verify signatures
         let epoch_bits = self.enforce(cs)?;
         let cs = epoch_bits.first_epoch_bits.cs();
+        // Compress public inputs
         epoch_bits.verify(self.hash_helper, cs)?;
         info!("constraints generated");
 
@@ -96,6 +99,9 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
 }
 
 impl ValidatorSetUpdate<Bls12_377> {
+    /// Verify in the constraint system the aggregate BLS
+    /// signature after constraining the epoch hashes and aggregate
+    /// public keys for each epoch
     #[tracing::instrument(target = "r1cs")]
     fn enforce(
         &self,
@@ -184,7 +190,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             AllocationMode::Constant,
         )?;
 
-        // Skip entropy circuit logic if the first epoch does not
+        // Trivially satisfy entropy circuit logic if the first epoch does not
         // contain entropy. Done to support earlier versions of Celo.
         // Assumes all epochs past a single version will contain entropy
         let entropy_bit = first_epoch_entropy.is_eq_zero()?.not();
@@ -208,9 +214,11 @@ impl ValidatorSetUpdate<Bls12_377> {
                 &previous_max_non_signers,
                 &entropy_bit,
                 self.num_validators,
-                self.hash_helper.is_none(), // generate constraints in BW6_761 if no helper was provided
+                self.hash_helper.is_none(), // generate all constraints in BW6_761 if no helper was provided
             )?;
 
+            // If zero, indicates the current epoch is a "dummy" value, and so
+            // some values shouldn't be updated in this loop
             let index_bit = constrained_epoch.index.is_eq_zero()?.not();
 
             // Update the randomness for the next iteration
