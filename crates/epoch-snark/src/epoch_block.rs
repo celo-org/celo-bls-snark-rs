@@ -1,4 +1,5 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, EncodingError};
+use crate::encoding::encode_u8;
 use algebra::{
     bls12_377::{G1Projective, G2Projective},
     ProjectiveCurve,
@@ -9,6 +10,12 @@ use bls_crypto::{
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_le};
+
+#[derive(Debug, Clone, Copy)]
+pub enum EpochType {
+    First,
+    Last,
+}
 
 /// A header as parsed after being fetched from the Celo Blockchain
 /// It contains information about the new epoch, as well as an aggregated
@@ -30,6 +37,8 @@ pub struct EpochTransition {
 pub struct EpochBlock {
     /// The block number
     pub index: u16,
+    /// The round number from consensus
+    pub round: u8,
     /// The entropy from this epoch, derived from the epoch block hash.
     /// Note: After encoding without epoch entropy is no longer supported,
     /// this can be made non-optional.
@@ -53,6 +62,7 @@ impl EpochBlock {
     /// Creates a new epoch block
     pub fn new(
         index: u16,
+        round: u8,
         epoch_entropy: Option<Vec<u8>>,
         parent_entropy: Option<Vec<u8>>,
         maximum_non_signers: u32,
@@ -61,6 +71,7 @@ impl EpochBlock {
     ) -> Self {
         Self {
             index,
+            round: round,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers,
@@ -79,14 +90,14 @@ impl EpochBlock {
     }
 
     /// Encodes the block to bytes and then hashes it with Blake2
-    pub fn blake2_cip22(&self) -> Result<Vec<bool>, EncodingError> {
-        Ok(hash_to_bits(&self.encode_to_bytes_cip22()?))
+    pub fn blake2_first_epoch_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+        Ok(hash_to_bits(&self.encode_first_epoch_to_bytes_cip22()?))
     }
 
     /// Encodes the block appended with the aggregate signature to bytes and then hashes it with Blake2
-    pub fn blake2_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+    pub fn blake2_last_epoch_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
         Ok(hash_to_bits(
-            &self.encode_to_bytes_with_aggregated_pk_cip22()?,
+            &self.encode_last_epoch_to_bytes_with_aggregated_pk_cip22()?,
         ))
     }
 
@@ -102,11 +113,17 @@ impl EpochBlock {
     }
 
     /// Encodes the block to LE bits
-    pub fn encode_to_bits_cip22(&self) -> Result<Vec<bool>, EncodingError> {
+    pub fn encode_to_bits_cip22(&self, epoch_type: EpochType) -> Result<Vec<bool>, EncodingError> {
         let mut epoch_bits = vec![];
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
-        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
-        epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
+        // The first epoch doesn't need the current entropy and the last epoch doesn't need the
+        // parent entropy.
+        match epoch_type {
+            EpochType::First => epoch_bits
+                .extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref())),
+            EpochType::Last => epoch_bits
+                .extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref())),
+        }
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
             epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
@@ -135,6 +152,7 @@ impl EpochBlock {
         let mut epoch_bits = vec![];
         let mut extra_data_bits = vec![];
         extra_data_bits.extend_from_slice(&encode_u16(self.index)?);
+        extra_data_bits.extend_from_slice(&encode_u8(self.round)?);
         extra_data_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
         epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
@@ -152,16 +170,20 @@ impl EpochBlock {
     }
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bits
-    pub fn encode_to_bits_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
-        let mut epoch_bits = self.encode_to_bits_cip22()?;
+    pub fn encode_last_epoch_to_bits_with_aggregated_pk_cip22(
+        &self,
+    ) -> Result<Vec<bool>, EncodingError> {
+        let mut epoch_bits = self.encode_to_bits_cip22(EpochType::Last)?;
         let aggregated_pk = PublicKey::aggregate(&self.new_public_keys);
         epoch_bits.extend_from_slice(encode_public_key(&aggregated_pk)?.as_slice());
         Ok(epoch_bits)
     }
 
     /// Encodes the block to LE bytes
-    pub fn encode_to_bytes_cip22(&self) -> Result<Vec<u8>, EncodingError> {
-        Ok(bits_be_to_bytes_le(&self.encode_to_bits_cip22()?))
+    pub fn encode_first_epoch_to_bytes_cip22(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(bits_be_to_bytes_le(
+            &self.encode_to_bits_cip22(EpochType::First)?,
+        ))
     }
 
     /// Encodes the block to LE bytes
@@ -170,9 +192,11 @@ impl EpochBlock {
     }
 
     /// Encodes the block with the aggregated public key from the vector of pubkeys to LE bytes
-    pub fn encode_to_bytes_with_aggregated_pk_cip22(&self) -> Result<Vec<u8>, EncodingError> {
+    pub fn encode_last_epoch_to_bytes_with_aggregated_pk_cip22(
+        &self,
+    ) -> Result<Vec<u8>, EncodingError> {
         Ok(bits_be_to_bytes_le(
-            &self.encode_to_bits_with_aggregated_pk_cip22()?,
+            &self.encode_last_epoch_to_bits_with_aggregated_pk_cip22()?,
         ))
     }
 
@@ -192,8 +216,8 @@ pub fn hash_first_last_epoch_block(
     first: &EpochBlock,
     last: &EpochBlock,
 ) -> Result<Vec<bool>, EncodingError> {
-    let h1 = first.blake2_cip22()?;
-    let h2 = last.blake2_with_aggregated_pk_cip22()?;
+    let h1 = first.blake2_first_epoch_cip22()?;
+    let h2 = last.blake2_last_epoch_with_aggregated_pk_cip22()?;
     Ok([h1, h2].concat())
 }
 
@@ -227,6 +251,7 @@ mod tests {
             .collect::<Vec<_>>();
         let epoch = EpochBlock::new(
             120u16,
+            5u8,
             Some(vec![255u8; EpochBlock::ENTROPY_BYTES]),
             Some(vec![254u8; EpochBlock::ENTROPY_BYTES]),
             3,
@@ -234,7 +259,7 @@ mod tests {
             pubkeys,
         );
         assert_eq!(
-            hex::encode(epoch.encode_to_bytes_cip22()?),
+            hex::encode(epoch.encode_first_epoch_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITH_ENTROPY
         );
         Ok(())
@@ -245,9 +270,9 @@ mod tests {
         let pubkeys = (0..10)
             .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
             .collect::<Vec<_>>();
-        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys.len(), pubkeys);
+        let epoch = EpochBlock::new(120u16, 5u8, None, None, 3, pubkeys.len(), pubkeys);
         assert_eq!(
-            hex::encode(epoch.encode_to_bytes_cip22()?),
+            hex::encode(epoch.encode_first_epoch_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITHOUT_ENTROPY
         );
         Ok(())
@@ -260,7 +285,7 @@ mod tests {
         let pubkeys = (0..10)
             .map(|_| bls12_377::G2Projective::prime_subgroup_generator().into())
             .collect::<Vec<_>>();
-        let epoch = EpochBlock::new(120u16, None, None, 3, pubkeys.len(), pubkeys);
+        let epoch = EpochBlock::new(120u16, 10u8, None, None, 3, pubkeys.len(), pubkeys);
         assert_eq!(
             hex::encode(epoch.encode_to_bytes()?),
             EXPECTED_ENCODING_BEFORE_DONUT
@@ -275,6 +300,7 @@ mod tests {
             .collect::<Vec<_>>();
         let epoch = EpochBlock::new(
             120u16,
+            5u8,
             Some(vec![255u8; EpochBlock::ENTROPY_BYTES]),
             Some(vec![254u8; EpochBlock::ENTROPY_BYTES]),
             3,
@@ -282,7 +308,7 @@ mod tests {
             pubkeys,
         );
         assert_eq!(
-            hex::encode(epoch.encode_to_bytes_cip22()?),
+            hex::encode(epoch.encode_first_epoch_to_bytes_cip22()?),
             EXPECTED_ENCODING_WITH_ENTROPY_PADDED
         );
         assert_eq!(

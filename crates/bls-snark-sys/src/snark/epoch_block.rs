@@ -6,7 +6,7 @@ use bls_crypto::PublicKey;
 use epoch_snark::{EncodingError, EpochBlock};
 use std::{
     convert::TryFrom,
-    os::raw::{c_int, c_uint, c_ushort},
+    os::raw::{c_int, c_uchar, c_uint, c_ushort},
     slice,
 };
 
@@ -16,6 +16,7 @@ const PUBKEY_BYTES: usize = 96;
 #[no_mangle]
 pub extern "C" fn encode_epoch_block_to_bytes_cip22(
     in_epoch_index: c_ushort,
+    in_round_number: c_uchar,
     in_epoch_entropy: *const u8,
     in_parent_entropy: *const u8,
     in_maximum_non_signers: c_uint,
@@ -41,6 +42,7 @@ pub extern "C" fn encode_epoch_block_to_bytes_cip22(
         let parent_entropy = unsafe { read_epoch_entropy(in_parent_entropy) };
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
+            in_round_number as u8,
             epoch_entropy,
             parent_entropy,
             in_maximum_non_signers as u32,
@@ -84,8 +86,9 @@ pub extern "C" fn encode_epoch_block_to_bytes(
 
         let epoch_block = EpochBlock::new(
             in_epoch_index as u16,
-            None,
-            None,
+            0u8,  // The round number is not used prior to CIP22
+            None, // The epoch entropy is not used prior to CIP22
+            None, // The parent entropy is not used prior to CIP22
             in_maximum_non_signers as u32,
             added_public_keys.len(),
             added_public_keys,
@@ -107,6 +110,8 @@ pub extern "C" fn encode_epoch_block_to_bytes(
 pub struct EpochBlockFFI {
     /// The epoch's index
     pub index: u16,
+    /// The round number from consensus
+    pub round: u8,
     /// The epoch's entropy value, derived from the epoch block hash.
     pub epoch_entropy: *const u8,
     /// The parent epoch's entropy value.
@@ -130,6 +135,7 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
         let parent_entropy = unsafe { read_epoch_entropy(src.parent_entropy) };
         Ok(EpochBlock {
             index: src.index,
+            round: src.round,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: src.maximum_non_signers,
@@ -226,6 +232,7 @@ mod tests {
         );
         let block = EpochBlock {
             index: 1,
+            round: 5,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: 19,
@@ -236,6 +243,7 @@ mod tests {
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
             index: src.index,
+            round: src.round,
             epoch_entropy: &src.epoch_entropy.as_ref().unwrap()[0],
             parent_entropy: &src.parent_entropy.as_ref().unwrap()[0],
             maximum_non_signers: src.maximum_non_signers,
@@ -255,6 +263,7 @@ mod tests {
         let parent_entropy = None;
         let block = EpochBlock {
             index: 1,
+            round: 5,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers: 19,
@@ -265,6 +274,7 @@ mod tests {
         let serialized_pubkeys = serialize_pubkeys(&src.new_public_keys).unwrap();
         let ffi_block = EpochBlockFFI {
             index: src.index,
+            round: src.round,
             epoch_entropy: std::ptr::null(),
             parent_entropy: std::ptr::null(),
             maximum_non_signers: src.maximum_non_signers,

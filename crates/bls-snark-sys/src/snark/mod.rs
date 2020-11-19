@@ -65,6 +65,7 @@ mod tests {
 
         let first_epoch = EpochBlockFFI {
             index: 0,
+            round: 0,
             epoch_entropy: std::ptr::null(),
             parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
@@ -75,6 +76,7 @@ mod tests {
 
         let last_epoch = EpochBlockFFI {
             index: 2,
+            round: 0,
             epoch_entropy: std::ptr::null(),
             parent_entropy: std::ptr::null(),
             maximum_non_signers: 1,
@@ -139,6 +141,7 @@ mod tests {
 
         let first_epoch = EpochBlockFFI {
             index: 0,
+            round: 0,
             epoch_entropy: &first_epoch_entropy[0] as *const u8,
             parent_entropy: &first_parent_entropy[0] as *const u8,
             maximum_non_signers: 1,
@@ -152,6 +155,7 @@ mod tests {
 
         let last_epoch = EpochBlockFFI {
             index: 2,
+            round: 0,
             epoch_entropy: &last_epoch_entropy[0] as *const u8,
             parent_entropy: &last_parent_entropy[0] as *const u8,
             maximum_non_signers: 1,
