@@ -241,20 +241,21 @@ mod tests {
 
     #[test]
     fn not_enough_pubkeys_for_update() {
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        // 2 false in the bitmap when only 1 allowed
-        single_update_enforce(
-            cs.clone(),
-            5,
-            5,
-            4,
-            None,
-            5,
-            1,
-            1,
-            &[true, true, false, true, false],
-        )
-        .unwrap();
+        run_profile_constraints(|| {
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            // 2 false in the bitmap when only 1 allowed
+            single_update_enforce(
+                cs.clone(),
+                5,
+                5,
+                4,
+                None,
+                5,
+                1,
+                1,
+                &[true, true, false, true, false],
+            )
+            .unwrap();
 
             print_unsatisfied_constraints(cs.clone());
             assert!(!cs.is_satisfied().unwrap());
