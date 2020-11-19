@@ -44,6 +44,7 @@ pub mod test_helpers {
     }
 
     /// Generate hashed point of epoch data without generating constraints
+    #[tracing::instrument(target = "r1cs")]
     pub fn hash_epoch(epoch: &EpochData<Bls12_377>) -> G1Projective {
         let mut pubkeys = Vec::new();
         for pk in &epoch.public_keys {
@@ -90,6 +91,7 @@ fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVa
 }
 
 /// Returns the bit representation of the Fr element in *little-endian* ordering.
+#[tracing::instrument(target = "r1cs")]
 fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError> {
     let input = input.to_bits_le()?;
     let result = input[0..length].to_vec();
@@ -97,6 +99,7 @@ fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError>
 }
 
 /// Returns elements in big-endian order
+#[tracing::instrument(target = "r1cs")]
 fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
     let mut x_0 = input.x.c0.to_bits_le()?;
     let mut x_1 = input.x.c1.to_bits_le()?;
@@ -111,6 +114,7 @@ fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
 }
 
 /// Constrains booleans to be witness variables
+#[tracing::instrument(target = "r1cs")]
 fn constrain_bool<F: PrimeField>(
     input: &[Option<bool>],
     cs: ConstraintSystemRef<F>,
