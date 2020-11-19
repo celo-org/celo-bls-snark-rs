@@ -118,6 +118,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             _,
             _,
             first_epoch_bits,
+            _,
             first_epoch_index,
             first_epoch_entropy,
             _,
@@ -278,7 +279,7 @@ impl ValidatorSetUpdate<Bls12_377> {
                 let affine_y = last_apk.y.mul_by_inverse(&last_apk.z)?;
                 let last_apk_affine = G2Var::new(affine_x, affine_y, Fq2Var::one());
                 let last_apk_bits = g2_to_bits(&last_apk_affine)?;
-                last_epoch_bits = constrained_epoch.bits;
+                last_epoch_bits = constrained_epoch.combined_last_epoch_bits;
                 last_epoch_bits.extend_from_slice(&last_apk_bits);
 
                 // make sure the last epoch index is not zero
@@ -343,6 +344,7 @@ mod tests {
         fn epoch_data_to_block(data: &EpochData<Curve>) -> EpochBlock {
             EpochBlock::new(
                 data.index.unwrap(),
+                data.round.unwrap(),
                 data.epoch_entropy.clone(),
                 data.parent_entropy.clone(),
                 data.maximum_non_signers,
@@ -367,6 +369,7 @@ mod tests {
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
             let initial_epoch = generate_single_update::<Curve>(
                 0,
+                0,
                 initial_entropy,
                 None, // parent entropy of initial epoch should be ignored
                 faults,
@@ -387,6 +390,7 @@ mod tests {
                     |(epoch_index, (epoch_validators, (parent_entropy, entropy)))| {
                         generate_single_update::<Curve>(
                             epoch_index as u16 + 1,
+                            0u8,
                             entropy,
                             parent_entropy,
                             faults,

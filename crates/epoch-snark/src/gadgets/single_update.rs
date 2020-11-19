@@ -62,8 +62,10 @@ pub struct ConstrainedEpoch {
     pub epoch_entropy: FrVar,
     /// Entropy value for the previous epoch.
     pub parent_entropy: FrVar,
-    /// Serialized epoch data containing the index, max non signers, aggregated pubkey and the pubkeys array
-    pub bits: Vec<Bool>,
+    /// Serialized epoch data containing the index, max non signers, parent entropy and the pubkeys array
+    pub combined_first_epoch_bits: Vec<Bool>,
+    /// Serialized epoch data containing the index, max non signers, current entropy, aggregated pubkey and the pubkeys array
+    pub combined_last_epoch_bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
     pub xof_bits: Vec<Bool>,
     /// Aux data for proving the CRH->XOF hash outside of BW6_761
@@ -128,7 +130,8 @@ impl SingleUpdate<Bls12_377> {
             index: epoch_data.index,
             epoch_entropy: epoch_data.epoch_entropy,
             parent_entropy: epoch_data.parent_entropy,
-            bits: epoch_data.bits,
+            combined_first_epoch_bits: epoch_data.combined_first_epoch_bits,
+            combined_last_epoch_bits: epoch_data.combined_last_epoch_bits,
             xof_bits: epoch_data.xof_bits,
             crh_bits: epoch_data.crh_bits,
         })
@@ -145,6 +148,7 @@ pub mod test_helpers {
     #[tracing::instrument(target = "r1cs")]
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
+        round: u8,
         epoch_entropy: Option<Vec<u8>>,
         parent_entropy: Option<Vec<u8>>,
         maximum_non_signers: u32,
@@ -153,6 +157,7 @@ pub mod test_helpers {
     ) -> SingleUpdate<E> {
         let epoch_data = EpochData::<E> {
             index: Some(index),
+            round: Some(round),
             epoch_entropy,
             parent_entropy,
             maximum_non_signers,
@@ -173,6 +178,7 @@ pub mod test_helpers {
             .collect::<Vec<_>>();
         let epoch_data = EpochData::<E> {
             index: Some(0),
+            round: Some(0),
             epoch_entropy: Some(vec![0u8; 8 * EpochData::<E>::ENTROPY_BYTES]),
             parent_entropy: Some(vec![0u8; 8 * EpochData::<E>::ENTROPY_BYTES]),
             maximum_non_signers: 0u32,
@@ -223,6 +229,7 @@ mod tests {
                 None,
                 2,
                 1,
+                1,
                 &[true, true, true, true, false],
             )
             .unwrap();
@@ -245,6 +252,7 @@ mod tests {
                 None,
                 5,
                 1,
+                1,
                 &[true, true, false, true, false],
             )
             .unwrap();
@@ -259,7 +267,7 @@ mod tests {
     fn validator_number_cannot_change() {
         run_profile_constraints(|| {
             let cs = ConstraintSystem::<Fr>::new_ref();
-            single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]).unwrap();
+            single_update_enforce(cs, 5, 6, 0, None, 0, 1, 0, &[]).unwrap();
         });
     }
 
@@ -271,6 +279,7 @@ mod tests {
         prev_index: u16,
         prev_randomness: Option<Vec<u8>>,
         index: u16,
+        round: u8,
         maximum_non_signers: u32,
         bitmap: &[bool],
     ) -> Result<ConstrainedEpoch, SynthesisError> {
@@ -306,6 +315,7 @@ mod tests {
         // generate the update via the helper
         let next_epoch = generate_single_update(
             index,
+            round,
             Some(vec![0u8; EpochData::<Bls12_377>::ENTROPY_BYTES]),
             prev_randomness,
             maximum_non_signers,

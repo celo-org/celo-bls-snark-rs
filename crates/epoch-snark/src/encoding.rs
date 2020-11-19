@@ -47,6 +47,17 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingEr
     Ok(bits)
 }
 
+/// LE Encodes a U8 to **bits**
+pub(crate) fn encode_u8(num: u8) -> Result<Vec<bool>, EncodingError> {
+    let bytes = vec![num];
+    let bits = bytes
+        .into_iter()
+        .map(|x| (0..8).map(move |i| (((x as u8) & u8::pow(2, i)) >> i) == 1))
+        .flatten()
+        .collect::<Vec<_>>();
+    Ok(bits)
+}
+
 /// LE Encodes a U16 to **bits**
 pub(crate) fn encode_u16(num: u16) -> Result<Vec<bool>, EncodingError> {
     let mut bytes = vec![];
