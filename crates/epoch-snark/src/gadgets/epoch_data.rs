@@ -458,6 +458,6 @@ mod tests {
         assert_eq!(bits_inner, first_bits);
         assert_ne!(bits_inner, last_bits);
         let bits_inner = ret.3.iter().map(|x| x.value().unwrap()).collect::<Vec<_>>();
-        assert_eq!(bits_inner, last_bits);
+        assert_eq!(bits_inner, last_bits[..bits_inner.len()].to_vec());
     }
 }
