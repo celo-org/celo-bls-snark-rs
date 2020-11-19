@@ -71,7 +71,7 @@ impl EpochBlock {
     ) -> Self {
         Self {
             index,
-            round: round,
+            round,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers,
