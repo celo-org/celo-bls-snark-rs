@@ -56,7 +56,15 @@ pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     use algebra::PrimeField;
-    use r1cs_core::ConstraintSystemRef;
+    use r1cs_core::{ConstraintLayer, ConstraintSystemRef};
+    use tracing_subscriber::layer::SubscriberExt;
+
+    pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
+        let mut layer = ConstraintLayer::default();
+        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+        let subscriber = tracing_subscriber::Registry::default().with(layer);
+        tracing::subscriber::with_default(subscriber, f)
+    }
 
     pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) {
         if !cs.is_satisfied().unwrap() {

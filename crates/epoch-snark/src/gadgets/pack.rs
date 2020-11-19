@@ -11,6 +11,7 @@ impl MultipackGadget {
     /// Packs the provided boolean constraints to a vector of field element gadgets of
     /// `element_size` each. If `should_alloc_input` is set to true, then the allocations
     /// will be made as public inputs.
+    #[tracing::instrument(target = "r1cs")]
     pub fn pack<F: PrimeField, Fp: FpParameters>(
         bits: &[Boolean<F>],
         element_size: usize,

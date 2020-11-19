@@ -142,6 +142,7 @@ pub mod test_helpers {
 
     use algebra::ProjectiveCurve;
 
+    #[tracing::instrument(target = "r1cs")]
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
         epoch_entropy: Option<Vec<u8>>,
@@ -164,6 +165,7 @@ pub mod test_helpers {
         }
     }
 
+    #[tracing::instrument(target = "r1cs")]
     pub fn generate_dummy_update<E: PairingEngine>(num_validators: u32) -> SingleUpdate<E> {
         let bitmap = (0..num_validators).map(|_| true).collect::<Vec<_>>();
         let public_keys = (0..num_validators)
@@ -188,7 +190,9 @@ pub mod test_helpers {
 mod tests {
     use super::{test_helpers::generate_single_update, *};
     use crate::gadgets::bytes_to_fr;
-    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+    use bls_gadgets::utils::test_helpers::{
+        print_unsatisfied_constraints, run_profile_constraints,
+    };
 
     use algebra::{BigInteger, PrimeField, UniformRand};
     use bls_gadgets::utils::bytes_le_to_bits_le;
@@ -208,49 +212,55 @@ mod tests {
 
     #[test]
     fn test_enough_pubkeys_for_update() {
-        let cs = ConstraintSystem::<Fr>::new_ref();
+        run_profile_constraints(|| {
+            let cs = ConstraintSystem::<Fr>::new_ref();
 
-        single_update_enforce(
-            cs.clone(),
-            5,
-            5,
-            1,
-            None,
-            2,
-            1,
-            &[true, true, true, true, false],
-        )
-        .unwrap();
+            single_update_enforce(
+                cs.clone(),
+                5,
+                5,
+                1,
+                None,
+                2,
+                1,
+                &[true, true, true, true, false],
+            )
+            .unwrap();
 
-        print_unsatisfied_constraints(cs.clone());
-        assert!(cs.is_satisfied().unwrap());
+            print_unsatisfied_constraints(cs.clone());
+            assert!(cs.is_satisfied().unwrap());
+        });
     }
 
     #[test]
     fn not_enough_pubkeys_for_update() {
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        // 2 false in the bitmap when only 1 allowed
-        single_update_enforce(
-            cs.clone(),
-            5,
-            5,
-            4,
-            None,
-            5,
-            1,
-            &[true, true, false, true, false],
-        )
-        .unwrap();
+        run_profile_constraints(|| {
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            // 2 false in the bitmap when only 1 allowed
+            single_update_enforce(
+                cs.clone(),
+                5,
+                5,
+                4,
+                None,
+                5,
+                1,
+                &[true, true, false, true, false],
+            )
+            .unwrap();
 
-        print_unsatisfied_constraints(cs.clone());
-        assert!(!cs.is_satisfied().unwrap());
+            print_unsatisfied_constraints(cs.clone());
+            assert!(!cs.is_satisfied().unwrap());
+        });
     }
 
     #[test]
     #[should_panic]
     fn validator_number_cannot_change() {
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]).unwrap();
+        run_profile_constraints(|| {
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            single_update_enforce(cs, 5, 6, 0, None, 0, 0, &[]).unwrap();
+        });
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]

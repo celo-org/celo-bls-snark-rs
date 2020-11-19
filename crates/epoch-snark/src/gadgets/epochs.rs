@@ -58,6 +58,7 @@ pub struct HashToBitsHelper<E: PairingEngine> {
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
     /// Initializes an empty validator set update. This is used when running the trusted setup.
+    #[tracing::instrument(target = "r1cs")]
     pub fn empty(
         num_validators: usize,
         num_epochs: usize,
@@ -83,6 +84,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     /// Enforce that the signatures over the epochs have been calculated
     /// correctly, and then compress the public inputs
+    #[tracing::instrument(target = "r1cs")]
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();
@@ -319,7 +321,9 @@ impl ValidatorSetUpdate<Bls12_377> {
 mod tests {
     use super::*;
     use crate::gadgets::single_update::test_helpers::generate_single_update;
-    use bls_gadgets::utils::test_helpers::print_unsatisfied_constraints;
+    use bls_gadgets::utils::test_helpers::{
+        print_unsatisfied_constraints, run_profile_constraints,
+    };
 
     use algebra::{bls12_377::G1Projective, ProjectiveCurve};
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
@@ -465,8 +469,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs() {
+            run_profile_constraints(test_multiple_epochs_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -492,8 +499,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_dummy() {
+            run_profile_constraints(test_multiple_epochs_with_dummy_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_dummy_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -519,8 +529,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_entropy() {
+            run_profile_constraints(test_multiple_epochs_with_entropy_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_entropy_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -563,8 +576,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_wrong_entropy() {
+            run_profile_constraints(test_multiple_epochs_with_wrong_entropy_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_wrong_entropy_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -608,8 +624,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_wrong_entropy_dummy() {
+            run_profile_constraints(test_multiple_epochs_with_wrong_entropy_dummy_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_wrong_entropy_dummy_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
@@ -655,8 +674,11 @@ mod tests {
         }
 
         #[test]
-        #[tracing::instrument(target = "r1cs")]
         fn test_multiple_epochs_with_no_initial_entropy() {
+            run_profile_constraints(test_multiple_epochs_with_no_initial_entropy_inner);
+        }
+        #[tracing::instrument(target = "r1cs")]
+        fn test_multiple_epochs_with_no_initial_entropy_inner() {
             let num_faults = 2;
             let num_epochs = 4;
             // no more than `faults` 0s exist in the bitmap
