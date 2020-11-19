@@ -160,7 +160,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
     use algebra::{
         bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
@@ -182,6 +182,9 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g1() {
+        run_profile_constraints(test_y_to_bit_g1_inner);
+    }
+    fn test_y_to_bit_g1_inner() {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let rng = &mut rand::thread_rng();
 
@@ -210,6 +213,9 @@ mod test {
 
     #[test]
     fn test_y_to_bit_g2() {
+        run_profile_constraints(test_y_to_bit_g2_inner);
+    }
+    fn test_y_to_bit_g2_inner() {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
         let rng = &mut rand::thread_rng();
@@ -290,33 +296,43 @@ mod test {
     // Check points at the edge - c1 == half.
     #[test]
     fn test_y_to_bit_g2_c1_is_half() {
-        let half = <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-        test_y_to_bit_g2_edge(half);
+        run_profile_constraints(|| {
+            let half =
+                <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            test_y_to_bit_g2_edge(half);
+        });
     }
 
     // Check points at the edge - c1 == 0.
     #[test]
     fn test_y_to_bit_g2_c1_is_zero() {
-        let zero = <Parameters as Bls12Parameters>::Fp::zero();
-        test_y_to_bit_g2_edge(zero.into_repr());
+        run_profile_constraints(|| {
+            let zero = <Parameters as Bls12Parameters>::Fp::zero();
+            test_y_to_bit_g2_edge(zero.into_repr());
+        });
     }
 
     // Check points at the edge - c1 == p-1.
     #[test]
     fn test_y_to_bit_g2_c1_is_p_minus_1() {
-        let half = <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-        let mut p_minus_one = half;
-        p_minus_one.mul2();
-        test_y_to_bit_g2_edge(p_minus_one);
+        run_profile_constraints(|| {
+            let half =
+                <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            let mut p_minus_one = half;
+            p_minus_one.mul2();
+            test_y_to_bit_g2_edge(p_minus_one);
+        });
     }
 
     // Check points at the edge - c1 == half + 1.
     #[test]
     fn test_y_to_bit_g2_c1_is_half_plus_one() {
-        let mut half_plus_one =
-            <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
-        let one = <<Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from(1);
-        half_plus_one.add_nocarry(&one);
-        test_y_to_bit_g2_edge(half_plus_one);
+        run_profile_constraints(|| {
+            let mut half_plus_one =
+                <<Parameters as Bls12Parameters>::Fp as PrimeField>::modulus_minus_one_div_two();
+            let one = <<Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from(1);
+            half_plus_one.add_nocarry(&one);
+            test_y_to_bit_g2_edge(half_plus_one);
+        });
     }
 }

@@ -215,7 +215,7 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
     use bls_crypto::test_helpers::*;
 
     use algebra::{
@@ -285,6 +285,9 @@ mod verify_one_message {
 
     #[test]
     fn batch_verify_ok() {
+        run_profile_constraints(batch_verify_ok_inner);
+    }
+    fn batch_verify_ok_inner() {
         // generate 5 (aggregate sigs, message hash pairs)
         // verify them all in 1 call
         let batch_size = 5;
@@ -350,8 +353,11 @@ mod verify_one_message {
     }
 
     #[test]
-    // Verifies signatures over BLS12_377 with Sw6 field (384 bits).
     fn one_signature_ok() {
+        run_profile_constraints(one_signature_ok_inner);
+    }
+    // Verifies signatures over BLS12_377 with Sw6 field (384 bits).
+    fn one_signature_ok_inner() {
         let (secret_key, pub_key) = keygen::<Bls12_377>();
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
@@ -384,6 +390,9 @@ mod verify_one_message {
 
     #[test]
     fn multiple_signatures_ok() {
+        run_profile_constraints(multiple_signatures_ok_inner);
+    }
+    fn multiple_signatures_ok_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
         let (sk, pk) = keygen::<Bls12_377>();
@@ -437,6 +446,9 @@ mod verify_one_message {
 
     #[test]
     fn zero_succeeds() {
+        run_profile_constraints(zero_succeeds_inner);
+    }
+    fn zero_succeeds_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
         let generator = G2Projective::prime_subgroup_generator();
@@ -462,6 +474,9 @@ mod verify_one_message {
 
     #[test]
     fn doubling_succeeds() {
+        run_profile_constraints(doubling_succeeds_inner);
+    }
+    fn doubling_succeeds_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
 

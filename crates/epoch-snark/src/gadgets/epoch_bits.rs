@@ -152,13 +152,19 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 mod tests {
     use super::*;
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
-    use bls_gadgets::utils::{bytes_le_to_bits_be, test_helpers::print_unsatisfied_constraints};
+    use bls_gadgets::utils::{
+        bytes_le_to_bits_be,
+        test_helpers::{print_unsatisfied_constraints, run_profile_constraints},
+    };
 
     use r1cs_core::ConstraintSystem;
     use rand::RngCore;
 
     #[test]
     fn correct_blake2_hash() {
+        run_profile_constraints(correct_blake2_hash_inner);
+    }
+    fn correct_blake2_hash_inner() {
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];
         rng.fill_bytes(&mut first_bytes);

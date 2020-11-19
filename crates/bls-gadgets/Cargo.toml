@@ -17,13 +17,13 @@ crypto-primitives = { git = "https://github.com/celo-org/zexe", default-features
 rand_xorshift = { version = "0.2", optional = true }
 rand = { version = "0.7" , optional = true }
 tracing = "0.1.13"
+tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
 rand = { version = "0.7" }
 groth16 = { git = "https://github.com/celo-org/zexe" }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
-tracing-subscriber = { version = "0.2" }
 
 [features]
 default = []

@@ -347,7 +347,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
     use algebra::bls12_377;
     use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
@@ -357,6 +357,9 @@ mod test {
 
     #[test]
     fn test_hash_to_group() {
+        run_profile_constraints(test_hash_to_group_inner);
+    }
+    fn test_hash_to_group_inner() {
         let mut rng = thread_rng();
         // test for various input sizes
         for length in &[10, 25, 50, 100, 200, 300] {

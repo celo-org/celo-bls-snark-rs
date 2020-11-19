@@ -13,6 +13,7 @@ pub trait Bitmap<F: PrimeField> {
 }
 
 impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
+    #[tracing::instrument(target = "r1cs")]
     fn enforce_maximum_occurrences_in_bitmap(
         &self,
         max_occurrences: &FpVar<F>,
@@ -73,7 +74,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
     use algebra::{
         bls12_377::{Fq, Fr},
@@ -161,31 +162,39 @@ mod tests {
 
         #[test]
         fn one_zero_allowed() {
-            assert!(cs_enforce_value(&[false], 1, false).is_satisfied().unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[false], 1, false);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
         fn no_zeros_allowed() {
-            assert!(!cs_enforce_value(&[false], 0, false).is_satisfied().unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[false], 0, false);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(!cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
 
         fn three_zeros_allowed() {
-            assert!(
-                cs_enforce_value(&[false, true, true, false, false], 3, false)
-                    .is_satisfied()
-                    .unwrap()
-            );
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[false, true, true, false, false], 3, false);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
         fn four_zeros_not_allowed() {
-            assert!(
-                !cs_enforce_value(&[false, false, true, false, false], 3, false)
-                    .is_satisfied()
-                    .unwrap()
-            );
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[false, false, true, false, false], 3, false);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(!cs.is_satisfied().unwrap());
+            });
         }
     }
 
@@ -194,26 +203,38 @@ mod tests {
 
         #[test]
         fn one_one_allowed() {
-            assert!(cs_enforce_value(&[true], 1, true).is_satisfied().unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[true], 1, true);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
         fn no_ones_allowed() {
-            assert!(!cs_enforce_value(&[true], 0, true).is_satisfied().unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[true], 0, true);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(!cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
         fn three_ones_allowed() {
-            assert!(cs_enforce_value(&[false, true, true, true, false], 3, true)
-                .is_satisfied()
-                .unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[false, true, true, true, false], 3, true);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(cs.is_satisfied().unwrap());
+            });
         }
 
         #[test]
         fn four_ones_not_allowed() {
-            assert!(!cs_enforce_value(&[true, true, true, true, false], 3, true)
-                .is_satisfied()
-                .unwrap());
+            run_profile_constraints(|| {
+                let cs = cs_enforce_value(&[true, true, true, true, false], 3, true);
+                print_unsatisfied_constraints(cs.clone());
+                assert!(!cs.is_satisfied().unwrap());
+            });
         }
     }
 }
