@@ -164,6 +164,7 @@ mod tests {
     fn correct_blake2_hash() {
         run_profile_constraints(correct_blake2_hash_inner);
     }
+    #[tracing::instrument(target = "r1cs")]
     fn correct_blake2_hash_inner() {
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];

@@ -142,6 +142,7 @@ pub mod test_helpers {
 
     use algebra::ProjectiveCurve;
 
+    #[tracing::instrument(target = "r1cs")]
     pub fn generate_single_update<E: PairingEngine>(
         index: u16,
         epoch_entropy: Option<Vec<u8>>,
@@ -164,6 +165,7 @@ pub mod test_helpers {
         }
     }
 
+    #[tracing::instrument(target = "r1cs")]
     pub fn generate_dummy_update<E: PairingEngine>(num_validators: u32) -> SingleUpdate<E> {
         let bitmap = (0..num_validators).map(|_| true).collect::<Vec<_>>();
         let public_keys = (0..num_validators)

@@ -143,6 +143,7 @@ mod tests {
         assert!(verify_proof(&pvk, &proof, &[]).unwrap());
     }
 
+    #[tracing::instrument(target = "r1cs")]
     fn cs_enforce_value(bitmap: &[bool], max_number: u64, is_one: bool) -> ConstraintSystemRef<Fq> {
         let cs = ConstraintSystem::<Fq>::new_ref();
         let bitmap = bitmap

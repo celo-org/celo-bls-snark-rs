@@ -101,6 +101,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
     /// so that they can be used to verify the correct calculation of the XOF from
     /// the CRH in a separate proof.
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(target = "r1cs")]
     pub fn enforce_hash_to_group(
         counter: UInt8<Bls12_377_Fq>,
         message: &[UInt8<Bls12_377_Fq>],
@@ -184,6 +185,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
+#[tracing::instrument(target = "r1cs")]
 pub fn hash_to_bits<F: PrimeField>(
     message: &[Boolean<F>],
     hash_length: u16,
@@ -374,6 +376,7 @@ mod test {
         }
     }
 
+    #[tracing::instrument(target = "r1cs")]
     fn hash_to_group(input: &[u8], extra_input: &[u8]) {
         let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
         let (expected_hash, attempt) = try_and_increment

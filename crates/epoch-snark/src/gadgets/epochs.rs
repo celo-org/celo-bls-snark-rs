@@ -58,6 +58,7 @@ pub struct HashToBitsHelper<E: PairingEngine> {
 
 impl<E: PairingEngine> ValidatorSetUpdate<E> {
     /// Initializes an empty validator set update. This is used when running the trusted setup.
+    #[tracing::instrument(target = "r1cs")]
     pub fn empty(
         num_validators: usize,
         num_epochs: usize,
@@ -83,6 +84,7 @@ impl<E: PairingEngine> ValidatorSetUpdate<E> {
 impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
     /// Enforce that the signatures over the epochs have been calculated
     /// correctly, and then compress the public inputs
+    #[tracing::instrument(target = "r1cs")]
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate");
         let _enter = span.enter();

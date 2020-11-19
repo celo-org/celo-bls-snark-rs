@@ -97,6 +97,7 @@ impl EpochData<Bls12_377> {
     /// Ensures that the epoch's index is equal to `previous_index + 1`. Enforces that
     /// the epoch's G1 hash is correctly calculated, and also provides auxiliary data for
     /// verifying the CRH->XOF hash outside of BW6_761.
+    #[tracing::instrument(target = "r1cs")]
     pub fn constrain(
         &self,
         previous_index: &FrVar,
@@ -207,6 +208,7 @@ impl EpochData<Bls12_377> {
     }
 
     /// Enforces that `index = previous_index + 1`
+    #[tracing::instrument(target = "r1cs")]
     fn enforce_next_epoch(previous_index: &FrVar, index: &FrVar) -> Result<(), SynthesisError> {
         trace!("enforcing next epoch");
         let previous_plus_one = previous_index + Fr::one();
@@ -219,6 +221,7 @@ impl EpochData<Bls12_377> {
 
     /// Packs the provided bits in U8s, and calculates the hash and the counter
     /// Also returns the auxiliary CRH and XOF bits for potential compression from consumers
+    #[tracing::instrument(target = "r1cs")]
     fn hash_bits_to_g1(
         epoch_bits: &[Bool],
         epoch_extra_data_bits: &[Bool],
@@ -300,6 +303,7 @@ mod tests {
     };
     use r1cs_core::ConstraintSystem;
 
+    #[tracing::instrument(target = "r1cs")]
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
         let rng = &mut rand::thread_rng();
         let pubkeys = (0..10)
@@ -333,6 +337,7 @@ mod tests {
     fn test_hash_epoch_to_g1() {
         run_profile_constraints(test_hash_epoch_to_g1_inner);
     }
+    #[tracing::instrument(target = "r1cs")]
     fn test_hash_epoch_to_g1_inner() {
         let epoch = test_epoch(10);
         let mut pubkeys = Vec::new();
@@ -368,6 +373,7 @@ mod tests {
     fn enforce_next_epoch() {
         run_profile_constraints(enforce_next_epoch_inner);
     }
+    #[tracing::instrument(target = "r1cs")]
     fn enforce_next_epoch_inner() {
         for (index1, index2, expected) in &[
             (0u16, 1u16, true),
@@ -390,6 +396,7 @@ mod tests {
     fn epoch_to_bits_ok() {
         run_profile_constraints(epoch_to_bits_ok_inner);
     }
+    #[tracing::instrument(target = "r1cs")]
     fn epoch_to_bits_ok_inner() {
         let epoch = test_epoch(18);
         let mut pubkeys = Vec::new();

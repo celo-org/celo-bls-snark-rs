@@ -84,6 +84,7 @@ impl YToBitGadget<Bls12_377_Parameters> for G2Var<Bls12_377_Parameters> {
 }
 
 impl<F: PrimeField> FpUtils<F> for FpVar<F> {
+    #[tracing::instrument(target = "r1cs")]
     fn is_eq_zero(&self) -> Result<Boolean<F>, SynthesisError> {
         match self {
             Self::Constant(_) => Ok(Boolean::constant(self.value()? == F::zero())),
@@ -122,6 +123,7 @@ impl<F: PrimeField> FpUtils<F> for FpVar<F> {
         }
     }
 
+    #[tracing::instrument(target = "r1cs")]
     fn normalize(&self) -> Result<Boolean<F>, SynthesisError> {
         let half = F::from_repr(F::modulus_minus_one_div_two()).get()?;
         match self {
@@ -184,6 +186,7 @@ mod test {
     fn test_y_to_bit_g1() {
         run_profile_constraints(test_y_to_bit_g1_inner);
     }
+    #[tracing::instrument(target = "r1cs")]
     fn test_y_to_bit_g1_inner() {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let rng = &mut rand::thread_rng();
