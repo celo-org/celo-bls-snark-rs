@@ -57,6 +57,7 @@ pub use bls::{PrivateKey, PublicKey, PublicKeyCache, Signature};
 /// Traits and implementations for hashing arbitrary data to an elliptic curve's group element
 pub mod hash_to_curve;
 pub use hash_to_curve::HashToCurve;
+pub use hash_to_curve::CrhAndXofHashToCurve;
 
 /// Hash function implementations using a CRH followed by a XOF.
 pub mod hashers;

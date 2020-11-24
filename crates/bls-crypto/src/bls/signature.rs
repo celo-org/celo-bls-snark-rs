@@ -1,5 +1,5 @@
 use super::PublicKey;
-use crate::{BLSError, HashToCurve};
+use crate::{BLSError, CrhAndXofHashToCurve};
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine},
@@ -77,7 +77,7 @@ impl Signature {
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
-    pub fn batch_verify<H: HashToCurve<Output = G1Projective>, P: Borrow<PublicKey>>(
+    pub fn batch_verify<H: CrhAndXofHashToCurve<Output = G1Projective>, P: Borrow<PublicKey>>(
         &self,
         pubkeys: &[P],
         domain: &[u8],
@@ -162,7 +162,7 @@ mod tests {
         test_aggregated_sig_inner(&*COMPOSITE_HASH_TO_G1_CIP22);
     }
 
-    fn test_aggregated_sig_inner<H: HashToCurve<Output = G1Projective>>(try_and_increment: &H) {
+    fn test_aggregated_sig_inner<H: CrhAndXofHashToCurve<Output = G1Projective>>(try_and_increment: &H) {
         let message = b"hello";
         let rng = &mut thread_rng();
 
@@ -227,7 +227,7 @@ mod tests {
     }
 
     #[allow(unused)] // needed when we don't compile with ffi features
-    fn test_batch_verify_with_hasher<H: HashToCurve<Output = G1Projective>>(
+    fn test_batch_verify_with_hasher<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         try_and_increment: &H,
         is_composite: bool,
         is_cip22: bool,
@@ -349,7 +349,7 @@ mod tests {
         test_signature_serialization_inner(try_and_increment_composite_cip22);
     }
 
-    fn test_signature_serialization_inner<H: HashToCurve<Output = G1Projective>>(
+    fn test_signature_serialization_inner<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         try_and_increment: &H,
     ) {
         let rng = &mut thread_rng();

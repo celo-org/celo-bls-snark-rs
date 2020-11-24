@@ -51,14 +51,45 @@ pub trait HashToCurve {
     /// The type of the curve being used.
     type Output;
 
-    /// Given a domain separator, a message and potentially some extra data, produces
-    /// a hash of them which is a curve point.
+    /// Given a domain separator, and a message, produce
+    /// a hash of them which is a curve point in the prime order subgroup.
+    fn hash(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+    ) -> Result<Self::Output, BLSError>;
+}
+
+/// Trait for hashes from arbitrary data to a group element, 
+/// where the hash contains a sub-routine of the form:
+/// XOF(extra_data, CRH(msg)).
+pub trait CrhAndXofHashToCurve {
+    /// The type of the curve being used.
+    type Output;
+
+    /// Given a domain separator, a message and extra data, 
+    /// produce a hash of them which is a curve point
     fn hash(
         &self,
         domain: &[u8],
         message: &[u8],
         extra_data: &[u8],
     ) -> Result<Self::Output, BLSError>;
+}
+
+impl<Alg: CrhAndXofHashToCurve> HashToCurve for Alg
+{
+    type Output = Alg::Output;
+
+    fn hash(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+    ) -> Result<Self::Output, BLSError>
+    {
+        let extra_data = [0u8; 0];
+        self.hash(domain, message, &extra_data)
+    }
 }
 
 /// Given `n` bytes, it returns the value rounded to the nearest multiple of 256 bits (in bytes)
@@ -148,7 +179,7 @@ mod test {
         (domain, msg, extra_data)
     }
 
-    pub fn test_hash_to_group<P: SWModelParameters, H: HashToCurve<Output = GroupProjective<P>>>(
+    pub fn test_hash_to_group<P: SWModelParameters, H: CrhAndXofHashToCurve<Output = GroupProjective<P>>>(
         hasher: &H,
         rng: &mut impl Rng,
         expected_hashes: Vec<Vec<u8>>,
@@ -165,7 +196,7 @@ mod test {
     #[allow(dead_code)]
     pub fn test_hash_to_group_cip22<
         P: SWModelParameters,
-        H: HashToCurve<Output = GroupProjective<P>>,
+        H: CrhAndXofHashToCurve<Output = GroupProjective<P>>,
     >(
         hasher: &H,
         rng: &mut impl Rng,
