@@ -105,6 +105,7 @@ pub fn hash_length(n: usize) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::hash_to_curve::CrhAndXofHashToCurve;
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hashers::{
         composite::{CompositeHasher, CRH},
@@ -154,7 +155,7 @@ mod test {
         for length in &[10, 25, 50, 100, 200, 300] {
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
-            let _ = hasher.hash(&b"domain"[..], &input, &b"extra"[..]).unwrap();
+            let _ = CrhAndXofHashToCurve::hash(&hasher, &b"domain"[..], &input, &b"extra"[..]).unwrap();
         }
     }
 

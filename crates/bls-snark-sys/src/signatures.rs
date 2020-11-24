@@ -6,7 +6,7 @@ use crate::{
 };
 use algebra::{ProjectiveCurve, ToBytes};
 use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
-use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
+use bls_crypto::{BLSError, CrhAndXofHashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use std::{os::raw::c_int, slice};
 
 /// # Safety
