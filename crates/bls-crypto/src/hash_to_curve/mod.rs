@@ -156,6 +156,7 @@ mod test {
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
             let _ = CrhAndXofHashToCurve::hash(&hasher, &b"domain"[..], &input, &b"extra"[..]).unwrap();
+            let _ = HashToCurve::hash(&hasher, &b"domain"[..], &input).unwrap();
         }
     }
 
