@@ -14,7 +14,9 @@ use r1cs_std::{
 };
 
 use super::{constrain_bool, EpochData};
+use crate::EpochBlock;
 use bls_gadgets::{BlsVerifyGadget, FpUtils};
+use r1cs_std::groups::CurveVar;
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
@@ -120,6 +122,7 @@ impl SingleUpdate<Bls12_377> {
             &signed_bitmap,
             &epoch_data.message_hash,
             &previous_max_non_signers,
+            &G2Var::constant(EpochBlock::padding_pk()),
         )?;
 
         Ok(ConstrainedEpoch {
