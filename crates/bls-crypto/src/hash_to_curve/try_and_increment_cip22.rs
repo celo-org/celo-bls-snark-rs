@@ -73,12 +73,24 @@ where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
-    /// Hash with attempt takes the input, appends a counter
-    pub fn hash_with_attempt_cip22(
+   /// Hash with attempt takes the input, appends a counter
+   pub fn hash_with_attempt_cip22(
         &self,
         domain: &[u8],
         message: &[u8],
         extra_data: &[u8],
+    ) -> Result<(GroupProjective<P>, usize), BLSError> {
+        let mut counter = 0;
+        self.hash_with_attempt_cip22_counter(domain, message, extra_data, &mut counter)
+    }
+
+ /// Hash with attempt takes the input, appends a counter
+    pub fn hash_with_attempt_cip22_counter(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+        counter_out: &mut u8,
     ) -> Result<(GroupProjective<P>, usize), BLSError> {
         let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
@@ -86,6 +98,7 @@ where
         let inner_hash = self.hasher.crh(domain, &message, hash_bytes)?;
         let mut counter = [0; 1];
         for c in 0..NUM_TRIES {
+            *counter_out = c;
             (&mut counter[..]).write_u8(c as u8)?;
 
             // concatenate the message with the counter
@@ -127,4 +140,16 @@ where
         }
         Err(BLSError::HashToCurveError)
     }
+
+    pub fn hash_with_counter(
+        &self,
+        domain: &[u8],
+        message: &[u8],
+        extra_data: &[u8],
+        counter: &mut u8,
+    ) -> Result<GroupProjective<P>, BLSError> {
+        self.hash_with_attempt_cip22_counter(domain, message, extra_data, counter)
+            .map(|res| res.0)
+    }
+
 }
