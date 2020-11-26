@@ -7,6 +7,8 @@ use crate::{
 use algebra::{ProjectiveCurve, ToBytes};
 use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
 use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
+use bls_crypto::hashers::COMPOSITE_HASHER;
+use bls_crypto::Hasher;
 use std::{os::raw::c_int, slice};
 
 /// # Safety
@@ -137,6 +139,28 @@ pub extern "C" fn hash_composite(
 }
 
 #[no_mangle]
+pub extern "C" fn hash_crh(
+    in_message: *const u8,
+    in_message_len: c_int,
+    out_hash: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
+        let hash = COMPOSITE_HASHER.crh(SIG_DOMAIN, message, 256)?;
+        let mut obj_bytes = vec![];
+        hash.write(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_hash = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+        }
+        std::mem::forget(obj_bytes);
+        Ok(())
+    })
+}
+
+#[no_mangle]
 pub extern "C" fn hash_composite_cip22(
     in_message: *const u8,
     in_message_len: c_int,
@@ -144,18 +168,21 @@ pub extern "C" fn hash_composite_cip22(
     in_extra_data_len: c_int,
     out_hash: *mut *mut u8,
     out_len: *mut c_int,
+    attempt_counter: *mut c_int,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let hash = COMPOSITE_HASH_TO_G1_CIP22.hash(SIG_DOMAIN, message, extra_data)?;
+        let mut counter = 0;
+        let hash = COMPOSITE_HASH_TO_G1_CIP22.hash_with_counter(SIG_DOMAIN, message, extra_data, &mut counter)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_hash = obj_bytes.as_mut_ptr();
             *out_len = obj_bytes.len() as c_int;
+            *attempt_counter = counter as c_int;
         }
         std::mem::forget(obj_bytes);
         Ok(())
