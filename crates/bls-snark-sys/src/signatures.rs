@@ -168,7 +168,7 @@ pub extern "C" fn hash_composite_cip22(
     in_extra_data_len: c_int,
     out_hash: *mut *mut u8,
     out_len: *mut c_int,
-    attempt_counter: *mut c_int,
+    attempt_counter: *mut u8,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
@@ -182,7 +182,7 @@ pub extern "C" fn hash_composite_cip22(
         unsafe {
             *out_hash = obj_bytes.as_mut_ptr();
             *out_len = obj_bytes.len() as c_int;
-            *attempt_counter = counter as c_int;
+            *attempt_counter = counter;
         }
         std::mem::forget(obj_bytes);
         Ok(())
