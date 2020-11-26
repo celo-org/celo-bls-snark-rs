@@ -94,6 +94,10 @@ impl EpochBlock {
         Ok(hash_to_bits(&self.encode_first_epoch_to_bytes_cip22()?))
     }
 
+    pub fn padding_pk() -> G2Projective {
+        G2Projective::prime_subgroup_generator()
+    }
+
     /// Encodes the block appended with the aggregate signature to bytes and then hashes it with Blake2
     pub fn blake2_last_epoch_with_aggregated_pk_cip22(&self) -> Result<Vec<bool>, EncodingError> {
         Ok(hash_to_bits(
@@ -130,9 +134,9 @@ impl EpochBlock {
         }
         if self.maximum_validators > self.new_public_keys.len() {
             let difference = self.maximum_validators - self.new_public_keys.len();
-            let generator = PublicKey::from(G2Projective::prime_subgroup_generator());
+            let padding_pk = PublicKey::from(Self::padding_pk());
             for _ in 0..difference {
-                epoch_bits.extend_from_slice(encode_public_key(&generator)?.as_slice());
+                epoch_bits.extend_from_slice(encode_public_key(&padding_pk)?.as_slice());
             }
         }
         Ok(epoch_bits)
@@ -161,9 +165,9 @@ impl EpochBlock {
         }
         if self.maximum_validators > self.new_public_keys.len() {
             let difference = self.maximum_validators - self.new_public_keys.len();
-            let generator = PublicKey::from(G2Projective::prime_subgroup_generator());
+            let padding_pk = PublicKey::from(Self::padding_pk());
             for _ in 0..difference {
-                epoch_bits.extend_from_slice(encode_public_key(&generator)?.as_slice());
+                epoch_bits.extend_from_slice(encode_public_key(&padding_pk)?.as_slice());
             }
         }
         Ok((epoch_bits, extra_data_bits))

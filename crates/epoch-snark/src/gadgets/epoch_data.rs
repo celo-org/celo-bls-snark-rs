@@ -179,7 +179,7 @@ impl EpochData<Bls12_377> {
 
         let extra_data_bits: Vec<Bool> = [
             index_bits.clone(),
-            round_bits.clone(),
+            round_bits,
             maximum_non_signers_bits.clone(),
         ]
         .concat();
