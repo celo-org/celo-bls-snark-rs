@@ -1,4 +1,4 @@
-use crate::{BLSError, HashToCurve, PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN};
+use crate::{BLSError, CrhAndXofHashToCurve, PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 use algebra::{
     bls12_377::{Fr, G1Projective},
@@ -31,7 +31,7 @@ impl PrivateKey {
 
     /// Hashes the message/extra_data tuple with the provided `hash_to_g1` function
     /// and then signs it in the SIG_DOMAIN
-    pub fn sign<H: HashToCurve<Output = G1Projective>>(
+    pub fn sign<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         extra_data: &[u8],
@@ -42,7 +42,7 @@ impl PrivateKey {
 
     /// Hashes the message with the provided `hash_to_g1` function
     /// and then signs it in the POP_DOMAIN
-    pub fn sign_pop<H: HashToCurve<Output = G1Projective>>(
+    pub fn sign_pop<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         hash_to_g1: &H,
@@ -51,7 +51,7 @@ impl PrivateKey {
     }
 
     /// Hashes to G1 and signs the hash
-    fn sign_message<H: HashToCurve<Output = G1Projective>>(
+    fn sign_message<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         domain: &[u8],
         message: &[u8],

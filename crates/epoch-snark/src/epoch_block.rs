@@ -6,7 +6,7 @@ use algebra::{
 };
 use blake2s_simd::Params;
 use bls_crypto::{
-    hash_to_curve::{try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, HashToCurve},
+    hash_to_curve::{try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, CrhAndXofHashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_le};

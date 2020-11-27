@@ -1,4 +1,4 @@
-use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
+use crate::{BLSError, BlsResult, CrhAndXofHashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 use algebra::{
     bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
@@ -48,7 +48,7 @@ impl PublicKey {
     /// `hash_to_g1` hasher.
     ///
     /// Uses the `SIG_DOMAIN` under the hood.
-    pub fn verify<H: HashToCurve<Output = G1Projective>>(
+    pub fn verify<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         extra_data: &[u8],
@@ -62,7 +62,7 @@ impl PublicKey {
     /// `hash_to_g1` hasher.
     ///
     /// Uses the `POP_DOMAIN` under the hood.
-    pub fn verify_pop<H: HashToCurve<Output = G1Projective>>(
+    pub fn verify_pop<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         message: &[u8],
         signature: &Signature,
@@ -71,7 +71,7 @@ impl PublicKey {
         self.verify_sig(POP_DOMAIN, &message, &[], signature, hash_to_g1)
     }
 
-    fn verify_sig<H: HashToCurve<Output = G1Projective>>(
+    fn verify_sig<H: CrhAndXofHashToCurve<Output = G1Projective>>(
         &self,
         domain: &[u8],
         message: &[u8],

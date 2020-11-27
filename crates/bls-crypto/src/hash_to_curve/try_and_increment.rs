@@ -3,7 +3,7 @@ use byteorder::WriteBytesExt;
 use log::trace;
 use std::marker::PhantomData;
 
-use super::HashToCurve;
+use super::CrhAndXofHashToCurve;
 use crate::hashers::{
     composite::{CompositeHasher, COMPOSITE_HASHER, CRH},
     DirectHasher, Hasher,
@@ -56,7 +56,7 @@ where
     }
 }
 
-impl<'a, H, P> HashToCurve for TryAndIncrement<'a, H, P>
+impl<'a, H, P> CrhAndXofHashToCurve for TryAndIncrement<'a, H, P>
 where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
