@@ -6,9 +6,9 @@ use crate::{
 };
 use algebra::{ProjectiveCurve, ToBytes};
 use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
-use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use bls_crypto::hashers::COMPOSITE_HASHER;
 use bls_crypto::Hasher;
+use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use std::{os::raw::c_int, slice};
 
 /// # Safety
@@ -174,7 +174,8 @@ pub extern "C" fn hash_composite_cip22(
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let (hash, counter) = COMPOSITE_HASH_TO_G1_CIP22.hash_with_attempt_cip22(SIG_DOMAIN, message, extra_data)?;
+        let (hash, counter) =
+            COMPOSITE_HASH_TO_G1_CIP22.hash_with_attempt_cip22(SIG_DOMAIN, message, extra_data)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
