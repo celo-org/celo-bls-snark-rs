@@ -174,15 +174,14 @@ pub extern "C" fn hash_composite_cip22(
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let mut counter = 0;
-        let hash = COMPOSITE_HASH_TO_G1_CIP22.hash_with_counter(SIG_DOMAIN, message, extra_data, &mut counter)?;
+        let (hash, counter) = COMPOSITE_HASH_TO_G1_CIP22.hash_with_attempt_cip22(SIG_DOMAIN, message, extra_data)?;
         let mut obj_bytes = vec![];
         hash.write(&mut obj_bytes)?;
         obj_bytes.shrink_to_fit();
         unsafe {
             *out_hash = obj_bytes.as_mut_ptr();
             *out_len = obj_bytes.len() as c_int;
-            *attempt_counter = counter;
+            *attempt_counter = counter as u8;
         }
         std::mem::forget(obj_bytes);
         Ok(())
