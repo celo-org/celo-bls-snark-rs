@@ -1,4 +1,4 @@
-use epoch_snark::{prove, trusted_setup, verify};
+use epoch_snark::{prove, trusted_setup, verify, BWCurve, Parameters, BLSCurve};
 use std::env;
 
 #[path = "../tests/fixtures.rs"]
@@ -11,6 +11,7 @@ use tracing_subscriber::{
 };
 
 use bench_utils::{end_timer, start_timer};
+use algebra::CanonicalDeserialize;
 
 fn main() {
     Subscriber::builder()
@@ -36,12 +37,30 @@ fn main() {
         .expect("expected flag for generating or not constraints inside BLS12_377")
         .parse()
         .expect("not a bool");
+    let use_params_file: bool =  args
+        .next()
+        .expect("expected flag for whether to load setup params from file")
+        .parse()
+        .expect("not a bool");
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
-    let params =
-        trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
+    let params = match use_params_file {
+        false =>
+        trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap(),
+        true => {
+            if hashes_in_bls12_377 {
+                panic!("can't both load params from file and use hashes in BLS12-377");
+            }
+            let setup_contents = std::fs::read("params").unwrap();
+
+            Parameters::<BWCurve, BLSCurve> {
+                epochs: groth16::Parameters::<BWCurve>::deserialize(&mut std::io::Cursor::new(setup_contents)).unwrap(),
+                hash_to_bits: None,
+            }
+        }
+    };
     end_timer!(time);
 
     // Create the state to be proven (first - last and in between)
