@@ -10,7 +10,7 @@ epoch-snark = { path = "../epoch-snark", features = ["compat"] }
 
 algebra = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["bls12_377", "parallel"] }
 once_cell = "1.4.0"
-rand = "0.7.3"
+rand = "0.7"
 log = "0.4.8"
 
 [lib]
