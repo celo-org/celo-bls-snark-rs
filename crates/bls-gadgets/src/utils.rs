@@ -59,6 +59,8 @@ pub mod test_helpers {
     use r1cs_core::{ConstraintLayer, ConstraintSystemRef};
     use tracing_subscriber::layer::SubscriberExt;
 
+    // private fields preclude functional update syntax
+    #[allow(clippy::field_reassign_with_default)]
     pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
         let mut layer = ConstraintLayer::default();
         layer.mode = r1cs_core::TracingMode::OnlyConstraints;
