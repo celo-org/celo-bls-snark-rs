@@ -2,7 +2,7 @@ use ark_bls12_377::{Fq, FqParameters};
 use ark_ec::ProjectiveCurve;
 use ark_ff::{FpParameters, PrimeField, ToBytes, Zero};
 use ark_serialize::SerializationError;
-use bls_crypto::{PublicKey, BLSError};
+use bls_crypto::{BLSError, PublicKey};
 use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;

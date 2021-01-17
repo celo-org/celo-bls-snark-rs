@@ -1,10 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
-use algebra::{
-    bls12_377::{G1Projective, G2Projective},
-    Zero,
-};
+use ark_bls12_377::{G1Projective, G2Projective};
+use ark_ff::Zero;
 
 use bls_crypto::{
     hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PrivateKey, PublicKey,

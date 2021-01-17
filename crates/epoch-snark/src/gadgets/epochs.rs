@@ -334,6 +334,8 @@ mod tests {
         use crate::epoch_block::hash_first_last_epoch_block;
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
         use crate::{BWField, BWFrParams, EpochBlock};
+        use ark_serialize::CanonicalSerialize;
+        use blake2s_simd::blake2s;
         use bls_crypto::PublicKey;
 
         fn epoch_data_to_block(data: &EpochData<Curve>) -> EpochBlock {
@@ -359,6 +361,7 @@ mod tests {
             entropy: Vec<(Entropy, Entropy)>,
             bitmaps: Vec<Vec<bool>>,
             include_dummy_epochs: bool,
+            expected_hashes: Option<Vec<String>>,
         ) -> bool {
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
@@ -462,6 +465,26 @@ mod tests {
                 cs.borrow().unwrap().instance_assignment[1..].to_vec(),
                 public_inputs
             );
+            cs.inline_all_lcs();
+            if let Some(expected_hashes) = expected_hashes {
+                let matrices = cs.to_matrices().unwrap();
+                let mut serialized_matrix = vec![];
+                matrices.a.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[0],
+                );
+                matrices.b.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[1],
+                );
+                matrices.c.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[2],
+                );
+            }
 
             print_unsatisfied_constraints(cs.clone());
             cs.is_satisfied().unwrap()
@@ -493,7 +516,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -523,7 +547,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -570,7 +595,12 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                Some(vec![
+                    "5ae20d76f27795a498b9e9f1d4035475bc137ad70cb75500c9cf3210f8cc10fa".to_string(),
+                    "58c12fa7ca9130918f4c86c6ebe870426d9ca7ae4571d6d1f9f190e2b497d41c".to_string(),
+                    "2f860526de1066469a151cd44e803866d947dc28668fdcd6c0a8098128223b21".to_string(),
+                ]),
             ));
         }
 
@@ -618,7 +648,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -668,7 +699,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -717,7 +749,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
     }

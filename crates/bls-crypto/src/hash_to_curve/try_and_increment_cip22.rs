@@ -10,7 +10,6 @@ use crate::hashers::{
 };
 use crate::BLSError;
 
-
 use ark_bls12_377::Parameters;
 use ark_ec::{
     bls12::Bls12Parameters,

@@ -60,8 +60,7 @@ pub mod test_helpers {
     use tracing_subscriber::layer::SubscriberExt;
 
     pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
-        let mut layer = ConstraintLayer::default();
-        layer.mode = ark_relations::r1cs::TracingMode::OnlyConstraints;
+        let layer = ConstraintLayer::new(ark_relations::r1cs::TracingMode::OnlyConstraints);
         let subscriber = tracing_subscriber::Registry::default().with(layer);
         tracing::subscriber::with_default(subscriber, f)
     }
