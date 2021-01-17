@@ -7,8 +7,8 @@ use algebra::{
 };
 
 use bls_crypto::{
-    hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1, PrivateKey, PublicKey, Signature,
-    SIG_DOMAIN,
+    hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PrivateKey, PublicKey,
+    Signature, SIG_DOMAIN,
 };
 
 fn batch_bls_comparison(c: &mut Criterion) {
@@ -18,7 +18,7 @@ fn batch_bls_comparison(c: &mut Criterion) {
     const NUM_BLOCKS: usize = 300;
     const NUM_VALIDATORS: usize = 20;
     let rng = &mut rand::thread_rng();
-    let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+    let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
 
     // generate some msgs and extra data
     let mut msgs = Vec::new();

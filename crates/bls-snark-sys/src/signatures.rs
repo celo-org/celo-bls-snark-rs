@@ -6,6 +6,9 @@ use crate::{
 };
 use ark_ec::ProjectiveCurve;
 use ark_ff::ToBytes;
+use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
+use bls_crypto::hashers::COMPOSITE_HASHER;
+use bls_crypto::Hasher;
 use bls_crypto::{BLSError, HashToCurve, POP_DOMAIN, SIG_DOMAIN};
 use std::{os::raw::c_int, slice};
 
@@ -45,6 +48,7 @@ pub extern "C" fn sign_message(
     in_extra_data: *const u8,
     in_extra_data_len: c_int,
     should_use_composite: bool,
+    should_use_cip22: bool,
     out_signature: *mut *mut Signature,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
@@ -52,10 +56,11 @@ pub extern "C" fn sign_message(
         let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
-        let signature = if should_use_composite {
-            private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G1)?
-        } else {
-            private_key.sign(message, extra_data, &*DIRECT_HASH_TO_G1)?
+        let signature = match (should_use_composite, should_use_cip22) {
+            (true, true) => private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G1_CIP22)?,
+            (false, true) => return Err(BLSError::HashToCurveError),
+            (true, false) => private_key.sign(message, extra_data, &*COMPOSITE_HASH_TO_G1)?,
+            (false, false) => private_key.sign(message, extra_data, &*DIRECT_HASH_TO_G1)?,
         };
         unsafe {
             *out_signature = Box::into_raw(Box::new(signature));
@@ -135,6 +140,58 @@ pub extern "C" fn hash_composite(
 }
 
 #[no_mangle]
+pub extern "C" fn hash_crh(
+    in_message: *const u8,
+    in_message_len: c_int,
+    hash_bytes: c_int,
+    out_hash: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
+        let hash = COMPOSITE_HASHER.crh(SIG_DOMAIN, message, hash_bytes as usize)?;
+        let mut obj_bytes = vec![];
+        hash.write(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_hash = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+        }
+        std::mem::forget(obj_bytes);
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn hash_composite_cip22(
+    in_message: *const u8,
+    in_message_len: c_int,
+    in_extra_data: *const u8,
+    in_extra_data_len: c_int,
+    out_hash: *mut *mut u8,
+    out_len: *mut c_int,
+    attempt_counter: *mut u8,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let message = unsafe { slice::from_raw_parts(in_message, in_message_len as usize) };
+        let extra_data =
+            unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
+        let (hash, counter) =
+            COMPOSITE_HASH_TO_G1_CIP22.hash_with_attempt_cip22(SIG_DOMAIN, message, extra_data)?;
+        let mut obj_bytes = vec![];
+        hash.write(&mut obj_bytes)?;
+        obj_bytes.shrink_to_fit();
+        unsafe {
+            *out_hash = obj_bytes.as_mut_ptr();
+            *out_len = obj_bytes.len() as c_int;
+            *attempt_counter = counter as u8;
+        }
+        std::mem::forget(obj_bytes);
+        Ok(())
+    })
+}
+
+#[no_mangle]
 pub extern "C" fn verify_signature(
     in_public_key: *const PublicKey,
     in_message: *const u8,
@@ -143,6 +200,7 @@ pub extern "C" fn verify_signature(
     in_extra_data_len: c_int,
     in_signature: *const Signature,
     should_use_composite: bool,
+    should_use_cip22: bool,
     out_verified: *mut bool,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
@@ -151,14 +209,17 @@ pub extern "C" fn verify_signature(
         let extra_data =
             unsafe { slice::from_raw_parts(in_extra_data, in_extra_data_len as usize) };
         let signature = unsafe { &*in_signature };
-        let verified = if should_use_composite {
-            public_key
+        let verified = match (should_use_composite, should_use_cip22) {
+            (true, true) => public_key
+                .verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G1_CIP22)
+                .is_ok(),
+            (false, true) => return Err(BLSError::HashToCurveError),
+            (true, false) => public_key
                 .verify(message, extra_data, signature, &*COMPOSITE_HASH_TO_G1)
-                .is_ok()
-        } else {
-            public_key
+                .is_ok(),
+            (false, false) => public_key
                 .verify(message, extra_data, signature, &*DIRECT_HASH_TO_G1)
-                .is_ok()
+                .is_ok(),
         };
         unsafe { *out_verified = verified };
 
@@ -181,6 +242,7 @@ pub extern "C" fn batch_verify_signature(
     messages_ptr: *const MessageFFI,
     messages_len: usize,
     should_use_composite: bool,
+    should_use_cip22: bool,
     verified: *mut bool,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
@@ -198,12 +260,22 @@ pub extern "C" fn batch_verify_signature(
             .map(|m| (m.data, m.extra))
             .collect::<Vec<_>>();
 
-        let is_verified = if should_use_composite {
-            asig.batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*COMPOSITE_HASH_TO_G1)
-                .is_ok()
-        } else {
-            asig.batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*DIRECT_HASH_TO_G1)
-                .is_ok()
+        let is_verified = match (should_use_composite, should_use_cip22) {
+            (true, true) => asig
+                .batch_verify(
+                    &pubkeys,
+                    SIG_DOMAIN,
+                    &messages,
+                    &*COMPOSITE_HASH_TO_G1_CIP22,
+                )
+                .is_ok(),
+            (false, true) => return Err(BLSError::HashToCurveError),
+            (true, false) => asig
+                .batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*COMPOSITE_HASH_TO_G1)
+                .is_ok(),
+            (false, false) => asig
+                .batch_verify(&pubkeys, SIG_DOMAIN, &messages, &*DIRECT_HASH_TO_G1)
+                .is_ok(),
         };
 
         unsafe { *verified = is_verified };

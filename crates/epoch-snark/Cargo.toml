@@ -1,6 +1,6 @@
 [package]
 name = "epoch-snark"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@celo.org>", "Georgios Konstantopoulos <me@gakonst.com>"]
 edition = "2018"
 

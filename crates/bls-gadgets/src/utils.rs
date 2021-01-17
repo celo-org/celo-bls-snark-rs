@@ -20,6 +20,7 @@ pub fn bits_be_to_bytes_le(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
+/// Converts the provided little endian bits to LE bytes
 pub fn bits_le_to_bytes_le(bits: &[bool]) -> Vec<u8> {
     bits_be_to_bytes_le(&bits.iter().cloned().rev().collect::<Vec<_>>())
 }
@@ -44,6 +45,7 @@ pub fn bytes_le_to_bits_be(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
         .collect()
 }
 
+/// Converts the provided little endian bytes to LE bits
 pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
     bytes_le_to_bits_be(bytes, bits_to_take)
         .into_iter()
@@ -54,7 +56,15 @@ pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     use ark_ff::PrimeField;
-    use ark_relations::r1cs::ConstraintSystemRef;
+    use ark_relations::r1cs::{ConstraintLayer, ConstraintSystemRef};
+    use tracing_subscriber::layer::SubscriberExt;
+
+    pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
+        let mut layer = ConstraintLayer::default();
+        layer.mode = ark_relations::r1cs::TracingMode::OnlyConstraints;
+        let subscriber = tracing_subscriber::Registry::default().with(layer);
+        tracing::subscriber::with_default(subscriber, f)
+    }
 
     pub fn print_unsatisfied_constraints<F: PrimeField>(cs: ConstraintSystemRef<F>) {
         if !cs.is_satisfied().unwrap() {

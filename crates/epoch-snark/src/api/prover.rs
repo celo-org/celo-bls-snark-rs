@@ -1,4 +1,4 @@
-use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, CPCurve};
+use super::{setup::Parameters, BLSCurve, BLSCurveG1, BLSCurveG2, BWCurve};
 use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
@@ -20,12 +20,12 @@ use tracing::{info, span, Level};
 /// epoch. The proof can then be verified only with constant amount of data (the first and last
 /// epochs)
 pub fn prove(
-    parameters: &Parameters<CPCurve, BLSCurve>,
+    parameters: &Parameters<BWCurve, BLSCurve>,
     num_validators: u32,
     initial_epoch: &EpochBlock,
     transitions: &[EpochTransition],
     max_transitions: usize,
-) -> Result<Groth16Proof<CPCurve>, SynthesisError> {
+) -> Result<Groth16Proof<BWCurve>, SynthesisError> {
     info!(
         "Generating proof for {} epochs (first epoch: {}, {} validators per epoch)",
         transitions.len(),
@@ -76,8 +76,10 @@ pub fn prove(
         num_validators,
         hash_helper,
     };
-    info!("BLS");
+
+    info!("proving");
     let bls_proof = create_proof_no_zk(circuit, &parameters.epochs)?;
+    info!("proved");
 
     Ok(bls_proof)
 }
@@ -94,7 +96,7 @@ fn generate_hash_helper(
         .iter()
         .map(|transition| {
             let block = &transition.block;
-            let (epoch_bytes, _) = block.encode_inner_to_bytes().unwrap();
+            let (epoch_bytes, _) = block.encode_inner_to_bytes_cip22().unwrap();
 
             let crh_bytes = composite_hasher.crh(&[], &epoch_bytes, 0).unwrap();
             // The verifier should run both the crh and the xof here to generate a
@@ -121,6 +123,7 @@ fn generate_hash_helper(
 fn to_epoch_data(block: &EpochBlock) -> EpochData<BLSCurve> {
     EpochData {
         index: Some(block.index),
+        round: Some(block.round),
         epoch_entropy: block.epoch_entropy.as_ref().map(|e| e.to_vec()),
         parent_entropy: block.parent_entropy.as_ref().map(|e| e.to_vec()),
         maximum_non_signers: block.maximum_non_signers,
@@ -150,6 +153,7 @@ fn to_dummy_update(num_validators: u32) -> SingleUpdate<BLSCurve> {
             epoch_entropy: Some(vec![0u8; EpochBlock::ENTROPY_BYTES]),
             parent_entropy: Some(vec![0u8; EpochBlock::ENTROPY_BYTES]),
             index: Some(0),
+            round: Some(0),
             public_keys: (0..num_validators)
                 .map(|_| Some(BLSCurveG2::prime_subgroup_generator()))
                 .collect::<Vec<_>>(),

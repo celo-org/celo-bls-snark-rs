@@ -23,9 +23,11 @@ pub fn generate_test_data(
         .collect::<Vec<_>>();
     let first_epoch = generate_block(
         0,
+        0,
         &[1u8; EpochBlock::ENTROPY_BYTES],
         &[2u8; EpochBlock::ENTROPY_BYTES],
         faults,
+        num_validators,
         &initial_pubkeys,
     );
 
@@ -46,12 +48,14 @@ pub fn generate_test_data(
     for (i, signers_epoch) in signers.iter().enumerate() {
         let block: EpochBlock = generate_block(
             i + 1,
-            &[3u8; EpochBlock::ENTROPY_BYTES],
-            &[4u8; EpochBlock::ENTROPY_BYTES],
+            i + 10,
+            &[(i + 2) as u8; EpochBlock::ENTROPY_BYTES],
+            &[(i + 1) as u8; EpochBlock::ENTROPY_BYTES],
             faults,
+            num_validators,
             &pubkeys[i],
         );
-        let hash = block.hash_to_g1().unwrap();
+        let hash = block.hash_to_g1_cip22().unwrap();
 
         // A subset of the i-th validator set, signs on the i+1th epoch's G1 hash
         let bitmap_epoch = &bitmaps[i];
@@ -80,16 +84,20 @@ pub fn generate_test_data(
 
 fn generate_block(
     index: usize,
+    round: usize,
     epoch_entropy: &[u8],
     parent_entropy: &[u8],
     non_signers: usize,
+    max_validators: usize,
     pubkeys: &[PublicKey],
 ) -> EpochBlock {
     EpochBlock {
         index: index as u16,
+        round: round as u8,
         epoch_entropy: Some(epoch_entropy.to_vec()),
         parent_entropy: Some(parent_entropy.to_vec()),
         maximum_non_signers: non_signers as u32,
+        maximum_validators: max_validators,
         new_public_keys: pubkeys.to_vec(),
     }
 }

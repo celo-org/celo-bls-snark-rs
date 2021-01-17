@@ -52,6 +52,8 @@ impl EpochBits {
         Ok(())
     }
 
+    /// Generates constrained hash outputs on the first and last
+    /// epoch bits
     fn verify_edges(&self) -> Result<Vec<FrVar>, SynthesisError> {
         // Verify the edges
         let mut xof_bits = vec![];
@@ -131,6 +133,9 @@ impl EpochBits {
     }
 }
 
+/// Returns a vector of vectors of constrained booleans
+/// all of the same size given a vector of constrained
+/// booleans
 fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
     iter.chunks(chunk_size as usize)
         .map(|b| {
@@ -145,13 +150,20 @@ fn le_chunks(iter: &[Bool], chunk_size: u32) -> Vec<Vec<Bool>> {
 mod tests {
     use super::*;
     use crate::{epoch_block::hash_to_bits, gadgets::pack};
-    use bls_gadgets::utils::{bytes_le_to_bits_be, test_helpers::print_unsatisfied_constraints};
+    use bls_gadgets::utils::{
+        bytes_le_to_bits_be,
+        test_helpers::{print_unsatisfied_constraints, run_profile_constraints},
+    };
 
     use ark_relations::r1cs::ConstraintSystem;
     use rand::RngCore;
 
     #[test]
     fn correct_blake2_hash() {
+        run_profile_constraints(correct_blake2_hash_inner);
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn correct_blake2_hash_inner() {
         let rng = &mut rand::thread_rng();
         let mut first_bytes = vec![0; 32];
         rng.fill_bytes(&mut first_bytes);

@@ -38,19 +38,26 @@ where
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Multi-Signature Verification"
+    #[tracing::instrument(target = "r1cs")]
     pub fn verify(
         pub_keys: &[P::G2Var],
         signed_bitmap: &[Boolean<F>],
         message_hash: &P::G1Var,
         signature: &P::G1Var,
         maximum_non_signers: &FpVar<F>,
+        padding_pk: &P::G2Var,
     ) -> Result<(), SynthesisError> {
         let span = span!(Level::TRACE, "BlsVerifyGadget_verify");
         let _enter = span.enter();
         // Get the message hash and the aggregated public key based on the bitmap
         // and allowed number of non-signers
-        let (message_hash, aggregated_pk) =
-            Self::enforce_bitmap(pub_keys, signed_bitmap, message_hash, maximum_non_signers)?;
+        let (message_hash, aggregated_pk) = Self::enforce_bitmap(
+            pub_keys,
+            signed_bitmap,
+            message_hash,
+            maximum_non_signers,
+            padding_pk,
+        )?;
 
         let prepared_aggregated_pk = P::prepare_g2(&aggregated_pk)?;
 
@@ -74,6 +81,7 @@ where
     ///
     /// The verification equation can be found in pg.11 from
     /// https://eprint.iacr.org/2018/483.pdf: "Batch verification"
+    #[tracing::instrument(target = "r1cs")]
     pub fn batch_verify(
         aggregated_pub_keys: &[P::G2Var],
         message_hashes: &[P::G1Var],
@@ -97,6 +105,7 @@ where
     }
 
     /// Batch verification against prepared messages
+    #[tracing::instrument(target = "r1cs")]
     pub fn batch_verify_prepared(
         prepared_aggregated_pub_keys: &[P::G2PreparedVar],
         prepared_message_hashes: &[P::G1PreparedVar],
@@ -124,15 +133,19 @@ where
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length
+    #[tracing::instrument(target = "r1cs")]
     pub fn enforce_aggregated_pubkeys(
         pub_keys: &[P::G2Var],
         signed_bitmap: &[Boolean<F>],
+        padding_pk: &P::G2Var,
     ) -> Result<P::G2Var, SynthesisError> {
         // Bitmap and Pubkeys must be of the same length
         assert_eq!(signed_bitmap.len(), pub_keys.len());
 
         let mut aggregated_pk = P::G2Var::zero();
         for (pk, bit) in pub_keys.iter().zip(signed_bitmap) {
+            // Disallow the padding pk
+            pk.conditional_enforce_not_equal(padding_pk, bit)?;
             // If bit = 1, add pk
             let adder = bit.select(pk, &P::G2Var::zero())?;
             aggregated_pk += &adder;
@@ -143,6 +156,7 @@ where
 
     /// Returns a gadget which checks that an aggregate pubkey is correctly calculated
     /// by the sum of the pub keys
+    #[tracing::instrument(target = "r1cs")]
     pub fn enforce_aggregated_all_pubkeys(
         pub_keys: &[P::G2Var],
     ) -> Result<P::G2Var, SynthesisError> {
@@ -161,22 +175,25 @@ where
     ///
     /// # Panics
     /// If signed_bitmap length != pub_keys length (due to internal call to `enforced_aggregated_pubkeys`)
+    #[tracing::instrument(target = "r1cs")]
     pub fn enforce_bitmap(
         pub_keys: &[P::G2Var],
         signed_bitmap: &[Boolean<F>],
         message_hash: &P::G1Var,
         maximum_non_signers: &FpVar<F>,
+        padding_pk: &P::G2Var,
     ) -> Result<(P::G1Var, P::G2Var), SynthesisError> {
         trace!("enforcing bitmap");
         signed_bitmap.enforce_maximum_occurrences_in_bitmap(maximum_non_signers, false)?;
 
-        let aggregated_pk = Self::enforce_aggregated_pubkeys(pub_keys, signed_bitmap)?;
+        let aggregated_pk = Self::enforce_aggregated_pubkeys(pub_keys, signed_bitmap, padding_pk)?;
 
         Ok((message_hash.clone(), aggregated_pk))
     }
 
     /// Verifying BLS signatures requires preparing a G1 Signature and
     /// preparing a negated G2 generator
+    #[tracing::instrument(target = "r1cs")]
     fn prepare_signature_neg_generator(
         signature: &P::G1Var,
     ) -> Result<(P::G1PreparedVar, P::G2PreparedVar), SynthesisError> {
@@ -201,6 +218,7 @@ where
     ///
     /// Each G1 element is paired with the corresponding G2 element.
     /// Fails if the 2 slices have different lengths.
+    #[tracing::instrument(target = "r1cs")]
     fn enforce_bls_equation(
         g1: &[P::G1PreparedVar],
         g2: &[P::G2PreparedVar],
@@ -216,7 +234,7 @@ where
 #[cfg(test)]
 mod verify_one_message {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
     use bls_crypto::test_helpers::*;
 
     use ark_bls12_377::{
@@ -225,17 +243,19 @@ mod verify_one_message {
     };
     use ark_bw6_761::Fr as BW6_761Fr;
     use ark_ec::ProjectiveCurve;
-    use ark_ff::{UniformRand, Zero};
+    use ark_ff::{One, UniformRand, Zero};
     use ark_r1cs_std::{alloc::AllocVar, boolean::Boolean};
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
     // converts the arguments to constraints and checks them against the `verify` function
+    #[tracing::instrument(target = "r1cs")]
     fn cs_verify<E: PairingEngine, F: PrimeField, P: PairingVar<E, F>>(
         message_hash: E::G1Projective,
         pub_keys: &[E::G2Projective],
         signature: E::G1Projective,
         bitmap: &[bool],
         num_non_signers: u64,
+        padding_pk: &P::G2Var,
     ) -> ConstraintSystemRef<F> {
         let cs = ConstraintSystem::<F>::new_ref();
 
@@ -276,6 +296,7 @@ mod verify_one_message {
             &message_hash_var,
             &signature_var,
             &max_occurrences,
+            padding_pk,
         )
         .unwrap();
 
@@ -284,6 +305,10 @@ mod verify_one_message {
 
     #[test]
     fn batch_verify_ok() {
+        run_profile_constraints(batch_verify_ok_inner);
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn batch_verify_ok_inner() {
         // generate 5 (aggregate sigs, message hash pairs)
         // verify them all in 1 call
         let batch_size = 5;
@@ -351,6 +376,11 @@ mod verify_one_message {
     #[test]
     // Verifies signatures over BLS12_377 with Sw6 field (384 bits).
     fn one_signature_ok() {
+        run_profile_constraints(one_signature_ok_inner);
+    }
+    // Verifies signatures over BLS12_377 with Sw6 field (384 bits).
+    #[tracing::instrument(target = "r1cs")]
+    fn one_signature_ok_inner() {
         let (secret_key, pub_key) = keygen::<Bls12_377>();
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
@@ -364,10 +394,11 @@ mod verify_one_message {
             signature,
             &[true],
             0,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
-        assert_eq!(cs.num_constraints(), 18678);
+        assert_eq!(cs.num_constraints(), 18702);
 
         // random sig fails
         let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(
@@ -376,6 +407,7 @@ mod verify_one_message {
             fake_signature,
             &[true],
             0,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
@@ -383,6 +415,10 @@ mod verify_one_message {
 
     #[test]
     fn multiple_signatures_ok() {
+        run_profile_constraints(multiple_signatures_ok_inner);
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn multiple_signatures_ok_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
         let (sk, pk) = keygen::<Bls12_377>();
@@ -396,6 +432,7 @@ mod verify_one_message {
             asig,
             &[true, true],
             1,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
@@ -408,6 +445,7 @@ mod verify_one_message {
             sigs[0],
             &[true, false],
             1,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
@@ -420,6 +458,7 @@ mod verify_one_message {
             asig,
             &[true, false],
             0,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
@@ -429,13 +468,46 @@ mod verify_one_message {
             sigs[0],
             &[true, false],
             0,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(!cs.is_satisfied().unwrap());
     }
 
     #[test]
+    #[should_panic]
+    fn multiple_signatures_with_padding_in_activated_bit_location_fails() {
+        run_profile_constraints(
+            multiple_signatures_with_padding_in_activated_bit_location_fails_inner,
+        );
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn multiple_signatures_with_padding_in_activated_bit_location_fails_inner() {
+        let rng = &mut rng();
+        let message_hash = G1Projective::rand(rng);
+        let (sk, pk) = (Bls12_377Fr::one(), G2Projective::prime_subgroup_generator());
+        let (sk2, pk2) = keygen::<Bls12_377>();
+        let (_, asig) = sign::<Bls12_377>(message_hash, &[sk, sk2]);
+
+        // good aggregate sig passes
+        let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(
+            message_hash,
+            &[pk, pk2],
+            asig,
+            &[true, true],
+            1,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
+        );
+        print_unsatisfied_constraints(cs.clone());
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
     fn zero_succeeds() {
+        run_profile_constraints(zero_succeeds_inner);
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn zero_succeeds_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
         let generator = G2Projective::prime_subgroup_generator();
@@ -454,6 +526,7 @@ mod verify_one_message {
             sigs[1],
             &[false, true],
             3,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
@@ -461,6 +534,10 @@ mod verify_one_message {
 
     #[test]
     fn doubling_succeeds() {
+        run_profile_constraints(doubling_succeeds_inner);
+    }
+    #[tracing::instrument(target = "r1cs")]
+    fn doubling_succeeds_inner() {
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
 
@@ -476,6 +553,7 @@ mod verify_one_message {
             sigs[0] + sigs[1],
             &[true, true],
             3,
+            &G2Var::constant(G2Projective::prime_subgroup_generator()),
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());

@@ -1,8 +1,8 @@
 use ark_bls12_377::{Fq, FqParameters};
 use ark_ec::ProjectiveCurve;
-use ark_ff::{FpParameters, PrimeField, ToBytes};
+use ark_ff::{FpParameters, PrimeField, ToBytes, Zero};
 use ark_serialize::SerializationError;
-use bls_crypto::PublicKey;
+use bls_crypto::{PublicKey, BLSError};
 use bls_gadgets::utils::bytes_le_to_bits_be;
 use byteorder::{LittleEndian, WriteBytesExt};
 use thiserror::Error;
@@ -14,6 +14,8 @@ pub enum EncodingError {
     ZexeSerialization(#[from] SerializationError),
     #[error("I/O Error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("BLS Error: {0}")]
+    BLSError(#[from] BLSError),
 }
 
 /// The function assumes that the public key is not the point in infinity, which is true for
@@ -26,8 +28,9 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingEr
     let y_c0_big = y.c0.into_repr();
     let y_c1_big = y.c1.into_repr();
 
+    let zero = Fq::zero().into_repr();
     let half = Fq::modulus_minus_one_div_two();
-    let is_over_half = y_c1_big > half || (y_c1_big == half && y_c0_big > half);
+    let is_over_half = y_c1_big > half || (y_c1_big == zero && y_c0_big > half);
 
     let mut bits = vec![];
     let mut x_bytes_c0 = vec![];
@@ -40,6 +43,17 @@ pub fn encode_public_key(public_key: &PublicKey) -> Result<Vec<bool>, EncodingEr
     bits.extend_from_slice(&bits_c1);
     bits.push(is_over_half);
 
+    Ok(bits)
+}
+
+/// LE Encodes a U8 to **bits**
+pub(crate) fn encode_u8(num: u8) -> Result<Vec<bool>, EncodingError> {
+    let bytes = vec![num];
+    let bits = bytes
+        .into_iter()
+        .map(|x| (0..8).map(move |i| (((x as u8) & u8::pow(2, i)) >> i) == 1))
+        .flatten()
+        .collect::<Vec<_>>();
     Ok(bits)
 }
 

@@ -1,4 +1,4 @@
-use super::{CPCurve, CPField, CPFrParams};
+use super::{BWCurve, BWField, BWFrParams};
 use crate::encoding::EncodingError;
 use crate::epoch_block::{hash_first_last_epoch_block, EpochBlock};
 use crate::gadgets::pack;
@@ -21,16 +21,16 @@ pub enum VerificationError {
 /// Given the Verifying Key for the circuit and the SNARK proof and _only the first and last epoch_,
 /// this function ensures that the state transition between epochs has been calculated correctly.
 pub fn verify(
-    vk: &VerifyingKey<CPCurve>,
+    vk: &VerifyingKey<BWCurve>,
     first_epoch: &EpochBlock,
     last_epoch: &EpochBlock,
-    proof: &Proof<CPCurve>,
+    proof: &Proof<BWCurve>,
 ) -> Result<(), VerificationError> {
     info!("Verifying proof");
     // Hash the first-last block together
     let hash = hash_first_last_epoch_block(first_epoch, last_epoch)?;
     // packs them
-    let public_inputs = pack::<CPField, CPFrParams>(&hash)?;
+    let public_inputs = pack::<BWField, BWFrParams>(&hash)?;
     // verifies the BLS proof by using the First/Last epoch as public inputs over CP
     if verify_proof(&prepare_verifying_key(vk), proof, &public_inputs)? {
         Ok(())

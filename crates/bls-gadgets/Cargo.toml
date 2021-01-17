@@ -1,6 +1,6 @@
 [package]
 name = "bls-gadgets"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Georgios Konstantopoulos <me@gakonst.com>", "Kobi Gurkan <kobigurk@gmail.com>", "Michael Straka <mstraka@clabs.co>"]
 edition = "2018"
 
@@ -21,13 +21,13 @@ ark-bw6-761 = { git = "https://github.com/celo-org/curves" }
 rand_xorshift = { version = "0.2", optional = true }
 rand = { version = "0.7" , optional = true }
 tracing = "0.1.13"
+tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
 rand = { version = "0.7" }
 ark-groth16 = { git = "https://github.com/celo-org/groth16", features = [ "std", "parallel", "r1cs" ] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
-tracing-subscriber = { version = "0.2" }
 
 [features]
 default = []

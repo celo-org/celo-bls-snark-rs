@@ -101,6 +101,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
     /// so that they can be used to verify the correct calculation of the XOF from
     /// the CRH in a separate proof.
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(target = "r1cs")]
     pub fn enforce_hash_to_group(
         counter: UInt8<Bls12_377_Fq>,
         message: &[UInt8<Bls12_377_Fq>],
@@ -123,6 +124,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         // combine the counter with the inner hash
         let mut input = counter.to_bits_le()?;
 
+        // add extra data to input
         for v in extra_data {
             input.extend_from_slice(&v.to_bits_le()?);
         }
@@ -186,6 +188,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
 /// # Panics
 ///
 /// If the provided hash_length is not a multiple of 256.
+#[tracing::instrument(target = "r1cs")]
 pub fn hash_to_bits<F: PrimeField>(
     message: &[Boolean<F>],
     hash_length: u16,
@@ -248,9 +251,9 @@ pub fn hash_to_bits<F: PrimeField>(
 }
 
 impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
-    // Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
-    // decodes the G1 point and then multiplies it by the curve's cofactor to
-    // get the hash
+    /// Receives the output of `HashToBitsGadget::hash_to_bits` in Little Endian
+    /// decodes the G1 point and then multiplies it by the curve's cofactor to
+    /// get the hash
     fn hash_to_group(
         xof_bits: &[Boolean<Bls12_377_Fq>],
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError> {
@@ -311,6 +314,7 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             (bits, greatest_bit)
         };
 
+        // Check point equal to itself after being compressed
         for (a, b) in compressed_point.iter().zip(x_bits.iter()) {
             a.enforce_equal(&b)?;
         }
@@ -322,6 +326,8 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
         Ok(scaled_point)
     }
 
+    /// Checks that the result is equal to the given point
+    /// multiplied by the cofactor in g1
     fn scale_by_cofactor_g1(
         p: &G1Var<Bls12_377_Parameters>,
     ) -> Result<G1Var<Bls12_377_Parameters>, SynthesisError>
@@ -346,31 +352,37 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::test_helpers::print_unsatisfied_constraints;
+    use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
     use ark_r1cs_std::bits::uint8::UInt8;
     use ark_relations::r1cs::ConstraintSystem;
-    use bls_crypto::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
+    use bls_crypto::hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22;
     use rand::{thread_rng, RngCore};
 
     #[test]
     fn test_hash_to_group() {
+        run_profile_constraints(test_hash_to_group_inner);
+    }
+    fn test_hash_to_group_inner() {
         let mut rng = thread_rng();
         // test for various input sizes
         for length in &[10, 25, 50, 100, 200, 300] {
             // fill a buffer with random elements
             let mut input = vec![0; *length];
             rng.fill_bytes(&mut input);
+            let mut extra_input = vec![0; *length];
+            rng.fill_bytes(&mut extra_input);
             // check that they get hashed properly
             dbg!(length);
-            hash_to_group(&input);
+            hash_to_group(&input, &extra_input);
         }
     }
 
-    fn hash_to_group(input: &[u8]) {
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+    #[tracing::instrument(target = "r1cs")]
+    fn hash_to_group(input: &[u8], extra_input: &[u8]) {
+        let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
         let (expected_hash, attempt) = try_and_increment
-            .hash_with_attempt_cip22(SIG_DOMAIN, input, &[])
+            .hash_with_attempt_cip22(SIG_DOMAIN, input, extra_input)
             .unwrap();
 
         let cs = ConstraintSystem::<ark_bls12_377::Fq>::new_ref();
@@ -379,10 +391,17 @@ mod test {
             .iter()
             .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
             .collect::<Vec<_>>();
+        let extra_input = extra_input
+            .iter()
+            .map(|num| UInt8::new_witness(cs.clone(), || Ok(num)).unwrap())
+            .collect::<Vec<_>>();
 
         let hash =
             HashToGroupGadget::<ark_bls12_377::Parameters, ark_bls12_377::Fq>::enforce_hash_to_group(
-                counter, &input, &[], true,
+                counter,
+                &input,
+                &extra_input,
+                true,
             )
             .unwrap()
             .0;

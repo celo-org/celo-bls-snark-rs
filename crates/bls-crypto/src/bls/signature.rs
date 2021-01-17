@@ -137,12 +137,17 @@ impl Signature {
 mod tests {
     use super::*;
     use crate::{
-        hash_to_curve::try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
-        hashers::{composite::COMPOSITE_HASHER, DirectHasher, Hasher},
+        hash_to_curve::{
+            try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
+            try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22,
+        },
+        hashers::{composite::COMPOSITE_HASHER, DirectHasher},
         test_helpers::{keygen_batch, sign_batch, sum},
         PrivateKey, PublicKeyCache, SIG_DOMAIN,
     };
 
+    use crate::hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1;
+    use crate::hash_to_curve::try_and_increment_cip22::TryAndIncrementCIP22;
     use ark_bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters};
     use ark_ec::bls12::Bls12Parameters;
     use ark_ff::{UniformRand, Zero};
@@ -151,10 +156,14 @@ mod tests {
 
     #[test]
     fn test_aggregated_sig() {
+        test_aggregated_sig_inner(&*COMPOSITE_HASH_TO_G1);
+        test_aggregated_sig_inner(&*COMPOSITE_HASH_TO_G1_CIP22);
+    }
+
+    fn test_aggregated_sig_inner<H: HashToCurve<Output = G1Projective>>(try_and_increment: &H) {
         let message = b"hello";
         let rng = &mut thread_rng();
 
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
         let sk1 = PrivateKey::generate(rng);
         let sk2 = PrivateKey::generate(rng);
 
@@ -198,15 +207,30 @@ mod tests {
 
     #[test]
     fn test_batch_verify() {
-        test_batch_verify_with_hasher(&DirectHasher, false);
-        test_batch_verify_with_hasher(&*COMPOSITE_HASHER, true);
+        let try_and_increment_direct =
+            TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&DirectHasher);
+        test_batch_verify_with_hasher(&try_and_increment_direct, false, false);
+        let try_and_increment_composite = TryAndIncrement::<
+            _,
+            <Parameters as Bls12Parameters>::G1Parameters,
+        >::new(&*COMPOSITE_HASHER);
+        for &cip22 in &[false, true] {
+            test_batch_verify_with_hasher(&try_and_increment_composite, true, cip22);
+            let try_and_increment_composite_cip22 = TryAndIncrementCIP22::<
+                _,
+                <Parameters as Bls12Parameters>::G1Parameters,
+            >::new(&*COMPOSITE_HASHER);
+            test_batch_verify_with_hasher(&try_and_increment_composite_cip22, true, cip22);
+        }
     }
 
     #[allow(unused)] // needed when we don't compile with ffi features
-    fn test_batch_verify_with_hasher<X: Hasher<Error = BLSError>>(hasher: &X, is_composite: bool) {
+    fn test_batch_verify_with_hasher<H: HashToCurve<Output = G1Projective>>(
+        try_and_increment: &H,
+        is_composite: bool,
+        is_cip22: bool,
+    ) {
         let rng = &mut thread_rng();
-        let try_and_increment =
-            TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(hasher);
         let num_epochs = 10;
         let num_validators = 7;
 
@@ -231,7 +255,7 @@ mod tests {
             let mut epoch_sig = G1Projective::zero();
             for _ in 0..num_validators {
                 let sk = PrivateKey::generate(rng);
-                let s = sk.sign(msg.0, msg.1, &try_and_increment).unwrap();
+                let s = sk.sign(msg.0, msg.1, try_and_increment).unwrap();
 
                 epoch_sig += s.as_ref();
                 epoch_pubkey += sk.to_public().as_ref();
@@ -245,7 +269,7 @@ mod tests {
 
         let asig = Signature::from(asig);
 
-        let res = asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, &try_and_increment);
+        let res = asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, try_and_increment);
 
         assert!(res.is_ok());
 
@@ -270,6 +294,7 @@ mod tests {
                 &msgs_ffi[0] as *const MessageFFI,
                 msgs_ffi.len(),
                 is_composite,
+                is_cip22,
                 &mut verified as *mut bool,
             );
             assert!(success);
@@ -314,7 +339,17 @@ mod tests {
 
     #[test]
     fn test_signature_serialization() {
-        let try_and_increment = &*COMPOSITE_HASH_TO_G1;
+        let try_and_increment_direct = &*DIRECT_HASH_TO_G1;
+        test_signature_serialization_inner(try_and_increment_direct);
+        let try_and_increment_composite = &*COMPOSITE_HASH_TO_G1;
+        test_signature_serialization_inner(try_and_increment_composite);
+        let try_and_increment_composite_cip22 = &*COMPOSITE_HASH_TO_G1_CIP22;
+        test_signature_serialization_inner(try_and_increment_composite_cip22);
+    }
+
+    fn test_signature_serialization_inner<H: HashToCurve<Output = G1Projective>>(
+        try_and_increment: &H,
+    ) {
         let rng = &mut thread_rng();
 
         for _ in 0..100 {

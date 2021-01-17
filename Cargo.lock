@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "bls-crypto"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-crypto-primitives",
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "bls-gadgets"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-bw6-761",
@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "bls-snark-sys"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-ec",
@@ -681,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "epoch-snark"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-bw6-761",
