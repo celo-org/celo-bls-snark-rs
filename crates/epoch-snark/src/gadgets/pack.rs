@@ -31,7 +31,7 @@ impl MultipackGadget {
                 if chunk.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-                let fp_val = F::BigInt::from_bits(
+                let fp_val = F::BigInt::from_bits_be(
                     &chunk
                         .iter()
                         .map(|x| x.value())
@@ -39,8 +39,7 @@ impl MultipackGadget {
                 );
                 Ok(F::from_repr(fp_val).get()?)
             })?;
-            let mut fp_bits = fp.to_bits_le()?;
-            fp_bits.reverse();
+            let fp_bits = fp.to_bits_be()?;
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
                 fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j].enforce_equal(&chunk[j])?;

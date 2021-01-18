@@ -30,31 +30,3 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
-
-[patch.'https://github.com/arkworks-rs/algebra']
-ark-serialize = { git = "https://github.com/celo-org/algebra", features = [ "derive" ] }
-ark-ff = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
-ark-ec = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
-
-[patch.'https://github.com/arkworks-rs/curves']
-ark-bls12-377 = { git = "https://github.com/celo-org/curves" }
-ark-ed-on-bw6-761 = { git = "https://github.com/celo-org/curves" }
-ark-bw6-761 = { git = "https://github.com/celo-org/curves" }
-ark-ed-on-bls12-377 = { git = "https://github.com/celo-org/curves" }
-
-[patch.'https://github.com/arkworks-rs/utils']
-ark-std = { git = "https://github.com/celo-org/utils" }
-bench-utils = { git = "https://github.com/celo-org/utils" }
-
-[patch.'https://github.com/arkworks-rs/crypto-primitives']
-ark-crypto-primitives = { git = "https://github.com/celo-org/crypto-primitives", branch = "main", features = ["parallel"] }
-
-[patch.'https://github.com/arkworks-rs/snark']
-ark-relations = { git = "https://github.com/celo-org/snark", features = [ "std" ] }
-ark-snark = { git = "https://github.com/celo-org/snark" }
-
-[patch.'https://github.com/arkworks-rs/r1cs-std']
-ark-r1cs-std = { git = "https://github.com/celo-org/r1cs-std", default-features = false, features = ["std", "parallel"] }
-
-[patch.'https://github.com/arkworks-rs/nonnative']
-ark-nonnative-field = { git = "https://github.com/celo-org/nonnative", default-features = false, features = ["std"] }

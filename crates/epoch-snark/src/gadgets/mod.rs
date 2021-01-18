@@ -76,7 +76,7 @@ pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Result<Vec<F>, S
     values
         .chunks(P::CAPACITY as usize)
         .map(|c| {
-            let b = F::BigInt::from_bits(c);
+            let b = F::BigInt::from_bits_be(c);
             F::from_repr(b).get()
         })
         .collect::<Result<Vec<_>, _>>()
@@ -86,7 +86,7 @@ pub fn pack<F: PrimeField, P: FpParameters>(values: &[bool]) -> Result<Vec<F>, S
 fn bytes_to_fr(cs: ConstraintSystemRef<Fr>, bytes: Option<&[u8]>) -> Result<FrVar, SynthesisError> {
     FrVar::new_witness(cs, || {
         let bits = bytes_le_to_bits_be(bytes.get()?, 64 * <Fr as PrimeField>::BigInt::NUM_LIMBS);
-        Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits(&bits)))
+        Ok(Fr::from(<Fr as PrimeField>::BigInt::from_bits_be(&bits)))
     })
 }
 
@@ -101,10 +101,8 @@ fn fr_to_bits(input: &FrVar, length: usize) -> Result<Vec<Bool>, SynthesisError>
 /// Returns elements in big-endian order
 #[tracing::instrument(target = "r1cs")]
 fn g2_to_bits(input: &G2Var) -> Result<Vec<Bool>, SynthesisError> {
-    let mut x_0 = input.x.c0.to_bits_le()?;
-    let mut x_1 = input.x.c1.to_bits_le()?;
-    x_0.reverse();
-    x_1.reverse();
+    let x_0 = input.x.c0.to_bits_be()?;
+    let x_1 = input.x.c1.to_bits_be()?;
     let y_bit = input.y_to_bit()?;
     let mut output = Vec::new();
     output.extend_from_slice(&x_0);

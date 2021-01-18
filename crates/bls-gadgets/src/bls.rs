@@ -384,7 +384,7 @@ mod verify_one_message {
         let (secret_key, pub_key) = keygen::<Bls12_377>();
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
-        let signature = message_hash.mul(secret_key);
+        let signature = message_hash.mul(secret_key.into_repr());
         let fake_signature = G1Projective::rand(rng);
 
         // good sig passes
@@ -515,7 +515,7 @@ mod verify_one_message {
         // if the first key is a bad one, it should fail, since the pubkey
         // won't be on the curve
         let sk = Bls12_377Fr::zero();
-        let pk = generator.clone().mul(sk);
+        let pk = generator.clone().mul(sk.into_repr());
         let (sk2, pk2) = keygen::<Bls12_377>();
 
         let (sigs, _) = sign::<Bls12_377>(message_hash, &[sk, sk2]);

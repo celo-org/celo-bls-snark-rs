@@ -12,7 +12,7 @@ use ark_ec::{
     AffineCurve, SWModelParameters,
 };
 use ark_ed_on_bw6_761::EdwardsParameters;
-use ark_ff::{BigInteger, BitIteratorBE, PrimeField};
+use ark_ff::{BigInteger, BitIteratorLE, PrimeField};
 use ark_r1cs_std::groups::curves::twisted_edwards::AffineVar;
 use ark_r1cs_std::{
     alloc::{AllocVar, AllocationMode},
@@ -275,16 +275,12 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
                     // get the bits from the Boolean constraints
                     // we assume that these are already encoded as LE
-                    let mut bits = x_bits
+                    let bits = x_bits
                         .iter()
                         .map(|x| x.value())
                         .collect::<Result<Vec<bool>, _>>()?;
 
-                    // `BigInt::from_bits` takes BigEndian representations so we need to
-                    // reverse them since they are read in LE
-                    bits.reverse();
-
-                    let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits(&bits);
+                    let big = <<Bls12_377_Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt::from_bits_le(&bits);
 
                     let x = <Bls12_377_Parameters as Bls12Parameters>::Fp::from_repr(big).get()?;
                     let sign_bit_value = sign_bit.value()?;
@@ -336,12 +332,9 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
             Borrow<GroupProjective<<Bls12_377_Parameters as Bls12Parameters>::G1Parameters>>,
     {
         // get the cofactor's bits
-        let mut cofactor_bits = BitIteratorBE::new(P::G1Parameters::COFACTOR)
+        let cofactor_bits = BitIteratorLE::new(P::G1Parameters::COFACTOR)
             .map(Boolean::constant)
             .collect::<Vec<Boolean<Bls12_377_Fq>>>();
-
-        // Zexe's mul_bits requires that inputs _MUST_ be in LE form, so we have to reverse
-        cofactor_bits.reverse();
 
         // return p * cofactor
         let scaled = p.scalar_mul_le(cofactor_bits.iter())?;

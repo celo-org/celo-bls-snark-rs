@@ -20,7 +20,7 @@ use ark_ec::{
     AffineCurve,
 };
 use ark_ff::Zero;
-use ark_serialize::ConstantSerializedSize;
+use ark_serialize::CanonicalSerialize;
 
 use crate::hash_to_curve::hash_length;
 use once_cell::sync::Lazy;
@@ -85,7 +85,7 @@ where
         message: &[u8],
         extra_data: &[u8],
     ) -> Result<(GroupProjective<P>, usize), BLSError> {
-        let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
+        let num_bytes = GroupAffine::<P>::zero().serialized_size();
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
         let inner_hash = self.hasher.crh(domain, &message, hash_bytes)?;

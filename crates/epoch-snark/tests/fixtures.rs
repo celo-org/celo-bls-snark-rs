@@ -1,6 +1,6 @@
 use ark_bls12_377::{Bls12_377, G1Projective};
 use ark_ec::ProjectiveCurve;
-use ark_ff::Zero;
+use ark_ff::{Zero, PrimeField};
 
 use bls_crypto::test_helpers::{keygen_batch, keygen_mul};
 use bls_crypto::{PublicKey, Signature};
@@ -63,7 +63,7 @@ pub fn generate_test_data(
             let mut asig = G1Projective::zero();
             for (j, sk) in signers_epoch.iter().enumerate() {
                 if bitmap_epoch[j] {
-                    asig += hash.mul(*sk)
+                    asig += hash.mul(sk.into_repr())
                 }
             }
             asig

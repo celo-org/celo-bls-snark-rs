@@ -1,5 +1,5 @@
 use ark_ec::{PairingEngine, ProjectiveCurve};
-use ark_ff::{UniformRand, Zero};
+use ark_ff::{UniformRand, Zero, PrimeField};
 
 // Same RNG for all tests
 pub fn rng() -> rand::rngs::ThreadRng {
@@ -12,7 +12,7 @@ pub fn keygen<E: PairingEngine>() -> (E::Fr, E::G2Projective) {
     let generator = E::G2Projective::prime_subgroup_generator();
 
     let secret_key = E::Fr::rand(rng);
-    let pubkey = generator.mul(secret_key);
+    let pubkey = generator.mul(secret_key.into_repr());
     (secret_key, pubkey)
 }
 
@@ -72,7 +72,7 @@ pub fn sign<E: PairingEngine>(
 ) -> (Vec<E::G1Projective>, E::G1Projective) {
     let sigs = secret_keys
         .iter()
-        .map(|key| message_hash.mul(*key))
+        .map(|key| message_hash.mul(key.into_repr()))
         .collect::<Vec<_>>();
     let asig = sigs
         .iter()

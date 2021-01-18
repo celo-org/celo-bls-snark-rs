@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 bls-crypto = { path = "../bls-crypto", features = ["compat"] }
 epoch-snark = { path = "../epoch-snark", features = ["compat"] }
-ark-bls12-377 = { git = "https://github.com/celo-org/curves" }
-ark-ff = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
-ark-serialize = { git = "https://github.com/celo-org/algebra", features = [ "derive" ] }
-ark-ec = { git = "https://github.com/celo-org/algebra", features = [ "std", "parallel"] }
+ark-bls12-377 = { git = "https://github.com/arkworks-rs/curves" }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
+ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
 once_cell = "1.4.0"
 rand = "0.7.3"
 log = "0.4.8"
@@ -19,7 +19,7 @@ log = "0.4.8"
 crate-type = ["lib", "staticlib"]
 
 [dev-dependencies]
-ark-groth16 = { git = "https://github.com/celo-org/groth16", features = [ "std", "parallel", "r1cs" ] }
-ark-relations = { git = "https://github.com/celo-org/snark", features = [ "std" ] }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
+ark-relations = { git = "https://github.com/arkworks-rs/snark", features = [ "std" ] }
 hex = "0.4.2"
-ark-r1cs-std = { git = "https://github.com/celo-org/r1cs-std", default-features = false, features = ["std", "parallel"] }
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-features = false, features = ["std", "parallel"] }

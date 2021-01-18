@@ -301,7 +301,7 @@ mod tests {
             Some(v) => {
                 let bits =
                     bytes_le_to_bits_le(&v.clone(), EpochData::<Bls12_377>::ENTROPY_BYTES * 8);
-                let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
+                let bigint = <Fr as PrimeField>::BigInt::from_bits_be(&bits);
                 FrVar::new_witness(cs, || Ok(Fr::from(bigint)))?
             }
             None => bytes_to_fr(
