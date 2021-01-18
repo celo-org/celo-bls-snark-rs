@@ -31,12 +31,12 @@ impl MultipackGadget {
                 if chunk.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-                let fp_val = F::BigInt::from_bits_be(
-                    &chunk
-                        .iter()
-                        .map(|x| x.value())
-                        .collect::<Result<Vec<bool>, _>>()?,
-                );
+                let fp_val =
+                    F::BigInt::from_bits_be(&chunk.iter().map(|x| x.value()).collect::<Result<
+                        Vec<bool>,
+                        _,
+                    >>(
+                    )?);
                 Ok(F::from_repr(fp_val).get()?)
             })?;
             let fp_bits = fp.to_bits_be()?;

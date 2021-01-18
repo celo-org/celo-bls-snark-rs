@@ -43,8 +43,10 @@
 /// ```
 pub mod try_and_increment;
 pub mod try_and_increment_cip22;
-
 use crate::BLSError;
+use ark_ec::models::{short_weierstrass_jacobian::GroupAffine, SWModelParameters};
+use ark_ff::{Field, Zero};
+use ark_serialize::Flags;
 
 /// Trait for hashing arbitrary data to a group element on an elliptic curve
 pub trait HashToCurve {
@@ -71,8 +73,98 @@ pub fn hash_length(n: usize) -> usize {
     rounded_bits as usize / 8
 }
 
+/// Flags to be encoded into the serialization.
+/// The default flags (empty) should not change the binary representation.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum YSignFlags {
+    PositiveYNotInfinity,
+    NegativeYNotInfinity,
+    PositiveYInfinity,
+    NegativeYInfinity,
+}
+
+impl YSignFlags {
+    #[inline]
+    pub fn from_y_sign(is_positive: bool) -> Self {
+        if is_positive {
+            YSignFlags::PositiveYNotInfinity
+        } else {
+            YSignFlags::NegativeYNotInfinity
+        }
+    }
+
+    #[inline]
+    pub fn is_infinity(&self) -> bool {
+        matches!(
+            self,
+            YSignFlags::PositiveYInfinity | YSignFlags::NegativeYInfinity
+        )
+    }
+
+    #[inline]
+    pub fn is_positive(&self) -> Option<bool> {
+        match self {
+            YSignFlags::PositiveYInfinity => Some(true),
+            YSignFlags::PositiveYNotInfinity => Some(true),
+            YSignFlags::NegativeYInfinity => Some(false),
+            YSignFlags::NegativeYNotInfinity => Some(false),
+        }
+    }
+}
+
+impl Default for YSignFlags {
+    #[inline]
+    fn default() -> Self {
+        // NegativeY doesn't change the serialization
+        YSignFlags::NegativeYNotInfinity
+    }
+}
+
+impl Flags for YSignFlags {
+    const BIT_SIZE: usize = 2;
+
+    #[inline]
+    fn u8_bitmask(&self) -> u8 {
+        let mut mask = 0;
+        match self {
+            YSignFlags::PositiveYInfinity | YSignFlags::NegativeYInfinity => mask |= 1 << 6,
+            _ => (),
+        }
+        match self {
+            YSignFlags::PositiveYNotInfinity | YSignFlags::PositiveYInfinity => mask |= 1 << 7,
+            _ => (),
+        }
+        mask
+    }
+
+    #[inline]
+    fn from_u8(value: u8) -> Option<Self> {
+        let x_sign = (value >> 7) & 1 == 1;
+        let is_infinity = (value >> 6) & 1 == 1;
+        match (x_sign, is_infinity) {
+            (true, true) => Some(YSignFlags::PositiveYInfinity),
+            (false, true) => Some(YSignFlags::NegativeYInfinity),
+            (true, false) => Some(YSignFlags::PositiveYNotInfinity),
+            (false, false) => Some(YSignFlags::NegativeYNotInfinity),
+        }
+    }
+}
+
+pub fn from_random_bytes<P: SWModelParameters>(bytes: &[u8]) -> Option<GroupAffine<P>> {
+    P::BaseField::from_random_bytes_with_flags::<YSignFlags>(bytes).and_then(|(x, flags)| {
+        if x.is_zero() && flags.is_infinity() {
+            Some(GroupAffine::<P>::zero())
+        } else if let Some(y_is_positve) = flags.is_positive() {
+            GroupAffine::<P>::get_point_from_x(x, y_is_positve) // Unwrap is safe because it's not zero.
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod test {
+
     use super::*;
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hashers::{
@@ -184,7 +276,6 @@ mod test {
 #[cfg(all(test, feature = "compat"))]
 mod compat_tests {
     #![allow(clippy::op_ref)]
-
     use super::*;
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hash_to_curve::try_and_increment_cip22::TryAndIncrementCIP22;

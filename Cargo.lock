@@ -229,8 +229,6 @@ dependencies = [
  "ark-relations",
  "ark-std",
  "derivative",
- "num-bigint",
- "num-traits",
  "tracing",
 ]
 

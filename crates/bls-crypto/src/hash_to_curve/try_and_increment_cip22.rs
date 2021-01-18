@@ -17,7 +17,6 @@ use ark_ec::{
         short_weierstrass_jacobian::{GroupAffine, GroupProjective},
         SWModelParameters,
     },
-    AffineCurve,
 };
 use ark_ff::Zero;
 use ark_serialize::CanonicalSerialize;
@@ -102,19 +101,20 @@ where
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
             let candidate_hash = {
-                use ark_serialize::{Flags, SWFlags};
+                use super::YSignFlags;
+                use ark_serialize::Flags;
 
                 let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
                 let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
                 if positive_flag {
-                    candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
+                    candidate_hash[num_bytes - 1] |= YSignFlags::PositiveYNotInfinity.u8_bitmask();
                 } else {
-                    candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
+                    candidate_hash[num_bytes - 1] &= !YSignFlags::PositiveYNotInfinity.u8_bitmask();
                 }
                 candidate_hash
             };
 
-            if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
+            if let Some(p) = super::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
                     "succeeded hashing \"{}\" to curve in {} tries",
                     hex::encode(message),

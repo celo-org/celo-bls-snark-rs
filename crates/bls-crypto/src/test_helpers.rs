@@ -1,5 +1,5 @@
 use ark_ec::{PairingEngine, ProjectiveCurve};
-use ark_ff::{UniformRand, Zero, PrimeField};
+use ark_ff::{PrimeField, UniformRand, Zero};
 
 // Same RNG for all tests
 pub fn rng() -> rand::rngs::ThreadRng {

@@ -1,6 +1,6 @@
 use ark_bls12_377::{Bls12_377, G1Projective};
 use ark_ec::ProjectiveCurve;
-use ark_ff::{Zero, PrimeField};
+use ark_ff::{PrimeField, Zero};
 
 use bls_crypto::test_helpers::{keygen_batch, keygen_mul};
 use bls_crypto::{PublicKey, Signature};
