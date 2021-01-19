@@ -589,6 +589,14 @@ mod tests {
             ];
             let include_dummy_epochs = false;
 
+            #[cfg(feature = "compat")]
+            let expected_matrices_hashes = Some(vec![
+                "5ae20d76f27795a498b9e9f1d4035475bc137ad70cb75500c9cf3210f8cc10fa".to_string(),
+                "58c12fa7ca9130918f4c86c6ebe870426d9ca7ae4571d6d1f9f190e2b497d41c".to_string(),
+                "2f860526de1066469a151cd44e803866d947dc28668fdcd6c0a8098128223b21".to_string(),
+            ]);
+            #[cfg(not(feature = "compat"))]
+            let expected_matrices_hashes = None;
             assert!(test_epochs(
                 num_faults,
                 num_epochs,
@@ -596,11 +604,7 @@ mod tests {
                 entropy,
                 bitmaps,
                 include_dummy_epochs,
-                Some(vec![
-                    "5ae20d76f27795a498b9e9f1d4035475bc137ad70cb75500c9cf3210f8cc10fa".to_string(),
-                    "58c12fa7ca9130918f4c86c6ebe870426d9ca7ae4571d6d1f9f190e2b497d41c".to_string(),
-                    "2f860526de1066469a151cd44e803866d947dc28668fdcd6c0a8098128223b21".to_string(),
-                ]),
+                expected_matrices_hashes,
             ));
         }
 
