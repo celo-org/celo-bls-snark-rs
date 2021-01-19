@@ -112,9 +112,9 @@ where
                 let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
                 let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
                 if positive_flag {
-                    candidate_hash[num_bytes - 1] |= YSignFlags::PositiveYNotInfinity.u8_bitmask();
+                    candidate_hash[num_bytes - 1] |= YSignFlags::PositiveY(false).u8_bitmask();
                 } else {
-                    candidate_hash[num_bytes - 1] &= !YSignFlags::PositiveYNotInfinity.u8_bitmask();
+                    candidate_hash[num_bytes - 1] &= !YSignFlags::PositiveY(false).u8_bitmask();
                 }
                 candidate_hash
             };

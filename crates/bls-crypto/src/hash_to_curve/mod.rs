@@ -73,23 +73,20 @@ pub fn hash_length(n: usize) -> usize {
     rounded_bits as usize / 8
 }
 
-/// Flags to be encoded into the serialization.
-/// The default flags (empty) should not change the binary representation.
+/// The bool signifies whether this is also an infinity point representation
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum YSignFlags {
-    PositiveYNotInfinity,
-    NegativeYNotInfinity,
-    PositiveYInfinity,
-    NegativeYInfinity,
+    PositiveY(bool),
+    NegativeY(bool),
 }
 
 impl YSignFlags {
     #[inline]
     pub fn from_y_sign(is_positive: bool) -> Self {
         if is_positive {
-            YSignFlags::PositiveYNotInfinity
+            YSignFlags::PositiveY(false)
         } else {
-            YSignFlags::NegativeYNotInfinity
+            YSignFlags::NegativeY(false)
         }
     }
 
@@ -97,17 +94,15 @@ impl YSignFlags {
     pub fn is_infinity(&self) -> bool {
         matches!(
             self,
-            YSignFlags::PositiveYInfinity | YSignFlags::NegativeYInfinity
+            YSignFlags::PositiveY(true) | YSignFlags::NegativeY(true)
         )
     }
 
     #[inline]
     pub fn is_positive(&self) -> Option<bool> {
         match self {
-            YSignFlags::PositiveYInfinity => Some(true),
-            YSignFlags::PositiveYNotInfinity => Some(true),
-            YSignFlags::NegativeYInfinity => Some(false),
-            YSignFlags::NegativeYNotInfinity => Some(false),
+            YSignFlags::PositiveY(_) => Some(true),
+            YSignFlags::NegativeY(_) => Some(false),
         }
     }
 }
@@ -116,7 +111,7 @@ impl Default for YSignFlags {
     #[inline]
     fn default() -> Self {
         // NegativeY doesn't change the serialization
-        YSignFlags::NegativeYNotInfinity
+        YSignFlags::NegativeY(false)
     }
 }
 
@@ -127,11 +122,11 @@ impl Flags for YSignFlags {
     fn u8_bitmask(&self) -> u8 {
         let mut mask = 0;
         match self {
-            YSignFlags::PositiveYInfinity | YSignFlags::NegativeYInfinity => mask |= 1 << 6,
+            YSignFlags::PositiveY(true) | YSignFlags::NegativeY(true) => mask |= 1 << 6,
             _ => (),
         }
         match self {
-            YSignFlags::PositiveYNotInfinity | YSignFlags::PositiveYInfinity => mask |= 1 << 7,
+            YSignFlags::PositiveY(false) | YSignFlags::PositiveY(true) => mask |= 1 << 7,
             _ => (),
         }
         mask
@@ -141,11 +136,9 @@ impl Flags for YSignFlags {
     fn from_u8(value: u8) -> Option<Self> {
         let x_sign = (value >> 7) & 1 == 1;
         let is_infinity = (value >> 6) & 1 == 1;
-        match (x_sign, is_infinity) {
-            (true, true) => Some(YSignFlags::PositiveYInfinity),
-            (false, true) => Some(YSignFlags::NegativeYInfinity),
-            (true, false) => Some(YSignFlags::PositiveYNotInfinity),
-            (false, false) => Some(YSignFlags::NegativeYNotInfinity),
+        match x_sign {
+            true => Some(YSignFlags::PositiveY(is_infinity)),
+            false => Some(YSignFlags::NegativeY(is_infinity)),
         }
     }
 }
