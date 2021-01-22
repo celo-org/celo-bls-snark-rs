@@ -30,3 +30,13 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+[patch.'https://github.com/scipr-lab/zexe']
+algebra_core = { git = "https://github.com/celo-org/zexe", package = "algebra-core", default-features = false, features = ["derive"] }
+algebra = { git = "https://github.com/celo-org/zexe", package = "algebra", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+crypto-primitives = { git = "https://github.com/celo-org/zexe", package = "crypto-primitives", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+fft = { git = "https://github.com/celo-org/zexe", package = "ff-fft", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+bench_utils = { git = "https://github.com/celo-org/zexe", package = "bench-utils", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+r1cs_core = { git = "https://github.com/celo-org/zexe", package = "r1cs-core", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+r1cs_std = { git = "https://github.com/celo-org/zexe", package = "r1cs-std", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
+groth16 = { git = "https://github.com/celo-org/zexe", package = "groth16", default-features = false, features = ["ed_on_bls12_381", "bls12_381", "bls12_377"] }
