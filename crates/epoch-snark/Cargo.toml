@@ -9,21 +9,21 @@ bls-crypto = { path = "../bls-crypto", default-features = false }
 bls-gadgets = { path = "../bls-gadgets", default-features = false }
 
 algebra = { git = "https://github.com/celo-org/zexe", features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-algebra-core = { git = "https://github.com/celo-org/zexe" } 
+algebra-core = { git = "https://github.com/celo-org/zexe" }
 r1cs-core = { git = "https://github.com/celo-org/zexe" }
 r1cs-std = { git = "https://github.com/celo-org/zexe", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
 crypto-primitives = { git = "https://github.com/celo-org/zexe", features = ["r1cs", "groth16", "parallel"] }
 groth16 = { git = "https://github.com/celo-org/zexe", features = ["parallel"] }
 
-rand = "0.7" 
-byteorder = "1.3.2"
+rand = "0.7"
+byteorder = "1.4.2"
 blake2s_simd = "0.5.8"
-thiserror = "1.0.11"
+thiserror = "1.0.23"
 tracing-subscriber = "0.2.3"
-tracing = "0.1.13"
+tracing = "0.1.22"
 
 [dev-dependencies]
-rand_xorshift = { version = "0.2" }
+rand_xorshift = "0.2"
 bench-utils = { git = "https://github.com/celo-org/zexe" }
 bls-gadgets = { path = "../bls-gadgets", default-features = false, features = ["test-helpers"] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }

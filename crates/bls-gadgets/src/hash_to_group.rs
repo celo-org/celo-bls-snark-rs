@@ -162,7 +162,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
                 &input,
             )?;
 
-        let mut crh_bits = pedersen_hash.x.to_bits_le().unwrap();
+        let mut crh_bits = pedersen_hash.x.to_bits_le()?;
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
         loop {
             if crh_bits.len() % 8 == 0 {
