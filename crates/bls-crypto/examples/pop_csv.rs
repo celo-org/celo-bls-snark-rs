@@ -7,7 +7,7 @@ use std::{fs::File, io::Write};
 
 fn main() {
     let matches = App::new("BLS Proof of Possession test vectors")
-        .about("Generates many proof of posession for random keys")
+        .about("Generates many proof of possession for random keys")
         .arg(
             Arg::with_name("num")
                 .short("n")
