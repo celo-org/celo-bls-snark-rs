@@ -77,17 +77,6 @@ fn main() -> Result<()> {
     };
 
     let mut bytes = vec![];
-    /*
-    m.num_instance_variables.serialize(&mut bytes)?;
-    m.num_witness_variables.serialize(&mut bytes)?;
-    m.num_constraints.serialize(&mut bytes)?;
-    m.a_num_non_zero.serialize(&mut bytes)?;
-    m.b_num_non_zero.serialize(&mut bytes)?;
-    m.c_num_non_zero.serialize(&mut bytes)?;
-    m.a.serialize(&mut bytes)?;
-    m.b.serialize(&mut bytes)?;
-    m.c.serialize(&mut bytes)?;
-    */
     m_for_ser.serialize(&mut bytes)?;
 
     let mut file = File::create("test.contraints")?;
@@ -100,6 +89,22 @@ fn main() -> Result<()> {
         faults,
         cs.num_constraints(),
         bytes.len(),
+    );
+
+    let mut file = File::open("test")?;
+    // read the same file back into a Vec of bytes
+    let mut buffer = Vec::<u8>::new();
+    file.read_to_end(&mut buffer)?;
+
+    let m = Matrices::deserialize(buffer);
+
+    println!(
+        "Number of constraints for {} epochs ({} validators, {} faults, hashes in BW6_761): {}, serialized size: {}",
+        num_epochs,
+        num_validators,
+        faults,
+        m.num_constraints,
+        buffer.len(),
     );
 
     Ok(())
