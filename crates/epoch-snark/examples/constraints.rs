@@ -1,17 +1,14 @@
 use ark_bls12_377::Bls12_377;
-use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisMode, Variable};
-use ark_serialize::CanonicalSerialize;
+use ark_bls12_377::Fq;
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, Field, Matrix, SynthesisMode, Variable};
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, Read, SerializationError, Write};
 use epoch_snark::ValidatorSetUpdate;
 use ark_relations::lc;
 use std::env;
 use std::fs::File;
-use ark_serialize::Write;
 use anyhow::Result;
-use ark_relations::r1cs::Matrix;
-use ark_relations::r1cs::Field;
-use ark_serialize::SerializationError;
 
-#[derive(Debug, Clone, PartialEq, Eq, CanonicalSerialize)]
+#[derive(Debug, Clone, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Matrices<F: Field> {
     /// The number of variables that are "public instances" to the constraint
     /// system.
@@ -91,12 +88,12 @@ fn main() -> Result<()> {
         bytes.len(),
     );
 
-    let mut file = File::open("test")?;
+    let mut file = File::open("test.contraints")?;
     // read the same file back into a Vec of bytes
     let mut buffer = Vec::<u8>::new();
     file.read_to_end(&mut buffer)?;
 
-    let m = Matrices::deserialize(buffer);
+    let m = Matrices::<Fq>::deserialize(&*buffer)?;
 
     println!(
         "Number of constraints for {} epochs ({} validators, {} faults, hashes in BW6_761): {}, serialized size: {}",
