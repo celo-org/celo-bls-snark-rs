@@ -149,33 +149,45 @@ impl EpochData<Bls12_377> {
         &self,
         cs: ConstraintSystemRef<Bls12_377_Fq>,
     ) -> Result<EpochDataToBits, SynthesisError> {
+        info!("1");
         let index = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.index.get()?)))?;
+        info!("2");
         let index_bits = fr_to_bits(&index, 16)?;
+        info!("3");
         let round = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.round.get()?)))?;
+        info!("4");
         let round_bits = fr_to_bits(&round, 8)?;
-
+        info!("5");
         let maximum_non_signers =
             FpVar::new_witness(index.cs(), || Ok(Fr::from(self.maximum_non_signers)))?;
+        info!("6");
 
         let maximum_non_signers_bits = fr_to_bits(&maximum_non_signers, 32)?;
+        info!("7");
 
         let empty_entropy = vec![0u8; Self::ENTROPY_BYTES];
+        info!("8");
         let epoch_entropy = match &self.epoch_entropy {
             Some(v) => v,
             None => &empty_entropy,
         };
+        info!("9"); 
         let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
+        info!("10"); 
         let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
-
+        info!("11");
         let parent_entropy = match &self.parent_entropy {
             Some(v) => v,
             None => &empty_entropy,
         };
+        info!("12"); 
         let parent_entropy_var = bytes_to_fr(cs, Some(&parent_entropy))?;
+        info!("13");
         let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
-
+        info!("14");
         let mut epoch_bits: Vec<Bool> =
             [epoch_entropy_bits.clone(), parent_entropy_bits.clone()].concat();
+        info!("15");
 
         let extra_data_bits: Vec<Bool> = [
             index_bits.clone(),
@@ -183,18 +195,19 @@ impl EpochData<Bls12_377> {
             maximum_non_signers_bits.clone(),
         ]
         .concat();
-
+        info!("16");
         let mut first_epoch_bits: Vec<Bool> = [
             index_bits.clone(),
             parent_entropy_bits,
             maximum_non_signers_bits.clone(),
         ]
         .concat();
-
+        info!("17");
         let mut last_epoch_bits: Vec<Bool> =
             [index_bits, epoch_entropy_bits, maximum_non_signers_bits].concat();
-
+        info!("18");
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
+        info!("19");
         for maybe_pk in self.public_keys.iter() {
             let pk_var = G2Var::new_variable_omit_prime_order_check(
                 index.cs(),
@@ -211,6 +224,7 @@ impl EpochData<Bls12_377> {
             // save the allocated pubkeys
             pubkey_vars.push(pk_var);
         }
+        info!("20");
 
         Ok((
             epoch_bits,
