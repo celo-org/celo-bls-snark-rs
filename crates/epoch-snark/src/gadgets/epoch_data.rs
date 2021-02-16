@@ -17,6 +17,7 @@ use r1cs_std::{
 
 use super::{bytes_to_fr, fr_to_bits, g2_to_bits};
 use tracing::{span, trace, Level};
+use tracing::info;
 
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
