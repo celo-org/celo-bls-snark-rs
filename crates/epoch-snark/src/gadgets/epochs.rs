@@ -91,7 +91,9 @@ impl ConstraintSynthesizer<Fr> for ValidatorSetUpdate<Bls12_377> {
         info!("generating constraints");
         // Verify signatures
         let epoch_bits = self.enforce(cs)?;
+        info!("Enforced epoch bits");
         let cs = epoch_bits.first_epoch_bits.cs();
+        info!("Got cs from epoch bits");
         // Compress public inputs
         epoch_bits.verify(self.hash_helper, cs)?;
         info!("constraints generated");
@@ -112,6 +114,7 @@ impl ValidatorSetUpdate<Bls12_377> {
         let span = span!(Level::TRACE, "ValidatorSetUpdate_enforce");
         let _enter = span.enter();
 
+        info!("converting initial epochdata to bits");
         debug!("converting initial EpochData to_bits");
         // Constrain the initial epoch and get its bits
         let (
@@ -125,10 +128,12 @@ impl ValidatorSetUpdate<Bls12_377> {
             initial_maximum_non_signers,
             initial_pubkey_vars,
         ) = self.initial_epoch.to_bits(cs)?;
+        info!("converted initial epoch to bits");
 
         // Constrain all intermediate epochs, and get the aggregate pubkey and epoch hash
         // from each one, to be used for the batch verification
         debug!("verifying intermediate epochs");
+        info!("verifying intermediate epochs"); 
         let (
             last_epoch_bits,
             crh_bits,
@@ -144,6 +149,7 @@ impl ValidatorSetUpdate<Bls12_377> {
 
         // Verify the aggregate BLS signature
         debug!("verifying bls signature");
+        info!("verifying bls signature");
         self.verify_signature(
             &prepared_aggregated_public_keys,
             &prepared_message_hashes,
