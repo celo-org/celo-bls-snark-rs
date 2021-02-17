@@ -209,6 +209,7 @@ impl EpochData<Bls12_377> {
         info!("18");
         let mut pubkey_vars = Vec::with_capacity(self.public_keys.len());
         info!("19");
+        info!("public keys length: {}", self.public_keys.len());
         for maybe_pk in self.public_keys.iter() {
             let pk_var = G2Var::new_variable_omit_prime_order_check(
                 index.cs(),
