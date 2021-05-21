@@ -1,5 +1,13 @@
-use epoch_snark::{prove, trusted_setup, verify};
+use epoch_snark::{prove, trusted_setup, verify, Parameters, BWCurve};
 use std::env;
+use std::fs::File;
+use std::io::BufReader;
+use groth16::Parameters as Groth16Parameters;
+use algebra::CanonicalDeserialize;
+use algebra::BW6_761;
+use phase2::parameters::MPCParameters;
+use setup_utils::{CheckForCorrectness, SubgroupCheckMode, UseCompression};
+
 
 #[path = "../tests/fixtures.rs"]
 mod fixtures;
@@ -31,18 +39,41 @@ fn main() {
         .expect("num epochs was expected")
         .parse()
         .expect("NaN");
-    let hashes_in_bls12_377: bool = args
+    let hashes_in_bls12_377 = false; /*: bool = args
         .next()
         .expect("expected flag for generating or not constraints inside BLS12_377")
         .parse()
-        .expect("not a bool");
+        .expect("not a bool");*/
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
-    let time = start_timer!(|| "Trusted setup");
+    /*let time = start_timer!(|| "Trusted setup");
     let params =
         trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
-    end_timer!(time);
+    end_timer!(time);*/
+
+    let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
+    let mpc_params = MPCParameters::<BW6_761>::read_fast(
+        file,
+        UseCompression::No,
+        CheckForCorrectness::Full,
+        true,
+        SubgroupCheckMode::Auto,
+    )
+    .expect("should have read parameters");
+    //let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize(&mut file).unwrap();
+
+    let hash_to_bits_proving_key = None; /*if let Some(path) = opts.hash_to_bits_proving_key {
+        let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
+        Some(Groth16Parameters::<BLSCurve>::deserialize(&mut file).unwrap())
+    } else {
+        None
+    };*/
+ 
+    let params = Parameters {
+        epochs: mpc_params.params,
+        hash_to_bits: hash_to_bits_proving_key,
+    };
 
     // Create the state to be proven (first - last and in between)
     // Note: This is all data which should be fetched via the Celo blockchain

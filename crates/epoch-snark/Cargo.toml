@@ -14,6 +14,8 @@ r1cs-core = { git = "https://github.com/celo-org/zexe" }
 r1cs-std = { git = "https://github.com/celo-org/zexe", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
 crypto-primitives = { git = "https://github.com/celo-org/zexe", features = ["r1cs", "groth16", "parallel"] }
 groth16 = { git = "https://github.com/celo-org/zexe", features = ["parallel"] }
+phase2 = { git = "https://github.com/celo-org/snark-setup", package = "phase2", rev = "9ada8fb746f317b9a5ae326ea6c5b3c244da41a0" }
+setup-utils = { git = "https://github.com/celo-org/snark-setup", package = "setup-utils", rev = "9ada8fb746f317b9a5ae326ea6c5b3c244da41a0" }
 
 rand = "0.7"
 byteorder = "1.4.2"
@@ -44,3 +46,4 @@ path = "examples/proof.rs"
 [[example]]
 name = "constraints"
 path = "examples/constraints.rs"
+
