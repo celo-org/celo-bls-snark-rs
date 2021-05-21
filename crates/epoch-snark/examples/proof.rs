@@ -47,12 +47,12 @@ fn main() {
     let faults = (num_validators - 1) / 3;
 
     // Trusted setup
-    /*let time = start_timer!(|| "Trusted setup");
+    let time = start_timer!(|| "Trusted setup");
     let params =
         trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
-    end_timer!(time);*/
+    end_timer!(time);
 
-    let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
+    /*let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
     let mpc_params = MPCParameters::<BW6_761>::read_fast(
         file,
         UseCompression::No,
@@ -60,20 +60,14 @@ fn main() {
         true,
         SubgroupCheckMode::Auto,
     )
-    .expect("should have read parameters");
+    .expect("should have read parameters");*/
+    println!("Read parameters");
     //let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize(&mut file).unwrap();
 
-    let hash_to_bits_proving_key = None; /*if let Some(path) = opts.hash_to_bits_proving_key {
-        let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
-        Some(Groth16Parameters::<BLSCurve>::deserialize(&mut file).unwrap())
-    } else {
-        None
-    };*/
- 
-    let params = Parameters {
+    /*let params = Parameters {
         epochs: mpc_params.params,
-        hash_to_bits: hash_to_bits_proving_key,
-    };
+        hash_to_bits: None,
+    };*/
 
     // Create the state to be proven (first - last and in between)
     // Note: This is all data which should be fetched via the Celo blockchain
@@ -91,10 +85,12 @@ fn main() {
     )
     .unwrap();
     end_timer!(time);
+    //println!("Time to generate proof was: {:?}", time);
 
     // Verifier checks the proof
     let time = start_timer!(|| "Verify proof");
     let res = verify(&params.epochs.vk, &first_epoch, &last_epoch, &proof);
     end_timer!(time);
+    //println!("Time to verify proof was: {:?}", time);
     assert!(res.is_ok());
 }
