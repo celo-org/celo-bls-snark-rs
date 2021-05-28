@@ -95,6 +95,15 @@ pub extern "C" fn serialize_signature(
     serialize(in_signature, out_bytes, out_len)
 }
 
+#[no_mangle]
+pub extern "C" fn serialize_signature_uncompressed(
+    in_signature: *const Signature,
+    out_bytes: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    serialize_uncompressed(in_signature, out_bytes, out_len)
+}
+
 fn deserialize<T: CanonicalDeserialize>(
     in_bytes: *const u8,
     in_bytes_len: c_int,
