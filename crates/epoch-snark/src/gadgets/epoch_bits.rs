@@ -1,30 +1,27 @@
-use algebra::{
-    bls12_377::{
-        Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters, Parameters as Bls12_377_Parameters,
-    },
-    bw6_761::{Fr, FrParameters},
-    curves::bls12::Bls12Parameters,
-    FpParameters,
+use ark_bls12_377::{
+    constraints::PairingVar, Bls12_377, Fr as BlsFr, FrParameters as BlsFrParameters,
+    Parameters as Bls12_377_Parameters,
+};
+use ark_bw6_761::{Fr, FrParameters};
+use ark_ec::bls12::Bls12Parameters;
+use ark_ff::FpParameters;
+use ark_groth16::{
+    constraints::{Groth16VerifierGadget, ProofVar, VerifyingKeyVar},
+    Groth16,
 };
 
-// Groth16 Specific imports
-use crypto_primitives::{
-    nizk::{
-        constraints::NIZKVerifierGadget,
-        groth16::{
-            constraints::{Groth16VerifierGadget, ProofVar, VerifyingKeyVar},
-            Groth16,
-        },
-    },
+use ark_crypto_primitives::{
     prf::blake2s::{constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
+    snark::SNARKGadget as NIZKVerifierGadget,
 };
-use r1cs_core::{ConstraintSystemRef, SynthesisError};
-use r1cs_std::{bls12_377::PairingVar, fields::fp::FpVar, prelude::*};
+use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
+use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 
 type FrVar = FpVar<Fr>;
 type Bool = Boolean<<Bls12_377_Parameters as Bls12Parameters>::Fp>;
 
-use crate::gadgets::{HashToBits, HashToBitsHelper, MultipackGadget};
+use crate::gadgets::{HashToBitsHelper, MultipackGadget};
+use ark_crypto_primitives::snark::BooleanInputVar;
 use bls_crypto::OUT_DOMAIN;
 
 /// Contains the first and last epoch's bits, along with auxiliary CRH and XOF bits
@@ -127,9 +124,10 @@ impl EpochBits {
         let public_inputs: Vec<Vec<Bool>> = [packed_crh_bits, packed_xof_bits].concat();
 
         let _ = <Groth16VerifierGadget<_, PairingVar> as NIZKVerifierGadget<
-            Groth16<Bls12_377, HashToBits, BlsFr>,
+            BlsFr,
             Fr,
-        >>::verify(&verifying_key, public_inputs.iter(), &proof)?;
+            Groth16<Bls12_377>,
+        >>::verify(&verifying_key, &BooleanInputVar::new(public_inputs), &proof)?;
 
         Ok(())
     }
@@ -157,7 +155,7 @@ mod tests {
         test_helpers::{print_unsatisfied_constraints, run_profile_constraints},
     };
 
-    use r1cs_core::ConstraintSystem;
+    use ark_relations::r1cs::ConstraintSystem;
     use rand::RngCore;
 
     #[test]

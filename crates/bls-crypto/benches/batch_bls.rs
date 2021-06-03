@@ -1,10 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
-use algebra::{
-    bls12_377::{G1Projective, G2Projective},
-    Zero,
-};
+use ark_bls12_377::{G1Projective, G2Projective};
+use ark_ff::Zero;
 
 use bls_crypto::{
     hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PrivateKey, PublicKey,
@@ -62,8 +60,7 @@ fn batch_bls_comparison(c: &mut Criterion) {
                 .zip(&sigs)
                 .zip(&msgs)
                 .for_each(|((pk, sig), msg)| {
-                    pk.verify(&msg.0[..], &msg.1[..], &sig, try_and_increment)
-                        .unwrap()
+                    pk.verify(&msg.0, &msg.1, &sig, try_and_increment).unwrap()
                 })
         })
     });

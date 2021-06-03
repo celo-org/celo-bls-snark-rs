@@ -1,9 +1,9 @@
 use crate::{BLSError, HashToCurve, PublicKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-use algebra::{
-    bls12_377::{Fr, G1Projective},
-    CanonicalDeserialize, CanonicalSerialize, Group, SerializationError, UniformRand,
-};
+use ark_bls12_377::{Fr, G1Projective};
+use ark_ec::group::Group;
+use ark_ff::UniformRand;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use rand::Rng;
 use std::io::{Read, Write};
 
@@ -82,7 +82,8 @@ mod tests {
             DirectHasher, Hasher,
         },
     };
-    use algebra::{bls12_377::Parameters, curves::models::bls12::Bls12Parameters};
+    use ark_bls12_377::Parameters;
+    use ark_ec::bls12::Bls12Parameters;
     use rand::{thread_rng, Rng};
 
     #[test]

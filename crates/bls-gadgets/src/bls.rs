@@ -1,10 +1,11 @@
 use crate::Bitmap;
-use algebra::{PairingEngine, PrimeField, ProjectiveCurve};
-use r1cs_core::SynthesisError;
-use r1cs_std::{
+use ark_ec::{PairingEngine, ProjectiveCurve};
+use ark_ff::PrimeField;
+use ark_r1cs_std::{
     alloc::AllocationMode, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, fields::FieldVar,
     groups::CurveVar, pairing::PairingVar, R1CSVar,
 };
+use ark_relations::r1cs::SynthesisError;
 use std::marker::PhantomData;
 use std::ops::AddAssign;
 use tracing::{debug, span, trace, Level};
@@ -236,17 +237,15 @@ mod verify_one_message {
     use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
     use bls_crypto::test_helpers::*;
 
-    use algebra::{
-        bls12_377::{Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective},
-        bw6_761::Fr as BW6_761Fr,
-        One, ProjectiveCurve, UniformRand, Zero,
+    use ark_bls12_377::{
+        constraints::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
+        Bls12_377, Fr as Bls12_377Fr, G1Projective, G2Projective,
     };
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::{
-        alloc::AllocVar,
-        bls12_377::{G1Var, G2Var, PairingVar as Bls12_377PairingGadget},
-        boolean::Boolean,
-    };
+    use ark_bw6_761::Fr as BW6_761Fr;
+    use ark_ec::ProjectiveCurve;
+    use ark_ff::{One, UniformRand, Zero};
+    use ark_r1cs_std::{alloc::AllocVar, boolean::Boolean};
+    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
     // converts the arguments to constraints and checks them against the `verify` function
     #[tracing::instrument(target = "r1cs")]
@@ -375,6 +374,7 @@ mod verify_one_message {
     }
 
     #[test]
+    // Verifies signatures over BLS12_377 with Sw6 field (384 bits).
     fn one_signature_ok() {
         run_profile_constraints(one_signature_ok_inner);
     }
@@ -384,7 +384,7 @@ mod verify_one_message {
         let (secret_key, pub_key) = keygen::<Bls12_377>();
         let rng = &mut rng();
         let message_hash = G1Projective::rand(rng);
-        let signature = message_hash.mul(secret_key);
+        let signature = message_hash.mul(secret_key.into_repr());
         let fake_signature = G1Projective::rand(rng);
 
         // good sig passes
@@ -515,7 +515,7 @@ mod verify_one_message {
         // if the first key is a bad one, it should fail, since the pubkey
         // won't be on the curve
         let sk = Bls12_377Fr::zero();
-        let pk = generator.clone().mul(sk);
+        let pk = generator.clone().mul(sk.into_repr());
         let (sk2, pk2) = keygen::<Bls12_377>();
 
         let (sigs, _) = sign::<Bls12_377>(message_hash, &[sk, sk2]);

@@ -1,7 +1,7 @@
 use crate::convert_result_to_bool;
-use algebra::{
-    bls12_377::G2Affine, AffineCurve, CanonicalDeserialize, CanonicalSerialize, ProjectiveCurve,
-};
+use ark_bls12_377::G2Affine;
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bls_crypto::PublicKey;
 use epoch_snark::{EncodingError, EpochBlock};
 use std::{
@@ -213,12 +213,11 @@ unsafe fn read_epoch_entropy(ptr: *const u8) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::snark::test_helpers::TestCircuit;
-    use algebra::{
-        bls12_377::{Fr, G2Projective},
-        serialize::CanonicalSerialize,
-        Bls12_377, ProjectiveCurve, UniformRand,
-    };
-    use groth16::{create_proof_no_zk, generate_random_parameters, Proof, VerifyingKey};
+    use ark_bls12_377::{Bls12_377, Fr, G2Projective};
+    use ark_ec::ProjectiveCurve;
+    use ark_ff::UniformRand;
+    use ark_groth16::{create_proof_no_zk, generate_random_parameters, Proof, VerifyingKey};
+    use ark_serialize::CanonicalSerialize;
 
     #[test]
     fn ffi_block_conversion() {

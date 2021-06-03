@@ -1,7 +1,11 @@
-use algebra::{Field, PairingEngine};
-use r1cs_core::{lc, ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
-use r1cs_std::alloc::AllocVar;
-use r1cs_std::fields::fp::FpVar;
+use ark_ec::PairingEngine;
+use ark_ff::Field;
+use ark_r1cs_std::alloc::AllocVar;
+use ark_r1cs_std::fields::fp::FpVar;
+use ark_relations::{
+    lc,
+    r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError},
+};
 
 // circuit proving knowledge of a square root
 // when generating the Setup, the element inside is None

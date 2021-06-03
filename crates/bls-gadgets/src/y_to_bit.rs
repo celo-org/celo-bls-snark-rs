@@ -1,14 +1,17 @@
 #![allow(clippy::op_ref)] // clippy throws a false positive around field ops
-use algebra::{
-    bls12_377::Parameters as Bls12_377_Parameters, curves::bls12::Bls12Parameters, PrimeField, Zero,
-};
-use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
-use r1cs_std::{
+use ark_bls12_377::Parameters as Bls12_377_Parameters;
+use ark_ec::bls12::Bls12Parameters;
+use ark_ff::{PrimeField, Zero};
+use ark_r1cs_std::{
     alloc::AllocVar,
     boolean::Boolean,
     fields::fp::FpVar,
     groups::curves::short_weierstrass::bls12::{G1Var, G2Var},
     Assignment, R1CSVar,
+};
+use ark_relations::{
+    lc,
+    r1cs::{LinearCombination, SynthesisError, Variable},
 };
 
 /// The goal of the gadget is to provide the bit according to the value of y,
@@ -164,21 +167,19 @@ mod test {
     use super::*;
     use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
-    use algebra::{
-        bls12_377::{G1Projective, G2Affine, G2Projective, Parameters},
-        bw6_761::Fr as BW6_761Fr,
-        curves::bls12::Bls12Parameters,
-        fields::Fp2,
-        AffineCurve, BigInteger, PrimeField, UniformRand, Zero,
-    };
-    use r1cs_core::ConstraintSystem;
-    use r1cs_std::{
+    use ark_bls12_377::{G1Projective, G2Affine, G2Projective, Parameters};
+    use ark_bw6_761::Fr as BW6_761Fr;
+    use ark_ec::bls12::Bls12Parameters;
+    use ark_ec::AffineCurve;
+    use ark_ff::{fields::Fp2, BigInteger, PrimeField, UniformRand, Zero};
+    use ark_r1cs_std::{
         alloc::AllocationMode,
         groups::{
             curves::short_weierstrass::bls12::{G1Var, G2Var},
             CurveVar,
         },
     };
+    use ark_relations::r1cs::ConstraintSystem;
 
     type Fp = <Parameters as Bls12Parameters>::Fp;
 

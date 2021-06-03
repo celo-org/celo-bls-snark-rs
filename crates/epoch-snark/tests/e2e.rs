@@ -1,4 +1,4 @@
-use algebra::serialize::CanonicalSerialize;
+use ark_serialize::CanonicalSerialize;
 use epoch_snark::{prove, trusted_setup, verify};
 
 mod fixtures;

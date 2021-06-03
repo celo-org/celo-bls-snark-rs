@@ -1,22 +1,15 @@
-use algebra::{
-    bls12_377::{Bls12_377, Parameters as Bls12_377_Parameters},
-    bw6_761::Fr,
-    curves::bls12::Bls12Parameters,
-    PairingEngine,
+use ark_bls12_377::{
+    constraints::{G1Var, G2Var, PairingVar},
+    Bls12_377, Parameters as Bls12_377_Parameters,
 };
-use r1cs_core::SynthesisError;
-use r1cs_std::{
-    bls12_377::{G1Var, G2Var, PairingVar},
-    boolean::Boolean,
-    eq::EqGadget,
-    fields::fp::FpVar,
-    R1CSVar,
-};
+use ark_bw6_761::Fr;
+use ark_ec::{bls12::Bls12Parameters, PairingEngine};
+use ark_r1cs_std::{boolean::Boolean, eq::EqGadget, fields::fp::FpVar, groups::CurveVar, R1CSVar};
+use ark_relations::r1cs::SynthesisError;
 
 use super::{constrain_bool, EpochData};
 use crate::EpochBlock;
 use bls_gadgets::{BlsVerifyGadget, FpUtils};
-use r1cs_std::groups::CurveVar;
 use tracing::{span, Level};
 
 // Instantiate the BLS Verification gadget
@@ -97,6 +90,7 @@ impl SingleUpdate<Bls12_377> {
         let _enter = span.enter();
         // the number of validators across all epochs must be consistent
         assert_eq!(num_validators as usize, self.epoch_data.public_keys.len());
+
         // Get the constrained epoch data
         let epoch_data = self
             .epoch_data
@@ -115,6 +109,7 @@ impl SingleUpdate<Bls12_377> {
         // convert the bitmap to constraints
         let signed_bitmap = constrain_bool(&self.signed_bitmap, previous_epoch_index.cs())?;
 
+        // convert the bitmap to constraints
         // Verify that the bitmap is consistent with the pubkeys read from the
         // previous epoch and prepare the message hash and the aggregate pk
         let (message_hash, aggregated_public_key) = BlsGadget::enforce_bitmap(
@@ -146,7 +141,7 @@ pub mod test_helpers {
     use super::*;
     use crate::gadgets::test_helpers::to_option_iter;
 
-    use algebra::ProjectiveCurve;
+    use ark_ec::ProjectiveCurve;
 
     #[tracing::instrument(target = "r1cs")]
     pub fn generate_single_update<E: PairingEngine>(
@@ -203,14 +198,14 @@ mod tests {
         print_unsatisfied_constraints, run_profile_constraints,
     };
 
-    use algebra::{BigInteger, PrimeField, UniformRand};
-    use bls_gadgets::utils::bytes_le_to_bits_le;
-    use r1cs_core::{ConstraintSystem, ConstraintSystemRef};
-    use r1cs_std::{
+    use ark_bls12_377::constraints::G2Var;
+    use ark_ff::{BigInteger, PrimeField, UniformRand};
+    use ark_r1cs_std::{
         alloc::{AllocVar, AllocationMode},
-        bls12_377::G2Var,
         groups::CurveVar,
     };
+    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
+    use bls_gadgets::utils::bytes_le_to_bits_le;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
         let rng = &mut rand::thread_rng();
@@ -306,7 +301,7 @@ mod tests {
             Some(v) => {
                 let bits =
                     bytes_le_to_bits_le(&v.clone(), EpochData::<Bls12_377>::ENTROPY_BYTES * 8);
-                let bigint = <Fr as PrimeField>::BigInt::from_bits(&bits);
+                let bigint = <Fr as PrimeField>::BigInt::from_bits_be(&bits);
                 FrVar::new_witness(cs, || Ok(Fr::from(bigint)))?
             }
             None => bytes_to_fr(
@@ -327,7 +322,7 @@ mod tests {
         );
 
         // enforce
-        Ok(next_epoch.constrain(
+        next_epoch.constrain(
             &prev_validators,
             &prev_index,
             &prev_randomness_var,
@@ -335,6 +330,6 @@ mod tests {
             &Bool::FALSE,
             prev_n_validators as u32,
             false,
-        )?)
+        )
     }
 }

@@ -1,6 +1,9 @@
-use algebra::PrimeField;
-use r1cs_core::{lc, LinearCombination, SynthesisError, Variable};
-use r1cs_std::{fields::fp::FpVar, prelude::*};
+use ark_ff::PrimeField;
+use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
+use ark_relations::{
+    lc,
+    r1cs::{LinearCombination, SynthesisError, Variable},
+};
 
 pub trait Bitmap<F: PrimeField> {
     /// Enforces that there are no more than `max_occurrences` of `value` (0 or 1)
@@ -76,14 +79,11 @@ mod tests {
     use super::*;
     use crate::utils::test_helpers::{print_unsatisfied_constraints, run_profile_constraints};
 
-    use algebra::{
-        bls12_377::{Fq, Fr},
-        Bls12_377,
-    };
-    use groth16::{
+    use ark_bls12_377::{Bls12_377, Fq, Fr};
+    use ark_groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
+    use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
     use std::assert;
 
     #[test]

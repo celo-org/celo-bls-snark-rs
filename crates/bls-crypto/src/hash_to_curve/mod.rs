@@ -24,7 +24,7 @@
 /// Doing this manually requires importing the curves and instantiating the hashers as follows:
 ///
 /// ```rust
-/// use algebra::bls12_377::g1::Parameters;
+/// use ark_bls12_377::g1::Parameters;
 /// use bls_crypto::{
 ///     OUT_DOMAIN,
 ///     hashers::composite::{CompositeHasher, CRH}, // We'll use the Composite Hasher
@@ -43,8 +43,10 @@
 /// ```
 pub mod try_and_increment;
 pub mod try_and_increment_cip22;
-
 use crate::BLSError;
+use ark_ec::models::{short_weierstrass_jacobian::GroupAffine, SWModelParameters};
+use ark_ff::{Field, Zero};
+use ark_serialize::Flags;
 
 /// Trait for hashing arbitrary data to a group element on an elliptic curve
 pub trait HashToCurve {
@@ -71,20 +73,103 @@ pub fn hash_length(n: usize) -> usize {
     rounded_bits as usize / 8
 }
 
+/// The bool signifies whether this is also an infinity point representation
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum YSignFlags {
+    PositiveY(bool),
+    NegativeY(bool),
+}
+
+impl YSignFlags {
+    #[inline]
+    pub fn from_y_sign(is_positive: bool) -> Self {
+        if is_positive {
+            YSignFlags::PositiveY(false)
+        } else {
+            YSignFlags::NegativeY(false)
+        }
+    }
+
+    #[inline]
+    pub fn is_infinity(&self) -> bool {
+        matches!(
+            self,
+            YSignFlags::PositiveY(true) | YSignFlags::NegativeY(true)
+        )
+    }
+
+    #[inline]
+    pub fn is_positive(&self) -> Option<bool> {
+        match self {
+            YSignFlags::PositiveY(_) => Some(true),
+            YSignFlags::NegativeY(_) => Some(false),
+        }
+    }
+}
+
+impl Default for YSignFlags {
+    #[inline]
+    fn default() -> Self {
+        // NegativeY doesn't change the serialization
+        YSignFlags::NegativeY(false)
+    }
+}
+
+impl Flags for YSignFlags {
+    const BIT_SIZE: usize = 2;
+
+    #[inline]
+    fn u8_bitmask(&self) -> u8 {
+        let mut mask = 0;
+        match self {
+            YSignFlags::PositiveY(true) | YSignFlags::NegativeY(true) => mask |= 1 << 6,
+            _ => (),
+        }
+        match self {
+            YSignFlags::PositiveY(false) | YSignFlags::PositiveY(true) => mask |= 1 << 7,
+            _ => (),
+        }
+        mask
+    }
+
+    #[inline]
+    fn from_u8(value: u8) -> Option<Self> {
+        let x_sign = (value >> 7) & 1 == 1;
+        let is_infinity = (value >> 6) & 1 == 1;
+        match x_sign {
+            true => Some(YSignFlags::PositiveY(is_infinity)),
+            false => Some(YSignFlags::NegativeY(is_infinity)),
+        }
+    }
+}
+
+pub fn from_random_bytes<P: SWModelParameters>(bytes: &[u8]) -> Option<GroupAffine<P>> {
+    P::BaseField::from_random_bytes_with_flags::<YSignFlags>(bytes).and_then(|(x, flags)| {
+        if x.is_zero() && flags.is_infinity() {
+            Some(GroupAffine::<P>::zero())
+        } else if let Some(y_is_positve) = flags.is_positive() {
+            GroupAffine::<P>::get_point_from_x(x, y_is_positve) // Unwrap is safe because it's not zero.
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod test {
+
     use super::*;
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hashers::{
         composite::{CompositeHasher, CRH},
         DirectHasher, Hasher,
     };
-    use algebra::{
-        bls12_377::Parameters,
-        curves::models::short_weierstrass_jacobian::GroupProjective,
-        curves::models::{bls12::Bls12Parameters, SWModelParameters},
-        CanonicalSerialize, ProjectiveCurve,
+    use ark_bls12_377::Parameters;
+    use ark_ec::{
+        bls12::Bls12Parameters, models::SWModelParameters,
+        short_weierstrass_jacobian::GroupProjective, ProjectiveCurve,
     };
+    use ark_serialize::CanonicalSerialize;
     use rand::{Rng, RngCore};
 
     #[test]
@@ -184,18 +269,18 @@ mod test {
 #[cfg(all(test, feature = "compat"))]
 mod compat_tests {
     #![allow(clippy::op_ref)]
-
     use super::*;
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hash_to_curve::try_and_increment_cip22::TryAndIncrementCIP22;
     use crate::hashers::{composite::COMPOSITE_HASHER, Hasher};
-    use algebra::bls12::{G1Affine, G1Projective};
-    use algebra::{
-        bls12_377::Parameters,
-        curves::models::{bls12::Bls12Parameters, SWModelParameters},
-        CanonicalSerialize, Field, FpParameters, FromBytes, ModelParameters, PrimeField,
-        ProjectiveCurve, SquareRootField, Zero,
+    use ark_bls12_377::Parameters;
+    use ark_ec::{
+        bls12::{Bls12Parameters, G1Affine, G1Projective},
+        models::SWModelParameters,
+        ModelParameters, ProjectiveCurve,
     };
+    use ark_ff::{Field, FpParameters, FromBytes, PrimeField, SquareRootField, Zero};
+    use ark_serialize::CanonicalSerialize;
     use bench_utils::{end_timer, start_timer};
     use byteorder::WriteBytesExt;
     use log::trace;
@@ -375,7 +460,8 @@ mod non_compat_tests {
     use crate::hash_to_curve::try_and_increment::TryAndIncrement;
     use crate::hash_to_curve::try_and_increment::COMPOSITE_HASH_TO_G1;
     use crate::hashers::composite::COMPOSITE_HASHER;
-    use algebra::{bls12_377::Parameters, curves::models::bls12::Bls12Parameters};
+    use ark_bls12_377::Parameters;
+    use ark_ec::models::bls12::Bls12Parameters;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 

@@ -46,7 +46,7 @@ jobs:
           key: v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run tests
-          command: cargo test --release
+          command: cargo test --release -- --test-threads 1
           no_output_timeout: 30m
       - run:
           name: Run non-compat tests in bls-crypto
@@ -58,7 +58,7 @@ jobs:
           no_output_timeout: 30m
       - run:
           name: Run non-compat tests in epoch-snark
-          command: cd crates/epoch-snark && cargo test --release --no-default-features
+          command: cd crates/epoch-snark && cargo test --release --no-default-features -- --test-threads 1
           no_output_timeout: 30m
       - run:
           name: Check Style

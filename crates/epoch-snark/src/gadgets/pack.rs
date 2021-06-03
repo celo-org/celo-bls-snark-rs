@@ -1,7 +1,6 @@
-use algebra::{FpParameters, PrimeField};
-use algebra_core::biginteger::BigInteger;
-use r1cs_core::SynthesisError;
-use r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use ark_ff::{biginteger::BigInteger, FpParameters, PrimeField};
+use ark_r1cs_std::{fields::fp::FpVar, prelude::*, Assignment};
+use ark_relations::r1cs::SynthesisError;
 use tracing::{span, trace, Level};
 
 /// Gadget which packs and unpacks boolean constraints in field elements for efficiency
@@ -32,16 +31,15 @@ impl MultipackGadget {
                 if chunk.cs().is_in_setup_mode() {
                     return Err(SynthesisError::AssignmentMissing);
                 }
-                let fp_val = F::BigInt::from_bits(
-                    &chunk
-                        .iter()
-                        .map(|x| x.value())
-                        .collect::<Result<Vec<bool>, _>>()?,
-                );
-                Ok(F::from_repr(fp_val).get()?)
+                let fp_val =
+                    F::BigInt::from_bits_be(&chunk.iter().map(|x| x.value()).collect::<Result<
+                        Vec<bool>,
+                        _,
+                    >>(
+                    )?);
+                F::from_repr(fp_val).get()
             })?;
-            let mut fp_bits = fp.to_bits_le()?;
-            fp_bits.reverse();
+            let fp_bits = fp.to_bits_be()?;
             let chunk_len = chunk.len();
             for j in 0..chunk_len {
                 fp_bits[Fp::MODULUS_BITS as usize - chunk_len + j].enforce_equal(&chunk[j])?;

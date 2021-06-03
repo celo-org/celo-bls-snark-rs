@@ -1,5 +1,7 @@
 use super::PublicKey;
-use algebra::{bls12_377::G2Projective, CanonicalDeserialize, SerializationError, Zero};
+use ark_bls12_377::G2Projective;
+use ark_ff::Zero;
+use ark_serialize::{CanonicalDeserialize, SerializationError};
 
 use lru::LruCache;
 use std::{
@@ -111,7 +113,8 @@ impl Hash for WrappedPublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use algebra::{CanonicalSerialize, UniformRand};
+    use ark_ff::UniformRand;
+    use ark_serialize::CanonicalSerialize;
 
     fn rand_pubkey() -> PublicKey {
         PublicKey(G2Projective::rand(&mut rand::thread_rng()))

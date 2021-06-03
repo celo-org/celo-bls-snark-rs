@@ -1,4 +1,4 @@
-use algebra::CanonicalSerialize;
+use ark_serialize::CanonicalSerialize;
 use bls_crypto::{hash_to_curve::try_and_increment::DIRECT_HASH_TO_G1, PrivateKey};
 
 use clap::{App, Arg};

@@ -55,15 +55,14 @@ pub fn bytes_le_to_bits_le(bytes: &[u8], bits_to_take: usize) -> Vec<bool> {
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
-    use algebra::PrimeField;
-    use r1cs_core::{ConstraintLayer, ConstraintSystemRef};
+    use ark_ff::PrimeField;
+    use ark_relations::r1cs::{ConstraintLayer, ConstraintSystemRef};
     use tracing_subscriber::layer::SubscriberExt;
 
     // private fields preclude functional update syntax
     #[allow(clippy::field_reassign_with_default)]
     pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
-        let mut layer = ConstraintLayer::default();
-        layer.mode = r1cs_core::TracingMode::OnlyConstraints;
+        let layer = ConstraintLayer::new(ark_relations::r1cs::TracingMode::OnlyConstraints);
         let subscriber = tracing_subscriber::Registry::default().with(layer);
         tracing::subscriber::with_default(subscriber, f)
     }

@@ -109,5 +109,5 @@ pub enum BLSError {
 
     /// Serialization error in Zexe
     #[error(transparent)]
-    SerializationError(#[from] algebra::SerializationError),
+    SerializationError(#[from] ark_serialize::SerializationError),
 }

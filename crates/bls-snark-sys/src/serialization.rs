@@ -1,9 +1,9 @@
 use super::{convert_result_to_bool, PrivateKey, PublicKey, Signature};
 use crate::cache::PUBLIC_KEY_CACHE;
-use algebra::{
-    bls12_377::{Fq, Fq2, G1Affine, G2Affine},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, FromBytes,
-};
+use ark_bls12_377::{Fq, Fq2, G1Affine, G2Affine};
+use ark_ec::AffineCurve;
+use ark_ff::FromBytes;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bls_crypto::BLSError;
 use std::{os::raw::c_int, slice};
 
@@ -95,6 +95,15 @@ pub extern "C" fn serialize_signature(
     serialize(in_signature, out_bytes, out_len)
 }
 
+#[no_mangle]
+pub extern "C" fn serialize_signature_uncompressed(
+    in_signature: *const Signature,
+    out_bytes: *mut *mut u8,
+    out_len: *mut c_int,
+) -> bool {
+    serialize_uncompressed(in_signature, out_bytes, out_len)
+}
+
 fn deserialize<T: CanonicalDeserialize>(
     in_bytes: *const u8,
     in_bytes_len: c_int,
@@ -102,6 +111,7 @@ fn deserialize<T: CanonicalDeserialize>(
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
         let bytes = unsafe { slice::from_raw_parts(in_bytes, in_bytes_len as usize) };
+        #[allow(clippy::redundant_slicing)]
         let key: T = CanonicalDeserialize::deserialize(&mut &bytes[..])?;
         unsafe {
             *out = Box::into_raw(Box::new(key));

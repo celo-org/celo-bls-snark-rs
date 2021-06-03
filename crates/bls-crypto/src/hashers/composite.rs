@@ -3,12 +3,11 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use algebra::{
-    ed_on_bw6_761::{EdwardsParameters, EdwardsProjective},
-    CanonicalSerialize, ProjectiveCurve,
-};
+use ark_crypto_primitives::crh::{bowe_hopwood, pedersen, FixedLengthCRH};
+use ark_ec::ProjectiveCurve;
+use ark_ed_on_bw6_761::{EdwardsParameters, EdwardsProjective};
+use ark_serialize::CanonicalSerialize;
 use blake2s_simd::Params;
-use crypto_primitives::crh::{bowe_hopwood, pedersen, FixedLengthCRH};
 use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -29,6 +28,7 @@ mod window {
 
 /// Bowe Hopwood Pedersen CRH instantiated over Edwards BW6_761 with `WINDOW_SIZE = 93` and
 /// `NUM_WINDOWS = 560`
+#[allow(clippy::upper_case_acronyms)]
 pub type CRH = bowe_hopwood::CRH<EdwardsParameters, window::Window>;
 
 /// Lazily evaluated composite hasher instantiated over the

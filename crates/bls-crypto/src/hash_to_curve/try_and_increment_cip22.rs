@@ -10,12 +10,16 @@ use crate::hashers::{
 };
 use crate::BLSError;
 
-use algebra::{
-    bls12_377::Parameters,
-    curves::models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-    curves::models::{bls12::Bls12Parameters, SWModelParameters},
-    AffineCurve, ConstantSerializedSize, Zero,
+use ark_bls12_377::Parameters;
+use ark_ec::{
+    bls12::Bls12Parameters,
+    models::{
+        short_weierstrass_jacobian::{GroupAffine, GroupProjective},
+        SWModelParameters,
+    },
 };
+use ark_ff::Zero;
+use ark_serialize::CanonicalSerialize;
 
 use crate::hash_to_curve::hash_length;
 use once_cell::sync::Lazy;
@@ -80,7 +84,7 @@ where
         message: &[u8],
         extra_data: &[u8],
     ) -> Result<(GroupProjective<P>, usize), BLSError> {
-        let num_bytes = GroupAffine::<P>::SERIALIZED_SIZE;
+        let num_bytes = GroupAffine::<P>::zero().serialized_size();
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
         let inner_hash = self.hasher.crh(domain, &message, hash_bytes)?;
@@ -97,19 +101,20 @@ where
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]
             let candidate_hash = {
-                use algebra::serialize::{Flags, SWFlags};
+                use super::YSignFlags;
+                use ark_serialize::Flags;
 
                 let mut candidate_hash = candidate_hash[..num_bytes].to_vec();
                 let positive_flag = candidate_hash[num_bytes - 1] & 2 != 0;
                 if positive_flag {
-                    candidate_hash[num_bytes - 1] |= SWFlags::PositiveY.u8_bitmask();
+                    candidate_hash[num_bytes - 1] |= YSignFlags::PositiveY(false).u8_bitmask();
                 } else {
-                    candidate_hash[num_bytes - 1] &= !SWFlags::PositiveY.u8_bitmask();
+                    candidate_hash[num_bytes - 1] &= !YSignFlags::PositiveY(false).u8_bitmask();
                 }
                 candidate_hash
             };
 
-            if let Some(p) = GroupAffine::<P>::from_random_bytes(&candidate_hash[..num_bytes]) {
+            if let Some(p) = super::from_random_bytes(&candidate_hash[..num_bytes]) {
                 trace!(
                     "succeeded hashing \"{}\" to curve in {} tries",
                     hex::encode(message),

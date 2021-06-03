@@ -7,22 +7,26 @@ edition = "2018"
 [dependencies]
 bls-crypto = { path = "../bls-crypto", default-features = false }
 
-algebra = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["bls12_377", "bw6_761", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
-algebra-core = { git = "https://github.com/celo-org/zexe" }
-r1cs-core = { git = "https://github.com/celo-org/zexe", default-features = false }
-r1cs-std = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["bls12_377", "ed_on_cp6_782", "parallel"] }
-crypto-primitives = { git = "https://github.com/celo-org/zexe", default-features = false, features = ["parallel"] }
+ark-relations = { git = "https://github.com/arkworks-rs/snark", features = [ "std" ] }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
+ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-features = false, features = ["std", "parallel"] }
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", branch = "main", features = ["parallel", "r1cs"] }
+ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
+ark-bls12-377 = { git = "https://github.com/arkworks-rs/curves", features = [ "r1cs" ] }
+ark-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
 
 # used only when exporting our test helpers to be used in the snark crate
 rand_xorshift = { version = "0.2", optional = true }
-rand = { version = "0.7", optional = true }
-tracing = "0.1.22"
+rand = { version = "0.7" , optional = true }
+tracing = "0.1.13"
 tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]
-rand_xorshift = "0.2"
-rand = "0.7"
-groth16 = { git = "https://github.com/celo-org/zexe" }
+rand_xorshift = { version = "0.2" }
+rand = { version = "0.7" }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
 
 [features]

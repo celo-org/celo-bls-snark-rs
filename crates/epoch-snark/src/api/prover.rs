@@ -3,15 +3,15 @@ use crate::{
     epoch_block::{EpochBlock, EpochTransition},
     gadgets::{EpochData, HashToBits, HashToBitsHelper, SingleUpdate, ValidatorSetUpdate},
 };
-use algebra::ProjectiveCurve;
+use ark_ec::ProjectiveCurve;
 use bls_crypto::{
     hashers::{Hasher, COMPOSITE_HASHER},
     Signature,
 };
 use bls_gadgets::utils::bytes_le_to_bits_be;
 
-use groth16::{create_proof_no_zk, Parameters as Groth16Parameters, Proof as Groth16Proof};
-use r1cs_core::SynthesisError;
+use ark_groth16::{create_proof_no_zk, Proof as Groth16Proof, ProvingKey as Groth16Parameters};
+use ark_relations::r1cs::SynthesisError;
 
 use tracing::{info, span, Level};
 

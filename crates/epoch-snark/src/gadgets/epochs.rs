@@ -5,23 +5,17 @@
 use crate::gadgets::{g2_to_bits, single_update::SingleUpdate, EpochBits, EpochData};
 use bls_gadgets::{BlsVerifyGadget, FpUtils};
 
-use algebra::{
-    bls12_377::{Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters},
-    bw6_761::Fr,
-    curves::bls12::Bls12Parameters,
-    PairingEngine, ProjectiveCurve,
+use ark_bls12_377::{
+    constraints::{Fq2Var, G1PreparedVar, G1Var, G2PreparedVar, G2Var, PairingVar},
+    Bls12_377, G1Projective, G2Projective, Parameters as Bls12_377_Parameters,
 };
-use groth16::{Proof, VerifyingKey};
-use r1cs_core::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
-use r1cs_std::{
-    alloc::AllocationMode,
-    bls12_377::{Fq2Var, G1Var, G2Var, PairingVar},
-    bls12_377::{G1PreparedVar, G2PreparedVar},
-    fields::fp::FpVar,
-    pairing::PairingVar as _,
-    prelude::*,
-    Assignment,
+use ark_bw6_761::Fr;
+use ark_ec::{bls12::Bls12Parameters, PairingEngine, ProjectiveCurve};
+use ark_groth16::{Proof, VerifyingKey};
+use ark_r1cs_std::{
+    alloc::AllocationMode, fields::fp::FpVar, pairing::PairingVar as _, prelude::*, Assignment,
 };
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use tracing::{debug, info, span, Level};
 
 // Initialize BLS verification gadget
@@ -326,9 +320,10 @@ mod tests {
         print_unsatisfied_constraints, run_profile_constraints,
     };
 
-    use algebra::{bls12_377::G1Projective, ProjectiveCurve};
+    use ark_bls12_377::G1Projective;
+    use ark_ec::ProjectiveCurve;
+    use ark_relations::r1cs::ConstraintSystem;
     use bls_crypto::test_helpers::{keygen_batch, keygen_mul, sign_batch, sum};
-    use r1cs_core::ConstraintSystem;
 
     type Curve = Bls12_377;
     type Entropy = Option<Vec<u8>>;
@@ -339,6 +334,8 @@ mod tests {
         use crate::epoch_block::hash_first_last_epoch_block;
         use crate::gadgets::single_update::test_helpers::generate_dummy_update;
         use crate::{BWField, BWFrParams, EpochBlock};
+        use ark_serialize::CanonicalSerialize;
+        use blake2s_simd::blake2s;
         use bls_crypto::PublicKey;
 
         fn epoch_data_to_block(data: &EpochData<Curve>) -> EpochBlock {
@@ -364,6 +361,7 @@ mod tests {
             entropy: Vec<(Entropy, Entropy)>,
             bitmaps: Vec<Vec<bool>>,
             include_dummy_epochs: bool,
+            expected_hashes: Option<Vec<String>>,
         ) -> bool {
             let num_validators = 3 * faults + 1;
             let initial_validator_set = keygen_mul::<Curve>(num_validators as usize);
@@ -467,6 +465,26 @@ mod tests {
                 cs.borrow().unwrap().instance_assignment[1..].to_vec(),
                 public_inputs
             );
+            cs.inline_all_lcs();
+            if let Some(expected_hashes) = expected_hashes {
+                let matrices = cs.to_matrices().unwrap();
+                let mut serialized_matrix = vec![];
+                matrices.a.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[0],
+                );
+                matrices.b.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[1],
+                );
+                matrices.c.serialize(&mut serialized_matrix).unwrap();
+                assert_eq!(
+                    blake2s(&serialized_matrix).to_hex().to_string(),
+                    expected_hashes[2],
+                );
+            }
 
             print_unsatisfied_constraints(cs.clone());
             cs.is_satisfied().unwrap()
@@ -498,7 +516,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -528,7 +547,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -569,13 +589,22 @@ mod tests {
             ];
             let include_dummy_epochs = false;
 
+            #[cfg(feature = "compat")]
+            let expected_matrices_hashes = Some(vec![
+                "5ae20d76f27795a498b9e9f1d4035475bc137ad70cb75500c9cf3210f8cc10fa".to_string(),
+                "58c12fa7ca9130918f4c86c6ebe870426d9ca7ae4571d6d1f9f190e2b497d41c".to_string(),
+                "2f860526de1066469a151cd44e803866d947dc28668fdcd6c0a8098128223b21".to_string(),
+            ]);
+            #[cfg(not(feature = "compat"))]
+            let expected_matrices_hashes = None;
             assert!(test_epochs(
                 num_faults,
                 num_epochs,
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                expected_matrices_hashes,
             ));
         }
 
@@ -623,7 +652,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -673,7 +703,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
 
@@ -722,7 +753,8 @@ mod tests {
                 initial_entropy,
                 entropy,
                 bitmaps,
-                include_dummy_epochs
+                include_dummy_epochs,
+                None,
             ));
         }
     }

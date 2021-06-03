@@ -1,10 +1,9 @@
 use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-use algebra::{
-    bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective},
-    AffineCurve, CanonicalDeserialize, CanonicalSerialize, One, PairingEngine, ProjectiveCurve,
-    SerializationError,
-};
+use ark_bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ff::{One, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
     borrow::Borrow,
@@ -24,7 +23,7 @@ impl From<G2Projective> for PublicKey {
 
 impl From<&PrivateKey> for PublicKey {
     fn from(pk: &PrivateKey) -> PublicKey {
-        PublicKey::from(G2Projective::prime_subgroup_generator().mul(*pk.as_ref()))
+        PublicKey::from(G2Projective::prime_subgroup_generator().mul(pk.as_ref().into_repr()))
     }
 }
 
