@@ -125,14 +125,14 @@ impl EpochData<Bls12_377> {
             Self::hash_bits_to_g1(&bits, &extra_data_bits, generate_constraints_for_hash)?;
 
         Ok(ConstrainedEpochData {
-            combined_first_epoch_bits,
-            combined_last_epoch_bits,
             index,
             epoch_entropy,
             parent_entropy,
             maximum_non_signers,
-            pubkeys,
             message_hash,
+            pubkeys,
+            combined_first_epoch_bits,
+            combined_last_epoch_bits,
             crh_bits,
             xof_bits,
         })

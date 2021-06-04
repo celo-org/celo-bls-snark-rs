@@ -322,7 +322,7 @@ mod tests {
         );
 
         // enforce
-        Ok(next_epoch.constrain(
+        next_epoch.constrain(
             &prev_validators,
             &prev_index,
             &prev_randomness_var,
@@ -330,6 +330,6 @@ mod tests {
             &Bool::FALSE,
             prev_n_validators as u32,
             false,
-        )?)
+        )
     }
 }

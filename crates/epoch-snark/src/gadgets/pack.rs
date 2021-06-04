@@ -37,7 +37,7 @@ impl MultipackGadget {
                         _,
                     >>(
                     )?);
-                Ok(F::from_repr(fp_val).get()?)
+                F::from_repr(fp_val).get()
             })?;
             let fp_bits = fp.to_bits_be()?;
             let chunk_len = chunk.len();

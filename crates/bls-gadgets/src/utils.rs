@@ -59,6 +59,8 @@ pub mod test_helpers {
     use ark_relations::r1cs::{ConstraintLayer, ConstraintSystemRef};
     use tracing_subscriber::layer::SubscriberExt;
 
+    // private fields preclude functional update syntax
+    #[allow(clippy::field_reassign_with_default)]
     pub fn run_profile_constraints<T>(f: impl FnOnce() -> T) -> T {
         let layer = ConstraintLayer::new(ark_relations::r1cs::TracingMode::OnlyConstraints);
         let subscriber = tracing_subscriber::Registry::default().with(layer);

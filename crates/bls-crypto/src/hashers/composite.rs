@@ -28,6 +28,7 @@ mod window {
 
 /// Bowe Hopwood Pedersen CRH instantiated over Edwards BW6_761 with `WINDOW_SIZE = 93` and
 /// `NUM_WINDOWS = 560`
+#[allow(clippy::upper_case_acronyms)]
 pub type CRH = bowe_hopwood::CRH<EdwardsParameters, window::Window>;
 
 /// Lazily evaluated composite hasher instantiated over the

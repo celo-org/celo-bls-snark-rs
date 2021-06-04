@@ -109,7 +109,7 @@ mod tests {
                     .map(|b| Boolean::new_witness(cs.clone(), || Ok(b.unwrap())).unwrap())
                     .collect::<Vec<_>>();
                 let max_occurrences =
-                    FpVar::<Fr>::new_witness(cs, || Ok(Fr::from(self.max_occurrences))).unwrap();
+                    FpVar::<Fr>::new_witness(cs, || Ok(Fr::from(self.max_occurrences)))?;
                 bitmap.enforce_maximum_occurrences_in_bitmap(&max_occurrences, self.value)
             }
         }
