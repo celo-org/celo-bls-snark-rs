@@ -83,7 +83,7 @@ where
     H: Hasher<Error = BLSError>,
     P: SWModelParameters,
 {
-    /// Hash with attempt takes the input, appends a counter
+    /// Hash with attempt takes the input, prepends a counter
     pub fn hash_with_attempt(
         &self,
         domain: &[u8],
