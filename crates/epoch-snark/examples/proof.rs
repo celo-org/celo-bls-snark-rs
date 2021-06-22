@@ -48,11 +48,11 @@ fn main() {
 
     // Trusted setup
     let time = start_timer!(|| "Trusted setup");
-    let params =
+    /*let params =
         trusted_setup(num_validators, num_epochs, faults, rng, hashes_in_bls12_377).unwrap();
-    end_timer!(time);
+    end_timer!(time);*/
 
-    /*let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
+    let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
     let mpc_params = MPCParameters::<BW6_761>::read_fast(
         file,
         UseCompression::No,
@@ -60,14 +60,14 @@ fn main() {
         true,
         SubgroupCheckMode::Auto,
     )
-    .expect("should have read parameters");*/
+    .expect("should have read parameters");
     println!("Read parameters");
-    //let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize(&mut file).unwrap();
+    let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize(&mut file).unwrap();
 
-    /*let params = Parameters {
+    let params = Parameters {
         epochs: mpc_params.params,
         hash_to_bits: None,
-    };*/
+    };
 
     // Create the state to be proven (first - last and in between)
     // Note: This is all data which should be fetched via the Celo blockchain
