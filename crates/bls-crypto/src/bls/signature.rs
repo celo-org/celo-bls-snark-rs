@@ -1,9 +1,9 @@
 use super::PublicKey;
 use crate::{BLSError, HashToCurve};
 
-use ark_bls12_377::{Bls12_377, Fq12, G1Affine, G1Projective, G2Affine};
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::One;
+use ark_bls12_377::{Bls12_377, Fr, Fq12, G1Affine, G1Projective, G2Affine};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve, msm::VariableBaseMSM};
+use ark_ff::{One, PrimeField, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
@@ -65,6 +65,24 @@ impl Signature {
             .sum::<G1Projective>()
             .into()
     }
+
+    /// Computes the dot product of a vector of signatures and a vector of exponents.
+    pub fn batch(r: &[Fr], signatures: &[&Signature]) -> Signature {
+        // Get everything in the right types
+        let projective_elements = signatures
+            .iter()
+            .map(|s| s.as_ref().clone())
+            .collect::<Vec<G1Projective>>();
+        
+        let bases = G1Projective::batch_normalization_into_affine(&projective_elements);
+        
+        let bigint_scalars: Vec<BigInteger256> = r
+            .iter()
+            .map(|n| n.into_repr())
+            .collect::<Vec<BigInteger256>>();
+
+        Signature(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
+    }    
 
     /// Verifies the signature against a vector of pubkey & message tuples, for the provided
     /// messages domain.
@@ -137,12 +155,13 @@ impl Signature {
 mod tests {
     use super::*;
     use crate::{
+        bls::Batch,
         hash_to_curve::{
             try_and_increment::{TryAndIncrement, COMPOSITE_HASH_TO_G1},
             try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22,
         },
         hashers::{composite::COMPOSITE_HASHER, DirectHasher},
-        test_helpers::{keygen_batch, sign_batch, sum},
+        test_helpers::{keygen_batch, keygen_mul, sign_batch, sum},
         PrivateKey, PublicKeyCache, SIG_DOMAIN,
     };
 
@@ -361,5 +380,45 @@ mod tests {
             let de = Signature::deserialize(&mut &sig_bytes[..]).unwrap();
             assert_eq!(sig, de);
         }
+    }
+
+    #[test]
+    fn test_batch_verify_strict() {
+        let (message, extra) = (b"Hello, world!", b"I'm a teapot");
+        let (secret_keys, public_keys) = keygen_mul::<Bls12_377>(10);
+
+        let signatures = secret_keys
+            .iter()
+            .map(|sk| {
+                let key = PrivateKey(*sk);
+                key.sign(message, extra, &*COMPOSITE_HASH_TO_G1_CIP22)
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let mut batch = Batch::new(message, extra);
+
+        public_keys
+            .iter()
+            .zip(signatures.iter())
+            .for_each(|(pk, sig)| {
+                let pk = PublicKey(*pk);
+                batch.add(&pk, sig);
+            });
+
+        let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
+        assert!(res.is_ok());
+
+        let rng = &mut thread_rng();
+        let wrong_msg_sk = PrivateKey::generate(rng);
+        let wrong_msg_pk = wrong_msg_sk.to_public();
+        let wrong_msg_sig = wrong_msg_sk
+            .sign(b"I am NOT a teapot", b"", &*COMPOSITE_HASH_TO_G1_CIP22)
+            .unwrap();
+
+        batch.add(&wrong_msg_pk, &wrong_msg_sig);
+
+        let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
+        assert!(!res.is_ok());
     }
 }

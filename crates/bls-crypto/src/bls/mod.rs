@@ -11,3 +11,6 @@ pub use signature::Signature;
 
 mod cache;
 pub use cache::PublicKeyCache;
+
+mod batch;
+pub use batch::Batch;

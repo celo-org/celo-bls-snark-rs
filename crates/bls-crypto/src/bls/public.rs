@@ -1,8 +1,8 @@
 use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
-use ark_bls12_377::{Bls12_377, Fq12, G1Projective, G2Affine, G2Projective};
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{One, PrimeField};
+use ark_bls12_377::{Bls12_377, Fq12, Fr, G1Projective, G2Affine, G2Projective};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve, msm::VariableBaseMSM};
+use ark_ff::{One, PrimeField, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
@@ -41,6 +41,23 @@ impl PublicKey {
             .map(|s| s.borrow().0)
             .sum::<G2Projective>()
             .into()
+    }
+
+    /// Computes the dot product of a vector of public keys and a vector of (ideally small or sparse) exponents.
+    pub fn batch(r: &[Fr], public_keys: &[&PublicKey]) -> PublicKey {
+        let projective_elements = public_keys
+            .iter()
+            .map(|pk| pk.as_ref().clone())
+            .collect::<Vec<G2Projective>>();
+        
+        let bases = G2Projective::batch_normalization_into_affine(&projective_elements);
+       
+        let bigint_scalars: Vec<BigInteger256> = r
+            .iter()
+            .map(|n| n.into_repr())
+            .collect::<Vec<BigInteger256>>();
+
+        PublicKey(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
     }
 
     /// Verifies the provided signature against the message-extra_data pair using the
