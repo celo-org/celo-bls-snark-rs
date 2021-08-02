@@ -1,8 +1,8 @@
 use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN, SIG_DOMAIN};
 
 use ark_bls12_377::{Bls12_377, Fq12, Fr, G1Projective, G2Affine, G2Projective};
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve, msm::VariableBaseMSM};
-use ark_ff::{One, PrimeField, BigInteger256};
+use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ff::{BigInteger256, One, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
@@ -49,9 +49,9 @@ impl PublicKey {
             .iter()
             .map(|pk| pk.as_ref().clone())
             .collect::<Vec<G2Projective>>();
-        
+
         let bases = G2Projective::batch_normalization_into_affine(&projective_elements);
-       
+
         let bigint_scalars: Vec<BigInteger256> = r
             .iter()
             .map(|n| n.into_repr())

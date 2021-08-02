@@ -1,7 +1,7 @@
 use crate::{
     cache::PUBLIC_KEY_CACHE,
     convert_result_to_bool,
-    utils::{Message, MessageFFI, BatchMessageFFI},
+    utils::{BatchMessageFFI, Message, MessageFFI},
     Batch, PrivateKey, PublicKey, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
 };
 use ark_ec::ProjectiveCurve;
@@ -349,20 +349,30 @@ pub extern "C" fn batch_verify_strict(
     out_results: *mut bool,
 ) -> bool {
     convert_result_to_bool::<_, BLSError, _>(|| {
-        let batch_messages: &[BatchMessageFFI] = unsafe { slice::from_raw_parts(in_batches_ptr, in_batches_len) };
+        let batch_messages: &[BatchMessageFFI] =
+            unsafe { slice::from_raw_parts(in_batches_ptr, in_batches_len) };
 
-        let results: &mut [bool] = unsafe {slice::from_raw_parts_mut(out_results, in_batches_len)};
+        let results: &mut [bool] =
+            unsafe { slice::from_raw_parts_mut(out_results, in_batches_len) };
         let mut all_valid = true;
 
         for (index, batch) in batch_messages.iter().enumerate() {
             let message = <&[u8]>::from(&batch.data);
             let extra_data = <&[u8]>::from(&batch.extra);
 
-            let public_keys = unsafe { slice::from_raw_parts(batch.public_keys, batch.public_keys_len as usize) };
-            let public_keys = public_keys.iter().map(|ptr| unsafe { (**ptr).clone() }).collect::<Vec<_>>();
+            let public_keys =
+                unsafe { slice::from_raw_parts(batch.public_keys, batch.public_keys_len as usize) };
+            let public_keys = public_keys
+                .iter()
+                .map(|ptr| unsafe { (**ptr).clone() })
+                .collect::<Vec<_>>();
 
-            let signatures = unsafe { slice::from_raw_parts(batch.signatures, batch.signatures_len as usize) };
-            let signatures = signatures.iter().map(|ptr| unsafe { (**ptr).clone() }).collect::<Vec<_>>();
+            let signatures =
+                unsafe { slice::from_raw_parts(batch.signatures, batch.signatures_len as usize) };
+            let signatures = signatures
+                .iter()
+                .map(|ptr| unsafe { (**ptr).clone() })
+                .collect::<Vec<_>>();
 
             let mut context = Batch::new(message, extra_data);
 
@@ -373,17 +383,17 @@ pub extern "C" fn batch_verify_strict(
                     context.add(pk, sig);
                 });
 
-                let result = match (should_use_composite, should_use_cip22) {
-                    (true, true) => context.verify(&*COMPOSITE_HASH_TO_G1_CIP22).is_ok(),
-                    (false, true) => return Err(BLSError::HashToCurveError),
-                    (true, false) => context.verify(&*COMPOSITE_HASH_TO_G1).is_ok(),
-                    (false, false) => context.verify(&*DIRECT_HASH_TO_G1).is_ok(),
-                };
+            let result = match (should_use_composite, should_use_cip22) {
+                (true, true) => context.verify(&*COMPOSITE_HASH_TO_G1_CIP22).is_ok(),
+                (false, true) => return Err(BLSError::HashToCurveError),
+                (true, false) => context.verify(&*COMPOSITE_HASH_TO_G1).is_ok(),
+                (false, false) => context.verify(&*DIRECT_HASH_TO_G1).is_ok(),
+            };
 
-                if result == false {
-                    all_valid = false;
-                }
-                (*results)[index] = result;
+            if result == false {
+                all_valid = false;
+            }
+            (*results)[index] = result;
         }
 
         if !all_valid {
