@@ -6,6 +6,7 @@ type PublicKey = bls::PublicKey;
 type Signature = bls::Signature;
 type PrivateKey = bls::PrivateKey;
 type PublicKeyCache = bls::PublicKeyCache;
+type Batch = bls::Batch;
 
 use bls_crypto::hash_to_curve::try_and_increment::{COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1};
 use core::fmt::Display;
