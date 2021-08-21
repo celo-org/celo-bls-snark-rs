@@ -3,6 +3,7 @@ use super::{PublicKey, Signature};
 // use algebra::{bls12_377::G1Projective, Field, PrimeField, ToBytes};
 use ark_bls12_377::{Fr, G1Projective};
 use ark_ff::{Field, PrimeField, ToBytes};
+use ark_std::log2;
 
 use blake2s_simd::{Params, State};
 
@@ -63,8 +64,8 @@ impl Batch {
             hash_inputs.push(input);
         });
 
-        let security_bound = (128 + ((self.size as f64).log2().ceil() as usize) + 7) / 8; // in bytes
-                                                                                          // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
+        let security_bound = (128 + (log2(self.size) as usize) + 7) / 8; // in bytes
+                                                                         // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
         let exp_size = std::cmp::min(security_bound, 31); // 32 bytes is the maximum output of blake2s anyway
 
         blake2s_simd::many::update_many(hash_states.iter_mut().zip(hash_inputs.iter()));
