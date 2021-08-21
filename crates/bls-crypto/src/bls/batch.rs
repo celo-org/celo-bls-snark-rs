@@ -14,7 +14,6 @@ pub struct Batch {
     entries: Vec<(PublicKey, Signature)>,
     message: Vec<u8>,
     extra_data: Vec<u8>,
-    size: usize,
 }
 
 impl Batch {
@@ -24,14 +23,12 @@ impl Batch {
             entries: Vec::<(PublicKey, Signature)>::new(),
             message: message.to_vec(),
             extra_data: extra_data.to_vec(),
-            size: 0,
         }
     }
 
     pub fn add(&mut self, public_key: &PublicKey, signature: &Signature) {
         self.entries
             .push((public_key.to_owned(), signature.to_owned()));
-        self.size += 1
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -44,6 +41,13 @@ impl Batch {
         let mut hash_states = Vec::<State>::new();
         let mut hash_inputs = Vec::<Vec<u8>>::new();
 
+        // convert bits to bytes
+        let security_bound = (128 + (log2(self.entries.len()) as usize) + 7) / 8;
+
+        // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
+        // 32 bytes is the maximum output of blake2s anyway
+        let exp_size = std::cmp::min(security_bound, 31);
+
         self.entries.iter().for_each(|(pk, sig)| {
             public_keys.push(&pk);
             signatures.push(&sig);
@@ -51,7 +55,7 @@ impl Batch {
             hash_states.push(
                 Params::new()
                     .personal(b"bvblssig")
-                    .hash_length(32)
+                    .hash_length(exp_size)
                     .to_state(),
             );
 
@@ -64,18 +68,12 @@ impl Batch {
             hash_inputs.push(input);
         });
 
-        let security_bound = (128 + (log2(self.size) as usize) + 7) / 8; // in bytes
-                                                                         // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
-        let exp_size = std::cmp::min(security_bound, 31); // 32 bytes is the maximum output of blake2s anyway
-
         blake2s_simd::many::update_many(hash_states.iter_mut().zip(hash_inputs.iter()));
 
         let r = hash_states
             .iter_mut()
             .map(|s| {
-                let f = s.finalize();
-                let bytes = f.as_array();
-                Fr::from_random_bytes(&bytes[0..exp_size]).unwrap()
+                Fr::from_random_bytes(s.finalize().as_bytes()).unwrap()
             })
             .collect::<Vec<_>>();
 
