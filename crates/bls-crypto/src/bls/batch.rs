@@ -5,80 +5,61 @@ use ark_bls12_377::{Fr, G1Projective};
 use ark_ff::{Field, PrimeField, ToBytes};
 use ark_std::log2;
 
-use blake2s_simd::{Params, State};
+use blake2s_simd::{Params};
 
 use crate::{BLSError, HashToCurve};
 
+use rand::RngCore;
+
 #[derive(Default)]
 pub struct Batch {
-    entries: Vec<(PublicKey, Signature)>,
+    entries: Vec<(PublicKey, Signature, PreExponent)>,
     message: Vec<u8>,
     extra_data: Vec<u8>,
 }
+
+type PreExponent = [u8; 32];
 
 impl Batch {
     /// Constructs a new strict batch verifier context for a given message.
     pub fn new(message: &[u8], extra_data: &[u8]) -> Batch {
         Batch {
-            entries: Vec::<(PublicKey, Signature)>::new(),
+            entries: Vec::<(PublicKey, Signature, PreExponent)>::new(),
             message: message.to_vec(),
             extra_data: extra_data.to_vec(),
         }
     }
 
     pub fn add(&mut self, public_key: &PublicKey, signature: &Signature) {
-        self.entries
-            .push((public_key.to_owned(), signature.to_owned()));
+        let mut random_bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
+
+        self.entries.push((public_key.to_owned(), signature.to_owned(), random_bytes));
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
         &self,
         hash_to_g1: &H,
     ) -> Result<(), BLSError> {
-        let mut public_keys = Vec::<&PublicKey>::new();
-        let mut signatures = Vec::<&Signature>::new();
-
-        let mut hash_states = Vec::<State>::new();
-        let mut hash_inputs = Vec::<Vec<u8>>::new();
+        let mut public_keys = vec![];
+        let mut signatures = vec![];
 
         // convert bits to bytes
         let security_bound = (128 + (log2(self.entries.len()) as usize) + 7) / 8;
 
         // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
-        // 32 bytes is the maximum output of blake2s anyway
         let exp_size = std::cmp::min(security_bound, 31);
 
-        self.entries.iter().for_each(|(pk, sig)| {
-            public_keys.push(&pk);
-            signatures.push(&sig);
+        let exponents = self.entries.iter().map(|(pk, sig, preexp)| {
+            public_keys.push(pk);
+            signatures.push(sig);
 
-            hash_states.push(
-                Params::new()
-                    .personal(b"bvblssig")
-                    .hash_length(exp_size)
-                    .to_state(),
-            );
+            // Now that the batch is being verified, we can know how large the exponents need to be.
+            Fr::from_random_bytes(&preexp[0..exp_size]).unwrap()
+        }).collect::<Vec<_>>();
 
-            // r <- H(pk || m || ad || sig)
-            let mut input = vec![];
-            pk.as_ref().write(&mut input).unwrap();
-            self.message.write(&mut input).unwrap();
-            self.extra_data.write(&mut input).unwrap();
-            sig.as_ref().write(&mut input).unwrap();
-            hash_inputs.push(input);
-        });
-
-        blake2s_simd::many::update_many(hash_states.iter_mut().zip(hash_inputs.iter()));
-
-        let r = hash_states
-            .iter_mut()
-            .map(|s| {
-                Fr::from_random_bytes(s.finalize().as_bytes()).unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        let batch_pubkey = PublicKey::batch(&r, &public_keys);
-        let batch_sig = Signature::batch(&r, &signatures);
+        let batch_pubkey = PublicKey::batch(&exponents, &public_keys);
+        let batch_sig = Signature::batch(&exponents, &signatures);
 
         batch_pubkey.verify(&self.message, &self.extra_data, &batch_sig, hash_to_g1)
     }
