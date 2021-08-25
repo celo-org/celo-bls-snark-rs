@@ -2,10 +2,8 @@ use super::{PublicKey, Signature};
 
 // use algebra::{bls12_377::G1Projective, Field, PrimeField, ToBytes};
 use ark_bls12_377::{Fr, G1Projective};
-use ark_ff::{Field, PrimeField, ToBytes};
+use ark_ff::Field;
 use ark_std::log2;
-
-use blake2s_simd::{Params};
 
 use crate::{BLSError, HashToCurve};
 
@@ -34,7 +32,8 @@ impl Batch {
         let mut random_bytes = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut random_bytes);
 
-        self.entries.push((public_key.to_owned(), signature.to_owned(), random_bytes));
+        self.entries
+            .push((public_key.to_owned(), signature.to_owned(), random_bytes));
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -50,13 +49,17 @@ impl Batch {
         // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
         let exp_size = std::cmp::min(security_bound, 31);
 
-        let exponents = self.entries.iter().map(|(pk, sig, preexp)| {
-            public_keys.push(pk);
-            signatures.push(sig);
+        let exponents = self
+            .entries
+            .iter()
+            .map(|(pk, sig, preexp)| {
+                public_keys.push(pk);
+                signatures.push(sig);
 
-            // Now that the batch is being verified, we can know how large the exponents need to be.
-            Fr::from_random_bytes(&preexp[0..exp_size]).unwrap()
-        }).collect::<Vec<_>>();
+                // Now that the batch is being verified, we can know how large the exponents need to be.
+                Fr::from_random_bytes(&preexp[0..exp_size]).unwrap()
+            })
+            .collect::<Vec<_>>();
 
         let batch_pubkey = PublicKey::batch(&exponents, &public_keys);
         let batch_sig = Signature::batch(&exponents, &signatures);
