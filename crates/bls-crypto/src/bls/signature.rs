@@ -3,7 +3,7 @@ use crate::{BLSError, HashToCurve};
 
 use ark_bls12_377::{Bls12_377, Fq12, Fr, G1Affine, G1Projective, G2Affine};
 use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{BigInteger256, One, PrimeField};
+use ark_ff::{One, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
@@ -13,7 +13,7 @@ use std::{
 };
 
 /// A BLS signature on G1.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Signature(G1Projective);
 
 impl From<G1Projective> for Signature {
@@ -67,19 +67,10 @@ impl Signature {
     }
 
     /// Computes the dot product of a vector of signatures and a vector of exponents.
-    pub fn batch(r: &[Fr], signatures: &[&Signature]) -> Signature {
-        // Get everything in the right types
-        let projective_elements = signatures
-            .iter()
-            .map(|s| s.as_ref().clone())
-            .collect::<Vec<G1Projective>>();
-
+    pub fn batch(exponents: &[Fr], signatures: impl IntoIterator<Item = Signature>) -> Signature {
+        let projective_elements = signatures.into_iter().map(|s| s.0).collect::<Vec<_>>();
         let bases = G1Projective::batch_normalization_into_affine(&projective_elements);
-
-        let bigint_scalars: Vec<BigInteger256> = r
-            .iter()
-            .map(|n| n.into_repr())
-            .collect::<Vec<BigInteger256>>();
+        let bigint_scalars = exponents.iter().map(|n| n.into_repr()).collect::<Vec<_>>();
 
         Signature(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
     }
@@ -402,8 +393,7 @@ mod tests {
             .iter()
             .zip(signatures.iter())
             .for_each(|(pk, sig)| {
-                let pk = PublicKey(*pk);
-                batch.add(&pk, sig);
+                batch.add(PublicKey(*pk), *sig);
             });
 
         let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
@@ -416,7 +406,7 @@ mod tests {
             .sign(b"I am NOT a teapot", b"", &*COMPOSITE_HASH_TO_G1_CIP22)
             .unwrap();
 
-        batch.add(&wrong_msg_pk, &wrong_msg_sig);
+        batch.add(wrong_msg_pk, wrong_msg_sig);
 
         let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
         assert!(!res.is_ok());

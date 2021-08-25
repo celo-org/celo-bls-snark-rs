@@ -2,7 +2,7 @@ use crate::{BLSError, BlsResult, HashToCurve, PrivateKey, Signature, POP_DOMAIN,
 
 use ark_bls12_377::{Bls12_377, Fq12, Fr, G1Projective, G2Affine, G2Projective};
 use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{BigInteger256, One, PrimeField};
+use ark_ff::{One, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 
 use std::{
@@ -12,7 +12,7 @@ use std::{
 };
 
 /// A BLS public key on G2
-#[derive(Clone, Eq, Debug, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, Debug, PartialEq, Hash)]
 pub struct PublicKey(pub(super) G2Projective);
 
 impl From<G2Projective> for PublicKey {
@@ -44,18 +44,10 @@ impl PublicKey {
     }
 
     /// Computes the dot product of a vector of public keys and a vector of (ideally small or sparse) exponents.
-    pub fn batch(r: &[Fr], public_keys: &[&PublicKey]) -> PublicKey {
-        let projective_elements = public_keys
-            .iter()
-            .map(|pk| pk.as_ref().clone())
-            .collect::<Vec<G2Projective>>();
-
+    pub fn batch(exponents: &[Fr], public_keys: impl IntoIterator<Item = PublicKey>) -> PublicKey {
+        let projective_elements = public_keys.into_iter().map(|pk| pk.0).collect::<Vec<_>>();
         let bases = G2Projective::batch_normalization_into_affine(&projective_elements);
-
-        let bigint_scalars: Vec<BigInteger256> = r
-            .iter()
-            .map(|n| n.into_repr())
-            .collect::<Vec<BigInteger256>>();
+        let bigint_scalars = exponents.iter().map(|n| n.into_repr()).collect::<Vec<_>>();
 
         PublicKey(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
     }

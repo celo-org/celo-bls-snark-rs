@@ -22,18 +22,17 @@ impl Batch {
     /// Constructs a new strict batch verifier context for a given message.
     pub fn new(message: &[u8], extra_data: &[u8]) -> Batch {
         Batch {
-            entries: Vec::<(PublicKey, Signature, PreExponent)>::new(),
+            entries: vec![],
             message: message.to_vec(),
             extra_data: extra_data.to_vec(),
         }
     }
 
-    pub fn add(&mut self, public_key: &PublicKey, signature: &Signature) {
+    pub fn add(&mut self, public_key: PublicKey, signature: Signature) {
         let mut random_bytes = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut random_bytes);
 
-        self.entries
-            .push((public_key.to_owned(), signature.to_owned(), random_bytes));
+        self.entries.push((public_key, signature, random_bytes));
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -53,16 +52,17 @@ impl Batch {
             .entries
             .iter()
             .map(|(pk, sig, preexp)| {
-                public_keys.push(pk);
-                signatures.push(sig);
+                // arkworks math routines require owned copies
+                public_keys.push(*pk);
+                signatures.push(*sig);
 
                 // Now that the batch is being verified, we can know how large the exponents need to be.
                 Fr::from_random_bytes(&preexp[0..exp_size]).unwrap()
             })
             .collect::<Vec<_>>();
 
-        let batch_pubkey = PublicKey::batch(&exponents, &public_keys);
-        let batch_sig = Signature::batch(&exponents, &signatures);
+        let batch_pubkey = PublicKey::batch(&exponents, public_keys);
+        let batch_sig = Signature::batch(&exponents, signatures);
 
         batch_pubkey.verify(&self.message, &self.extra_data, &batch_sig, hash_to_g1)
     }
