@@ -379,7 +379,7 @@ pub extern "C" fn batch_verify_strict(
                 .iter()
                 .zip(signatures.iter())
                 .for_each(|(pk, sig)| {
-                    context.add(*pk, *sig);
+                    context.add(pk.clone(), sig.clone());
                 });
 
             let result = match (should_use_composite, should_use_cip22) {

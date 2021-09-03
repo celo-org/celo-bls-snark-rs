@@ -13,7 +13,7 @@ use std::{
 };
 
 /// A BLS signature on G1.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Signature(G1Projective);
 
 impl From<G1Projective> for Signature {
@@ -406,7 +406,7 @@ mod tests {
             .iter()
             .zip(signatures.iter())
             .for_each(|(pk, sig)| {
-                batch.add(PublicKey(*pk), *sig);
+                batch.add(PublicKey(*pk), sig.clone());
             });
 
         let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);

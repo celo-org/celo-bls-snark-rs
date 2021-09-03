@@ -55,8 +55,8 @@ impl Batch {
             .iter()
             .map(|(pk, sig)| {
                 // arkworks math routines require owned copies
-                public_keys.push(*pk);
-                signatures.push(*sig);
+                public_keys.push(pk.clone());
+                signatures.push(sig.clone());
 
                 // Now that the batch is being verified, we can know how large the exponents need to be.
                 let mut random_bytes = vec![0; exp_size];

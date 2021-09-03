@@ -12,7 +12,7 @@ use std::{
 };
 
 /// A BLS public key on G2
-#[derive(Clone, Copy, Eq, Debug, PartialEq, Hash)]
+#[derive(Clone, Eq, Debug, PartialEq, Hash)]
 pub struct PublicKey(pub(super) G2Projective);
 
 impl From<G2Projective> for PublicKey {
@@ -43,7 +43,7 @@ impl PublicKey {
             .into()
     }
 
-    /// Computes the dot product of a vector of public keys and a vector of (ideally small or sparse) exponents.
+    /// Computes the dot product of a vector of public keys and a vector of (ideally small or sparse) exponents. Returns None if the exponents and public keys are not of the same length.
     pub fn batch(
         exponents: &[Fr],
         public_keys: impl IntoIterator<Item = PublicKey>,
