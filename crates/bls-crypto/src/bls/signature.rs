@@ -381,7 +381,7 @@ mod tests {
         let signatures = secret_keys
             .iter()
             .map(|sk| {
-                let key = PrivateKey(*sk);
+                let key = PrivateKey::from(*sk);
                 key.sign(message, extra, &*COMPOSITE_HASH_TO_G1_CIP22)
                     .unwrap()
             })

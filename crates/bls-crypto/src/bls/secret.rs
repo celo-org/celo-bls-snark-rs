@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 
 /// A Private Key using a pairing friendly curve's Fr point
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct PrivateKey(pub(crate) Fr);
+pub struct PrivateKey(Fr);
 
 impl From<Fr> for PrivateKey {
     fn from(sk: Fr) -> PrivateKey {
