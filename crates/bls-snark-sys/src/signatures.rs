@@ -338,8 +338,7 @@ pub extern "C" fn batch_verify_signature(
 /// 1. the public keys which signed on the data
 /// 1. the signature produced by the public keys
 ///
-/// It will batch verify the signatures in the sense of [0] section 5.1 using deterministic random exponents.
-/// The exponents are tuned to accomodate 128-bit security for the size of each batch.
+/// It will batch verify (not screen) the signatures using small random exponents tuned for 128-bit security.
 /// The return value is true if all batches verified successfully and false if not. The specific batch results are returned in the out_result vector of booleans.
 pub extern "C" fn batch_verify_strict(
     in_batches_ptr: *const BatchMessageFFI,
@@ -380,12 +379,12 @@ pub extern "C" fn batch_verify_strict(
                 .iter()
                 .zip(signatures.iter())
                 .for_each(|(pk, sig)| {
-                    context.add(pk, sig);
+                    context.add(*pk, *sig);
                 });
 
             let result = match (should_use_composite, should_use_cip22) {
                 (true, true) => context.verify(&*COMPOSITE_HASH_TO_G1_CIP22).is_ok(),
-                (false, true) => return Err(BLSError::HashToCurveError),
+                (false, true) => false, // bad hash to curve configuration
                 (true, false) => context.verify(&*COMPOSITE_HASH_TO_G1).is_ok(),
                 (false, false) => context.verify(&*DIRECT_HASH_TO_G1).is_ok(),
             };
