@@ -5,9 +5,8 @@ use ark_bls12_377::{G1Projective, G2Projective};
 use ark_ff::Zero;
 
 use bls_crypto::{
-    bls::Batch,
-    hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PrivateKey, PublicKey,
-    Signature, SIG_DOMAIN,
+    bls::Batch, hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, PrivateKey,
+    PublicKey, Signature, SIG_DOMAIN,
 };
 
 fn batch_bls_comparison(c: &mut Criterion) {
@@ -34,8 +33,8 @@ fn batch_bls_comparison(c: &mut Criterion) {
 
     // get each signed by a committee _on the same domain_ and get the agg sigs of the commitee
     let mut asig = G1Projective::zero();
-    let mut pubkeys = Vec::new();
-    let mut sigs = Vec::new();
+    let mut aggregate_pubkeys = Vec::new();
+    let mut aggregate_sigs = Vec::new();
     let mut epoch_batches = Vec::new();
 
     for msg in msgs.iter().take(NUM_BLOCKS) {
@@ -51,8 +50,8 @@ fn batch_bls_comparison(c: &mut Criterion) {
             epoch_batch.add(sk.to_public(), s);
         }
 
-        pubkeys.push(PublicKey::from(epoch_pubkey));
-        sigs.push(Signature::from(epoch_sig));
+        aggregate_pubkeys.push(PublicKey::from(epoch_pubkey));
+        aggregate_sigs.push(Signature::from(epoch_sig));
 
         asig += epoch_sig;
 
@@ -60,11 +59,11 @@ fn batch_bls_comparison(c: &mut Criterion) {
     }
 
     // verify the sigs individually in a loop
-    group.bench_function("individual aggregate verification", |b| {
+    group.bench_function("per-epoch aggregate screening", |b| {
         b.iter(|| {
-            pubkeys
+            aggregate_pubkeys
                 .iter()
-                .zip(&sigs)
+                .zip(&aggregate_sigs)
                 .zip(&msgs)
                 .for_each(|((pk, sig), msg)| {
                     pk.verify(msg.0, msg.1, sig, try_and_increment).unwrap()
@@ -73,18 +72,26 @@ fn batch_bls_comparison(c: &mut Criterion) {
     });
 
     let asig = Signature::from(asig);
-    group.bench_function("batch aggregate verification", |b| {
+    group.bench_function("all epoch aggregate screening", |b| {
         b.iter(|| {
-            asig.batch_verify(&pubkeys, SIG_DOMAIN, &msgs, try_and_increment)
+            asig.batch_verify(&aggregate_pubkeys, SIG_DOMAIN, &msgs, try_and_increment)
                 .unwrap()
         })
     });
 
     group.bench_function("per-epoch batch verification", |b| {
         b.iter(|| {
-            epoch_batches.iter().for_each(|batch| {
-                batch.verify(try_and_increment).unwrap()
-            })
+            epoch_batches
+                .iter()
+                .for_each(|batch| batch.verify(try_and_increment).unwrap())
+        })
+    });
+
+    group.bench_function("per-epoch individual verification", |b| {
+        b.iter(|| {
+            epoch_batches
+                .iter()
+                .for_each(|batch| batch.verify_each(try_and_increment).unwrap())
         })
     });
 }

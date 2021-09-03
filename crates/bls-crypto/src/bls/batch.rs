@@ -7,7 +7,7 @@ use ark_std::log2;
 
 use crate::{BLSError, HashToCurve};
 
-use rand::RngCore;
+use rand::{rngs::adapter::ReseedingRng, RngCore};
 
 #[derive(Default)]
 pub struct Batch {
@@ -65,5 +65,19 @@ impl Batch {
         let batch_sig = Signature::batch(&exponents, signatures);
 
         batch_pubkey.verify(&self.message, &self.extra_data, &batch_sig, hash_to_g1)
+    }
+
+    /// Verifies each signature in the batch individually, returning an error if any of them fails to verify.
+    pub fn verify_each<H: HashToCurve<Output = G1Projective>>(
+        &self,
+        hash_to_g1: &H,
+    ) -> Result<(), BLSError> {
+        for (pk, sig, _) in self.entries.iter() {
+            let result = pk.verify(&self.message, &self.extra_data, &sig, hash_to_g1);
+            if result.is_err() {
+                return result;
+            }
+        }
+        Ok(())
     }
 }
