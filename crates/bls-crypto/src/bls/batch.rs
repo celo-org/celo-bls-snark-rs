@@ -1,22 +1,29 @@
 use super::{PublicKey, Signature};
 
-// use algebra::{bls12_377::G1Projective, Field, PrimeField, ToBytes};
 use ark_bls12_377::{Fr, G1Projective};
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
 use ark_std::log2;
 
 use crate::{BLSError, HashToCurve};
 
-use rand::{rngs::adapter::ReseedingRng, RngCore};
+use rand::RngCore;
 
 #[derive(Default)]
 pub struct Batch {
-    entries: Vec<(PublicKey, Signature, PreExponent)>,
+    entries: Vec<(PublicKey, Signature)>,
     message: Vec<u8>,
     extra_data: Vec<u8>,
 }
 
-type PreExponent = [u8; 32];
+const SECURITY_BOUND: usize = 128;
+
+/// Returns a byte count for sizing small exponents up to the maximum size of an Fr field element.
+fn byte_count_from_target_batch_size(size: usize, target_security: usize) -> usize {
+    let target_byte_count = (target_security + (log2(size) as usize) + 7) / 8;
+    let field_byte_count = Fr::size_in_bits() / 8;
+
+    std::cmp::min(target_byte_count, field_byte_count)
+}
 
 impl Batch {
     /// Constructs a new strict batch verifier context for a given message.
@@ -29,10 +36,7 @@ impl Batch {
     }
 
     pub fn add(&mut self, public_key: PublicKey, signature: Signature) {
-        let mut random_bytes = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut random_bytes);
-
-        self.entries.push((public_key, signature, random_bytes));
+        self.entries.push((public_key, signature));
     }
 
     pub fn verify<H: HashToCurve<Output = G1Projective>>(
@@ -42,22 +46,21 @@ impl Batch {
         let mut public_keys = vec![];
         let mut signatures = vec![];
 
-        // convert bits to bytes
-        let security_bound = (128 + (log2(self.entries.len()) as usize) + 7) / 8;
-
-        // let field_size = algebra::bls12_377::Fr::size_in_bits() / 8; // => 31
-        let exp_size = std::cmp::min(security_bound, 31);
+        let exp_size = byte_count_from_target_batch_size(self.entries.len(), SECURITY_BOUND);
 
         let exponents = self
             .entries
             .iter()
-            .map(|(pk, sig, preexp)| {
+            .map(|(pk, sig)| {
                 // arkworks math routines require owned copies
                 public_keys.push(*pk);
                 signatures.push(*sig);
 
                 // Now that the batch is being verified, we can know how large the exponents need to be.
-                Fr::from_random_bytes(&preexp[0..exp_size]).unwrap()
+                let mut random_bytes = vec![0; exp_size];
+                rand::thread_rng().fill_bytes(&mut random_bytes);
+
+                Fr::from_random_bytes(&random_bytes).unwrap()
             })
             .collect::<Vec<_>>();
 
@@ -72,7 +75,7 @@ impl Batch {
         &self,
         hash_to_g1: &H,
     ) -> Result<(), BLSError> {
-        for (pk, sig, _) in self.entries.iter() {
+        for (pk, sig) in self.entries.iter() {
             let result = pk.verify(&self.message, &self.extra_data, &sig, hash_to_g1);
             if result.is_err() {
                 return result;
