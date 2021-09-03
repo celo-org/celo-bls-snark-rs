@@ -44,12 +44,24 @@ impl PublicKey {
     }
 
     /// Computes the dot product of a vector of public keys and a vector of (ideally small or sparse) exponents.
-    pub fn batch(exponents: &[Fr], public_keys: impl IntoIterator<Item = PublicKey>) -> PublicKey {
+    pub fn batch(
+        exponents: &[Fr],
+        public_keys: impl IntoIterator<Item = PublicKey>,
+    ) -> Option<PublicKey> {
         let projective_elements = public_keys.into_iter().map(|pk| pk.0).collect::<Vec<_>>();
+
+        if projective_elements.len() != exponents.len() {
+            // multi_scalar_mul does not enforce this and takes the min length of the two
+            return None;
+        }
+
         let bases = G2Projective::batch_normalization_into_affine(&projective_elements);
         let bigint_scalars = exponents.iter().map(|n| n.into_repr()).collect::<Vec<_>>();
 
-        PublicKey(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
+        Some(PublicKey(VariableBaseMSM::multi_scalar_mul(
+            &bases,
+            &bigint_scalars,
+        )))
     }
 
     /// Verifies the provided signature against the message-extra_data pair using the

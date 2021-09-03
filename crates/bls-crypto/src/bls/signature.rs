@@ -66,13 +66,26 @@ impl Signature {
             .into()
     }
 
-    /// Computes the dot product of a vector of signatures and a vector of exponents.
-    pub fn batch(exponents: &[Fr], signatures: impl IntoIterator<Item = Signature>) -> Signature {
+    /// Computes the dot product of a vector of signatures and a vector of exponents. Returns None if the exponents and signatures are not of the same length.
+    pub fn batch(
+        exponents: &[Fr],
+        signatures: impl IntoIterator<Item = Signature>,
+    ) -> Option<Signature> {
         let projective_elements = signatures.into_iter().map(|s| s.0).collect::<Vec<_>>();
+
+        if projective_elements.len() != exponents.len() {
+            // multi_scalar_mul does not enforce this and takes the min length of the two
+
+            return None;
+        }
+
         let bases = G1Projective::batch_normalization_into_affine(&projective_elements);
         let bigint_scalars = exponents.iter().map(|n| n.into_repr()).collect::<Vec<_>>();
 
-        Signature(VariableBaseMSM::multi_scalar_mul(&bases, &bigint_scalars))
+        Some(Signature(VariableBaseMSM::multi_scalar_mul(
+            &bases,
+            &bigint_scalars,
+        )))
     }
 
     /// Verifies the signature against a vector of pubkey & message tuples, for the provided

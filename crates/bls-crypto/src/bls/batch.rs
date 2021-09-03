@@ -1,3 +1,5 @@
+use core::panic;
+
 use super::{PublicKey, Signature};
 
 use ark_bls12_377::{Fr, G1Projective};
@@ -64,8 +66,19 @@ impl Batch {
             })
             .collect::<Vec<_>>();
 
-        let batch_pubkey = PublicKey::batch(&exponents, public_keys);
-        let batch_sig = Signature::batch(&exponents, signatures);
+        let batch_pubkey = match PublicKey::batch(&exponents, public_keys) {
+            Some(bpk) => bpk,
+            None => {
+                panic!("Uneven number of exponents and public keys")
+            }
+        };
+
+        let batch_sig = match Signature::batch(&exponents, signatures) {
+            Some(bsig) => bsig,
+            None => {
+                panic!("Uneven number of exponents and signatures")
+            }
+        };
 
         batch_pubkey.verify(&self.message, &self.extra_data, &batch_sig, hash_to_g1)
     }
