@@ -29,7 +29,7 @@ tracing = "0.1.13"
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
-bench-utils = { git = "https://github.com/arkworks-rs/utils" }
+bench-utils = { git = "https://github.com/arkworks-rs/snark", tag = "bench-utils-v0.1.0" }
 bls-gadgets = { path = "../bls-gadgets", default-features = false, features = ["test-helpers"] }
 bls-crypto = { path = "../bls-crypto", default-features = false, features = ["test-helpers"] }
 hex = "0.4.2"

@@ -12,7 +12,7 @@ ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "
 ark-std = { git = "https://github.com/arkworks-rs/utils" }
 ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
 ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", branch = "main", features = ["parallel"] }
-bench-utils = { git = "https://github.com/arkworks-rs/utils" }
+bench-utils = { git = "https://github.com/arkworks-rs/snark", tag = "bench-utils-v0.1.0", optional = true }
 
 # other deps
 rand = "0.7"
