@@ -28,6 +28,7 @@ cargo build (--release)
 # Test. 
 # Consider running tests in release mode, as some of 
 # the cryptographic operations are slow in debug mode.
+# meaningless change
 cargo test (--release)
 ```
 
