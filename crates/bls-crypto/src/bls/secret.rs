@@ -47,7 +47,7 @@ impl PrivateKey {
         message: &[u8],
         hash_to_g1: &H,
     ) -> Result<Signature, BLSError> {
-        self.sign_message(POP_DOMAIN, &message, &[], hash_to_g1)
+        self.sign_message(POP_DOMAIN, message, &[], hash_to_g1)
     }
 
     /// Hashes to G1 and signs the hash

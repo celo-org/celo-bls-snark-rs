@@ -338,7 +338,7 @@ mod compat_tests {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = hasher.hash(
                 domain,
-                &[&counter, extra_data, &message].concat(),
+                &[&counter, extra_data, message].concat(),
                 hash_num_bytes,
             )?;
             let (possible_x, greatest) = {

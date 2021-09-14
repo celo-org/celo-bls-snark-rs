@@ -59,7 +59,7 @@ pub fn sign_batch<E: PairingEngine>(
         .iter()
         .zip(messages)
         .map(|(secret_keys, message)| {
-            let (_, asig) = sign::<E>(*message, &secret_keys);
+            let (_, asig) = sign::<E>(*message, secret_keys);
             asig
         })
         .collect::<Vec<_>>()

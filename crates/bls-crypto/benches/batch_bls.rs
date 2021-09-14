@@ -60,7 +60,7 @@ fn batch_bls_comparison(c: &mut Criterion) {
                 .zip(&sigs)
                 .zip(&msgs)
                 .for_each(|((pk, sig), msg)| {
-                    pk.verify(&msg.0, &msg.1, &sig, try_and_increment).unwrap()
+                    pk.verify(msg.0, msg.1, sig, try_and_increment).unwrap()
                 })
         })
     });

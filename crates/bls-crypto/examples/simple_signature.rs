@@ -38,15 +38,15 @@ fn main() {
     println!("Starting!\n\n");
 
     let sig1 = sk1
-        .sign(&message.as_bytes(), &[], try_and_increment)
+        .sign(message.as_bytes(), &[], try_and_increment)
         .unwrap();
     println!("sig1: {}", hex::encode(to_bytes!(sig1.as_ref()).unwrap()));
     let sig2 = sk2
-        .sign(&message.as_bytes(), &[], try_and_increment)
+        .sign(message.as_bytes(), &[], try_and_increment)
         .unwrap();
     println!("sig2: {}", hex::encode(to_bytes!(sig2.as_ref()).unwrap()));
     let sig3 = sk3
-        .sign(&message.as_bytes(), &[], try_and_increment)
+        .sign(message.as_bytes(), &[], try_and_increment)
         .unwrap();
     println!("sig3: {}", hex::encode(to_bytes!(sig3.as_ref()).unwrap()));
 
@@ -61,7 +61,7 @@ fn main() {
     let asig2 = Signature::aggregate(&[sig2, sig3]);
     let asig = Signature::aggregate(&[asig1, asig2]);
     println!("asig: {}", hex::encode(to_bytes!(asig.as_ref()).unwrap()));
-    apk.verify(&message.as_bytes(), &[], &asig, try_and_increment)
+    apk.verify(message.as_bytes(), &[], &asig, try_and_increment)
         .unwrap();
     println!("aggregated signature verified successfully");
 }
