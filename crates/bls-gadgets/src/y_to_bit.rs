@@ -243,9 +243,9 @@ mod test {
             let c0 = allocated.y.c0.value().unwrap();
 
             if c1 > half || (c1 == zero && c0 > half) {
-                assert_eq!(true, y_bit.value().unwrap());
+                assert!(y_bit.value().unwrap());
             } else {
-                assert_eq!(false, y_bit.value().unwrap());
+                assert!(!y_bit.value().unwrap());
             }
 
             assert_eq!(cs.num_constraints(), 2014);
@@ -282,9 +282,9 @@ mod test {
             let c0 = allocated.y.c0.value().unwrap();
 
             if c1 > half || (c1 == zero && c0 > half) {
-                assert_eq!(true, y_bit.value().unwrap());
+                assert!(y_bit.value().unwrap());
             } else {
-                assert_eq!(false, y_bit.value().unwrap());
+                assert!(!y_bit.value().unwrap());
             }
 
             assert_eq!(cs.num_constraints(), 2014);
