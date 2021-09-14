@@ -515,7 +515,7 @@ mod verify_one_message {
         // if the first key is a bad one, it should fail, since the pubkey
         // won't be on the curve
         let sk = Bls12_377Fr::zero();
-        let pk = generator.clone().mul(sk.into_repr());
+        let pk = generator.mul(sk.into_repr());
         let (sk2, pk2) = keygen::<Bls12_377>();
 
         let (sigs, _) = sign::<Bls12_377>(message_hash, &[sk, sk2]);
