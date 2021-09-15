@@ -65,7 +65,7 @@ where
 
         // Prepare the signature and get the generator
         let (prepared_signature, prepared_g2_neg_generator) =
-            Self::prepare_signature_neg_generator(&signature)?;
+            Self::prepare_signature_neg_generator(signature)?;
 
         // e(σ, g_2^-1) * e(H(m), apk) == 1_{G_T}
         Self::enforce_bls_equation(
@@ -90,11 +90,11 @@ where
         debug!("batch verifying BLS signature");
         let prepared_message_hashes = message_hashes
             .iter()
-            .map(|message_hash| P::prepare_g1(&message_hash))
+            .map(|message_hash| P::prepare_g1(message_hash))
             .collect::<Result<Vec<_>, _>>()?;
         let prepared_aggregated_pub_keys = aggregated_pub_keys
             .iter()
-            .map(|pubkey| P::prepare_g2(&pubkey))
+            .map(|pubkey| P::prepare_g2(pubkey))
             .collect::<Result<Vec<_>, _>>()?;
 
         Self::batch_verify_prepared(
@@ -118,8 +118,8 @@ where
         // Create the vectors which we'll batch verify
         let mut prepared_g1s = vec![prepared_signature];
         let mut prepared_g2s = vec![prepared_g2_neg_generator];
-        prepared_g1s.extend_from_slice(&prepared_message_hashes);
-        prepared_g2s.extend_from_slice(&prepared_aggregated_pub_keys);
+        prepared_g1s.extend_from_slice(prepared_message_hashes);
+        prepared_g2s.extend_from_slice(prepared_aggregated_pub_keys);
 
         // Enforce the BLS check
         // e(σ, g_2^-1) * e(H(m0), pk_0) * e(H(m1), pk_1) ...  * e(H(m_n), pk_n)) == 1_{G_T}
@@ -295,7 +295,7 @@ mod verify_one_message {
             &bitmap[..],
             &message_hash_var,
             &signature_var,
-            &max_occurrences,
+            max_occurrences,
             padding_pk,
         )
         .unwrap();

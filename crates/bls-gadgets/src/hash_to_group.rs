@@ -119,7 +119,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         let _enter = span.enter();
 
         // compress the input
-        let crh_bits = Self::pedersen_hash(&message)?;
+        let crh_bits = Self::pedersen_hash(message)?;
 
         // combine the counter with the inner hash
         let mut input = counter.to_bits_le()?;
@@ -163,7 +163,7 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
             <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as FixedLengthCRHGadget<
                 CRH,
                 Bls12_377_Fq,
-            >>::evaluate(&crh_params, &input)?;
+            >>::evaluate(&crh_params, input)?;
 
         let mut crh_bits = pedersen_hash.x.to_bits_le()?;
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding
@@ -312,9 +312,9 @@ impl<P: Bls12Parameters> HashToGroupGadget<P, Bls12_377_Fq> {
 
         // Check point equal to itself after being compressed
         for (a, b) in compressed_point.iter().zip(x_bits.iter()) {
-            a.enforce_equal(&b)?;
+            a.enforce_equal(b)?;
         }
-        compressed_sign_bit.enforce_equal(&sign_bit)?;
+        compressed_sign_bit.enforce_equal(sign_bit)?;
 
         trace!("scaling by G1 cofactor");
         let scaled_point = Self::scale_by_cofactor_g1(&expected_point_before_cofactor)?;
