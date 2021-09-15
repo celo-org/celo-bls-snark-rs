@@ -56,7 +56,7 @@ pub fn prove(
     // Generate a helping proof if a Proving Key for the HashToBits
     // circuit was provided
     let hash_helper = if let Some(ref params) = parameters.hash_to_bits {
-        Some(generate_hash_helper(&params, transitions)?)
+        Some(generate_hash_helper(params, transitions)?)
     } else {
         None
     };

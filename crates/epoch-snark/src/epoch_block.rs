@@ -108,7 +108,7 @@ impl EpochBlock {
         epoch_bits.extend_from_slice(&encode_u16(self.index)?);
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
-            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+            epoch_bits.extend_from_slice(encode_public_key(added_public_key)?.as_slice());
         }
         Ok(epoch_bits)
     }
@@ -127,7 +127,7 @@ impl EpochBlock {
         }
         epoch_bits.extend_from_slice(&encode_u32(self.maximum_non_signers)?);
         for added_public_key in &self.new_public_keys {
-            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+            epoch_bits.extend_from_slice(encode_public_key(added_public_key)?.as_slice());
         }
         if self.maximum_validators > self.new_public_keys.len() {
             let difference = self.maximum_validators - self.new_public_keys.len();
@@ -158,7 +158,7 @@ impl EpochBlock {
         epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.epoch_entropy.as_ref()));
         epoch_bits.extend_from_slice(&Self::encode_entropy_cip22(self.parent_entropy.as_ref()));
         for added_public_key in &self.new_public_keys {
-            epoch_bits.extend_from_slice(encode_public_key(&added_public_key)?.as_slice());
+            epoch_bits.extend_from_slice(encode_public_key(added_public_key)?.as_slice());
         }
         if self.maximum_validators > self.new_public_keys.len() {
             let difference = self.maximum_validators - self.new_public_keys.len();
@@ -228,7 +228,7 @@ pub fn hash_to_bits(bytes: &[u8]) -> Vec<bool> {
         .hash_length(32)
         .personal(OUT_DOMAIN)
         .to_state()
-        .update(&bytes)
+        .update(bytes)
         .finalize()
         .as_ref()
         .to_vec();
