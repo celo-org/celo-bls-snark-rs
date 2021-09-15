@@ -281,7 +281,7 @@ mod compat_tests {
     };
     use ark_ff::{Field, FpParameters, FromBytes, PrimeField, SquareRootField, Zero};
     use ark_serialize::CanonicalSerialize;
-    use bench_utils::{end_timer, start_timer};
+    use ark_std::{end_timer, start_timer};
     use byteorder::WriteBytesExt;
     use log::trace;
     use rand::SeedableRng;
@@ -338,7 +338,7 @@ mod compat_tests {
             (&mut counter[..]).write_u8(c as u8)?;
             let hash = hasher.hash(
                 domain,
-                &[&counter, extra_data, &message].concat(),
+                &[&counter, extra_data, message].concat(),
                 hash_num_bytes,
             )?;
             let (possible_x, greatest) = {

@@ -1,4 +1,4 @@
-use bench_utils::{end_timer, start_timer};
+use ark_std::{end_timer, start_timer};
 use byteorder::WriteBytesExt;
 use log::trace;
 use std::marker::PhantomData;
@@ -87,7 +87,7 @@ where
         let num_bytes = GroupAffine::<P>::zero().serialized_size();
         let hash_loop_time = start_timer!(|| "try_and_increment::hash_loop");
         let hash_bytes = hash_length(num_bytes);
-        let inner_hash = self.hasher.crh(domain, &message, hash_bytes)?;
+        let inner_hash = self.hasher.crh(domain, message, hash_bytes)?;
         let mut counter = [0; 1];
         for c in 0..NUM_TRIES {
             (&mut counter[..]).write_u8(c as u8)?;
@@ -96,7 +96,7 @@ where
             let msg = &[&counter, extra_data, &inner_hash].concat();
 
             // produce a hash with sufficient length
-            let candidate_hash = self.hasher.xof(domain, &msg, hash_bytes)?;
+            let candidate_hash = self.hasher.xof(domain, msg, hash_bytes)?;
 
             // handle the Celo deployed bit extraction logic
             #[cfg(feature = "compat")]

@@ -1,4 +1,4 @@
-use bench_utils::{end_timer, start_timer};
+use ark_std::{end_timer, start_timer};
 use byteorder::WriteBytesExt;
 use log::trace;
 use std::marker::PhantomData;
@@ -99,7 +99,7 @@ where
             (&mut counter[..]).write_u8(c as u8)?;
             let candidate_hash = self.hasher.hash(
                 domain,
-                &[&counter, extra_data, &message].concat(),
+                &[&counter, extra_data, message].concat(),
                 hash_bytes,
             )?;
 

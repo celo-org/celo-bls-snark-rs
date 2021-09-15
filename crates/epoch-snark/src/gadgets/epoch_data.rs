@@ -159,14 +159,14 @@ impl EpochData<Bls12_377> {
             Some(v) => v,
             None => &empty_entropy,
         };
-        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(&epoch_entropy))?;
+        let epoch_entropy_var = bytes_to_fr(cs.clone(), Some(epoch_entropy))?;
         let epoch_entropy_bits = fr_to_bits(&epoch_entropy_var, 8 * Self::ENTROPY_BYTES)?;
 
         let parent_entropy = match &self.parent_entropy {
             Some(v) => v,
             None => &empty_entropy,
         };
-        let parent_entropy_var = bytes_to_fr(cs, Some(&parent_entropy))?;
+        let parent_entropy_var = bytes_to_fr(cs, Some(parent_entropy))?;
         let parent_entropy_bits = fr_to_bits(&parent_entropy_var, 8 * Self::ENTROPY_BYTES)?;
 
         let mut epoch_bits: Vec<Bool> =

@@ -57,7 +57,7 @@ impl<F: PrimeField> Bitmap<F> for [Boolean<F>] {
         let occurrences = FpVar::new_witness(self.cs(), || Ok(F::from(occurrences)))?;
 
         // Enforce `occurences <= max_occurences`
-        occurrences.enforce_cmp(&max_occurrences, std::cmp::Ordering::Less, true)?;
+        occurrences.enforce_cmp(max_occurrences, std::cmp::Ordering::Less, true)?;
 
         let occurrences_var = match occurrences {
             FpVar::Var(v) => v.variable,

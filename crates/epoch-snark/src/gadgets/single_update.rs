@@ -103,7 +103,7 @@ impl SingleUpdate<Bls12_377> {
         // first epoch
         previous_epoch_randomness.conditional_enforce_equal(
             &epoch_data.parent_entropy,
-            &index_bit.and(&constrain_entropy_bit)?,
+            &index_bit.and(constrain_entropy_bit)?,
         )?;
 
         // convert the bitmap to constraints
@@ -116,7 +116,7 @@ impl SingleUpdate<Bls12_377> {
             previous_pubkeys,
             &signed_bitmap,
             &epoch_data.message_hash,
-            &previous_max_non_signers,
+            previous_max_non_signers,
             &G2Var::constant(EpochBlock::padding_pk()),
         )?;
 

@@ -44,7 +44,7 @@ impl ConstraintSynthesizer<Fr> for HashToBits {
         let mut xof_bits = vec![];
         for (i, message_bits) in self.message_bits.iter().enumerate() {
             trace!(epoch = i, "hashing to bits");
-            let bits = constrain_bool(&message_bits, cs.clone())?;
+            let bits = constrain_bool(message_bits, cs.clone())?;
             let hash = hash_to_bits(&bits[..], 512, personalization, true)?;
             all_bits.extend_from_slice(&bits);
             xof_bits.extend_from_slice(&hash);
@@ -87,7 +87,7 @@ mod tests {
     fn hash_to_bits_fn(message: &[bool]) -> Vec<bool> {
         let mut personalization = [0; 8];
         personalization.copy_from_slice(SIG_DOMAIN);
-        let message = bits_le_to_bytes_le(&message);
+        let message = bits_le_to_bytes_le(message);
         let hash_result = DirectHasher.xof(&personalization, &message, 64).unwrap();
         bytes_le_to_bits_le(&hash_result, 512)
     }

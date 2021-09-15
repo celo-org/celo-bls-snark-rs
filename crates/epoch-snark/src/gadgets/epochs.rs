@@ -306,7 +306,7 @@ impl ValidatorSetUpdate<Bls12_377> {
             || self.aggregated_signature.get(),
             AllocationMode::Witness,
         )?;
-        BlsGadget::batch_verify_prepared(&pubkeys, &messages, &aggregated_signature)?;
+        BlsGadget::batch_verify_prepared(pubkeys, messages, &aggregated_signature)?;
 
         Ok(())
     }
