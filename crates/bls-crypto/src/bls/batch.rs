@@ -89,7 +89,7 @@ impl Batch {
         hash_to_g1: &H,
     ) -> Result<(), BLSError> {
         for (pk, sig) in self.entries.iter() {
-            let result = pk.verify(&self.message, &self.extra_data, &sig, hash_to_g1);
+            let result = pk.verify(&self.message, &self.extra_data, sig, hash_to_g1);
             if result.is_err() {
                 return result;
             }

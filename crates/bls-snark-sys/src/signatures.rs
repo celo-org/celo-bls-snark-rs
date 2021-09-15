@@ -389,7 +389,7 @@ pub extern "C" fn batch_verify_strict(
                 (false, false) => context.verify(&*DIRECT_HASH_TO_G1).is_ok(),
             };
 
-            if result == false {
+            if !result {
                 all_valid = false;
             }
             (*results)[index] = result;
