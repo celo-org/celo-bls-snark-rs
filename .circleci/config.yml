@@ -67,7 +67,7 @@ jobs:
             cargo clippy --release --all-targets --all-features -- -D warnings
       - run:
           name: Audit Dependencies
-          command: cargo audit
+          command: cargo audit --ignore "RUSTSEC-2021-0075"
       - persist_to_workspace:
           root: .
           paths: target/release
