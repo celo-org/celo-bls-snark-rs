@@ -10,7 +10,7 @@ use tracing_subscriber::{
     fmt::{time::ChronoUtc, Subscriber},
 };
 
-use bench_utils::{end_timer, start_timer};
+use ark_std::{end_timer, start_timer};
 
 fn main() {
     Subscriber::builder()
