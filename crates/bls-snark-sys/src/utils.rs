@@ -55,6 +55,22 @@ impl From<&Message<'_>> for MessageFFI {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+/// Pointers to the necessary data for signature verification of an epoch
+pub struct BatchMessageFFI {
+    /// Pointer to the data which was signed
+    pub data: Buffer,
+    /// Pointer to the extra data which was signed alongside the `data`
+    pub extra: Buffer,
+    /// Pointers to the public keys of the epoch which signed the data/extra pair
+    pub public_keys: *const *const PublicKey,
+    pub public_keys_len: usize,
+    /// Pointers to the signatures corresponding the public keys
+    pub signatures: *const *const Signature,
+    pub signatures_len: usize,
+}
+
 /// Data structure which is used to store buffers of varying length
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]

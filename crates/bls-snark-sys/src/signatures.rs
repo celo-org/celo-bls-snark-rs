@@ -1,8 +1,8 @@
 use crate::{
     cache::PUBLIC_KEY_CACHE,
     convert_result_to_bool,
-    utils::{Message, MessageFFI},
-    PrivateKey, PublicKey, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
+    utils::{BatchMessageFFI, Message, MessageFFI},
+    Batch, PrivateKey, PublicKey, Signature, COMPOSITE_HASH_TO_G1, DIRECT_HASH_TO_G1,
 };
 use ark_ec::ProjectiveCurve;
 use ark_ff::ToBytes;
@@ -328,6 +328,77 @@ pub extern "C" fn batch_verify_signature(
         };
 
         unsafe { *verified = is_verified };
+        Ok(())
+    })
+}
+
+#[no_mangle]
+/// Receives a list of epoch batches composed of:
+/// 1. the data
+/// 1. the public keys which signed on the data
+/// 1. the signature produced by the public keys
+///
+/// It will batch verify (not screen) the signatures using small random exponents tuned for 128-bit security.
+/// The return value is true if all batches verified successfully and false if not. The specific batch results are returned in the out_result vector of booleans.
+pub extern "C" fn batch_verify_strict(
+    in_batches_ptr: *const BatchMessageFFI,
+    in_batches_len: usize,
+    should_use_composite: bool,
+    should_use_cip22: bool,
+    out_results: *mut bool,
+) -> bool {
+    convert_result_to_bool::<_, BLSError, _>(|| {
+        let batch_messages: &[BatchMessageFFI] =
+            unsafe { slice::from_raw_parts(in_batches_ptr, in_batches_len) };
+
+        let results: &mut [bool] =
+            unsafe { slice::from_raw_parts_mut(out_results, in_batches_len) };
+        let mut all_valid = true;
+
+        for (index, batch) in batch_messages.iter().enumerate() {
+            let message = <&[u8]>::from(&batch.data);
+            let extra_data = <&[u8]>::from(&batch.extra);
+
+            let public_keys =
+                unsafe { slice::from_raw_parts(batch.public_keys, batch.public_keys_len as usize) };
+            let public_keys = public_keys
+                .iter()
+                .map(|ptr| unsafe { (**ptr).clone() })
+                .collect::<Vec<_>>();
+
+            let signatures =
+                unsafe { slice::from_raw_parts(batch.signatures, batch.signatures_len as usize) };
+            let signatures = signatures
+                .iter()
+                .map(|ptr| unsafe { (**ptr).clone() })
+                .collect::<Vec<_>>();
+
+            let mut context = Batch::new(message, extra_data);
+
+            public_keys
+                .iter()
+                .zip(signatures.iter())
+                .for_each(|(pk, sig)| {
+                    context.add(pk.clone(), sig.clone());
+                });
+
+            let result = match (should_use_composite, should_use_cip22) {
+                (true, true) => context.verify(&*COMPOSITE_HASH_TO_G1_CIP22).is_ok(),
+                (false, true) => false, // bad hash to curve configuration
+                (true, false) => context.verify(&*COMPOSITE_HASH_TO_G1).is_ok(),
+                (false, false) => context.verify(&*DIRECT_HASH_TO_G1).is_ok(),
+            };
+
+            if !result {
+                all_valid = false;
+            }
+            (*results)[index] = result;
+        }
+
+        if !all_valid {
+            return Err(BLSError::VerificationFailed);
+        }
+
         Ok(())
     })
 }
