@@ -30,3 +30,7 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+
+[patch."https://github.com/arkworks-rs/utils"]
+bench-utils = { git = "https://github.com/arkworks-rs/std", rev = "b37f1c8" }

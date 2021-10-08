@@ -79,6 +79,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-crypto-primitives"
+version = "0.1.0"
+source = "git+https://github.com/arkworks-rs/crypto-primitives?rev=fde39ab#fde39ab764f00e28b2f292af3706a2654ea55edb"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-nonnative-field",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-snark",
+ "ark-std 0.1.0",
+ "bench-utils",
+ "blake2",
+ "derivative",
+ "digest",
+ "rand 0.7.3",
+ "rayon",
+ "tracing",
+]
+
+[[package]]
 name = "ark-ec"
 version = "0.1.0"
 source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
@@ -165,7 +186,7 @@ name = "ark-groth16"
 version = "0.1.0"
 source = "git+https://github.com/arkworks-rs/groth16#d8acb2b2108023b2ad09974040b347b03bfe70b1"
 dependencies = [
- "ark-crypto-primitives",
+ "ark-crypto-primitives 0.1.0 (git+https://github.com/arkworks-rs/crypto-primitives?branch=main)",
  "ark-ec",
  "ark-ff",
  "ark-poly",
@@ -317,7 +338,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/utils#b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9"
+source = "git+https://github.com/arkworks-rs/std?rev=b37f1c8#b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9"
 
 [[package]]
 name = "bitflags"
@@ -353,7 +374,7 @@ name = "bls-crypto"
 version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
- "ark-crypto-primitives",
+ "ark-crypto-primitives 0.1.0 (git+https://github.com/arkworks-rs/crypto-primitives?rev=fde39ab)",
  "ark-ec",
  "ark-ed-on-bw6-761",
  "ark-ff",
@@ -381,7 +402,7 @@ version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-bw6-761",
- "ark-crypto-primitives",
+ "ark-crypto-primitives 0.1.0 (git+https://github.com/arkworks-rs/crypto-primitives?rev=fde39ab)",
  "ark-ec",
  "ark-ed-on-bw6-761",
  "ark-ff",
@@ -668,7 +689,7 @@ version = "0.2.0"
 dependencies = [
  "ark-bls12-377",
  "ark-bw6-761",
- "ark-crypto-primitives",
+ "ark-crypto-primitives 0.1.0 (git+https://github.com/arkworks-rs/crypto-primitives?branch=main)",
  "ark-ec",
  "ark-ed-on-bls12-377",
  "ark-ed-on-bw6-761",

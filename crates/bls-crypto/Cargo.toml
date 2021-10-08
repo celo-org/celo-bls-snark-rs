@@ -11,7 +11,7 @@ ark-ff = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "
 ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
 ark-std = { git = "https://github.com/arkworks-rs/std" }
 ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
-ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", branch = "main", features = ["parallel"] }
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "fde39ab", features = ["parallel"] }
 
 # other deps
 rand = "0.7"

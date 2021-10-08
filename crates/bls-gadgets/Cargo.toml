@@ -12,7 +12,7 @@ ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "
 ark-ff = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
 ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
 ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-features = false, features = ["std", "parallel"] }
-ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", branch = "main", features = ["parallel", "r1cs"] }
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "fde39ab", features = ["parallel", "r1cs"] }
 ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
 ark-bls12-377 = { git = "https://github.com/arkworks-rs/curves", features = [ "r1cs" ] }
 ark-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
