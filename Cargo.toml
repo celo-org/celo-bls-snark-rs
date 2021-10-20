@@ -52,6 +52,7 @@ ark-groth16 = { git = "https://github.com//arkworks-rs/groth16", rev = "d8acb2b"
 
 [patch."https://github.com/arkworks-rs/snark"]
 ark-relations = { git = "https://github.com//arkworks-rs/snark", rev = "8d9055d" }
+ark-snark = { git = "https://github.com//arkworks-rs/snark", rev = "8d9055d"}
 
 [patch."https://github.com/arkworks-rs/r1cs-std"]
 ark-r1cs-std = { git = "https://github.com//arkworks-rs/r1cs-std", rev = "e5ec2e6" }
