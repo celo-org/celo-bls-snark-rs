@@ -14,8 +14,8 @@ r1cs-core = { git = "https://github.com/celo-org/zexe" }
 r1cs-std = { git = "https://github.com/celo-org/zexe", features = ["bls12_377", "ed_on_bw6_761", "ed_on_bls12_377", "parallel"] }
 crypto-primitives = { git = "https://github.com/celo-org/zexe", features = ["r1cs", "groth16", "parallel"] }
 groth16 = { git = "https://github.com/celo-org/zexe", features = ["parallel"] }
-phase2 = { git = "https://github.com/celo-org/snark-setup", package = "phase2", rev = "9ada8fb746f317b9a5ae326ea6c5b3c244da41a0" }
-setup-utils = { git = "https://github.com/celo-org/snark-setup", package = "setup-utils", rev = "9ada8fb746f317b9a5ae326ea6c5b3c244da41a0" }
+phase2 = { git = "https://github.com/celo-org/snark-setup", package = "phase2", rev = "5b5143afcb70ed7ef76f3dff97c7b5c65a5fa6f4" }
+setup-utils = { git = "https://github.com/celo-org/snark-setup", package = "setup-utils", rev = "5b5143afcb70ed7ef76f3dff97c7b5c65a5fa6f4" }
 
 rand = "0.7"
 byteorder = "1.4.2"
