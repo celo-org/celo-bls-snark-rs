@@ -19,7 +19,8 @@ ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-featur
 ark-relations = { git = "https://github.com/arkworks-rs/snark", features = [ "std" ] }
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
 ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
-ark-std = { git = "https://github.com/arkworks-rs/std" }
+ark-std = { git = "https://github.com/arkworks-rs/std", rev = "b37f1c8" }
+bench-utils = { git = "https://github.com/arkworks-rs/std", rev = "b37f1c8" }
 
 rand = "0.7"
 byteorder = "1.3.2"
@@ -36,7 +37,8 @@ hex = "0.4.2"
 
 [features]
 default = ["compat"]
-print-trace = ["ark-std/print-trace"]
+# arkworks 0.1.0 does not have this feature
+#print-trace = ["ark-std/print-trace"]
 compat = ["bls-crypto/compat", "bls-gadgets/compat"]
 
 [lib]
