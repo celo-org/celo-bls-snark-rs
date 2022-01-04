@@ -12,7 +12,6 @@ ark-ff = { version = "0.3", features = [ "std", "parallel"] }
 ark-ec = { version = "0.3", features = [ "std", "parallel"] }
 ark-bls12-377 = { version = "0.3", features = [ "r1cs" ] }
 ark-bw6-761 = { version = "0.3" }
-ark-ed-on-bw6-761 = { version = "0.3" }
 ark-ed-on-bls12-377 = { version = "0.3" }
 ark-crypto-primitives = { version = "0.3", features = ["parallel", "r1cs"] }
 ark-r1cs-std = { version = "0.3", default-features = false, features = ["std", "parallel"] }
