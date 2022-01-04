@@ -84,8 +84,7 @@ impl EpochBits {
                 evaluate_blake2s_with_parameters(&message, &blake2s_parameters.parameters())?;
             let xof_bits_i = xof_result
                 .into_iter()
-                .map(|n| n.to_bits_le())
-                .flatten()
+                .flat_map(|n| n.to_bits_le())
                 .collect::<Vec<Bool>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }
@@ -172,8 +171,7 @@ mod tests {
 
         let both_blake_bits = [first_bytes.clone(), last_bytes.clone()]
             .iter()
-            .map(|b| hash_to_bits(b))
-            .flatten()
+            .flat_map(|b| hash_to_bits(b))
             .collect::<Vec<bool>>();
 
         let cs = ConstraintSystem::<Fr>::new_ref();
