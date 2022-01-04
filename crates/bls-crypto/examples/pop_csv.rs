@@ -9,15 +9,15 @@ fn main() {
     let matches = App::new("BLS Proof of Possession test vectors")
         .about("Generates many proof of posession for random keys")
         .arg(
-            Arg::with_name("num")
-                .short("n")
+            Arg::new("num")
+                .short('n')
                 .value_name("NUM")
                 .help("Sets the number of test vectors")
                 .required(true),
         )
         .arg(
-            Arg::with_name("out")
-                .short("o")
+            Arg::new("out")
+                .short('o')
                 .value_name("OUT")
                 .help("Sets the output file path")
                 .required(true),

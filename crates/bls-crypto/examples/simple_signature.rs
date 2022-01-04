@@ -11,8 +11,8 @@ fn main() {
     let matches = App::new("SimpleAggregatedSignature")
         .about("Show an example of a simple signature with a random key")
         .arg(
-            Arg::with_name("message")
-                .short("m")
+            Arg::new("message")
+                .short('m')
                 .value_name("MESSAGE")
                 .help("Sets the message to sign")
                 .required(true),
