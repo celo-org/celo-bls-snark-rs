@@ -591,9 +591,9 @@ mod tests {
 
             #[cfg(feature = "compat")]
             let expected_matrices_hashes = Some(vec![
-                "5ae20d76f27795a498b9e9f1d4035475bc137ad70cb75500c9cf3210f8cc10fa".to_string(),
-                "58c12fa7ca9130918f4c86c6ebe870426d9ca7ae4571d6d1f9f190e2b497d41c".to_string(),
-                "2f860526de1066469a151cd44e803866d947dc28668fdcd6c0a8098128223b21".to_string(),
+                "8d09ddc5de651900f6627294e5cf2cdcff607a1e876cde84520d065300677960".to_string(),
+                "50941ec798486d8e1344dfe120739e2fa5a7b5a0552e564d7983dc9f3081b15c".to_string(),
+                "d965592d1056eae81dc30b7b61cf60354becb06983b2eae86b65a05f95f7e072".to_string(),
             ]);
             #[cfg(not(feature = "compat"))]
             let expected_matrices_hashes = None;
