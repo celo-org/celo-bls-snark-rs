@@ -3,7 +3,7 @@ use crate::YToBitGadget;
 use ark_bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters};
 use ark_crypto_primitives::CRHGadget;
 use ark_crypto_primitives::{
-    crh::{bowe_hopwood::constraints::CRHGadget as BHHash},
+    crh::bowe_hopwood::constraints::CRHGadget as BHHash,
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
 use ark_ec::{
