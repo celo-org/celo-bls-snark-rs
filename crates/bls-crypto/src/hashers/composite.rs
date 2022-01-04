@@ -3,13 +3,14 @@
 //! Blake2x as the XOF
 use crate::{hashers::DirectHasher, BLSError, Hasher};
 
-use ark_crypto_primitives::crh::{bowe_hopwood, pedersen, FixedLengthCRH};
+use ark_crypto_primitives::crh::{bowe_hopwood, pedersen, CRH as CRHTrait};
 use ark_ec::ProjectiveCurve;
 use ark_ed_on_bw6_761::{EdwardsParameters, EdwardsProjective};
 use ark_serialize::CanonicalSerialize;
+use ark_std::rand::Rng;
+use ark_std::rand::SeedableRng;
 use blake2s_simd::Params;
 use once_cell::sync::Lazy;
-use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 // Fix to get around leaking a private type in a public interface
@@ -39,11 +40,11 @@ pub static COMPOSITE_HASHER: Lazy<CompositeHasher<CRH>> =
 /// Uses the Bowe-Hopwood-Pedersen hash (instantiated with a prng) as a CRH and Blake2x as the XOF.
 /// The CRH does _not_ use the domain or the output bytes.
 #[derive(Clone, Debug)]
-pub struct CompositeHasher<H: FixedLengthCRH> {
+pub struct CompositeHasher<H: CRHTrait> {
     parameters: H::Parameters,
 }
 
-impl<H: FixedLengthCRH> CompositeHasher<H> {
+impl<H: CRHTrait> CompositeHasher<H> {
     /// Initializes the CRH and returns a new hasher
     pub fn new() -> Result<CompositeHasher<H>, BLSError> {
         Ok(CompositeHasher {
@@ -72,7 +73,7 @@ impl<H: FixedLengthCRH> CompositeHasher<H> {
     }
 }
 
-impl<H: FixedLengthCRH<Output = EdwardsProjective>> Hasher for CompositeHasher<H> {
+impl<H: CRHTrait<Output = EdwardsProjective>> Hasher for CompositeHasher<H> {
     type Error = BLSError;
 
     // TODO: Should we improve the trait design somehow? Seems like there's a bad abstraction

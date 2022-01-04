@@ -9,7 +9,7 @@ fn main() {
         .about("Generates a proof of posession for the given private key")
         .arg(
             Arg::with_name("key")
-                .short("k")
+                .short('k')
                 .value_name("KEY")
                 .help("Sets the BLS private key")
                 .required(true),

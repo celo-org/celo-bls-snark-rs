@@ -175,7 +175,7 @@ mod tests {
     use ark_ec::bls12::Bls12Parameters;
     use ark_ff::{UniformRand, Zero};
     use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-    use rand::{thread_rng, Rng};
+    use ark_std::{rand::Rng, test_rng};
 
     #[test]
     fn test_aggregated_sig() {
@@ -185,7 +185,7 @@ mod tests {
 
     fn test_aggregated_sig_inner<H: HashToCurve<Output = G1Projective>>(try_and_increment: &H) {
         let message = b"hello";
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
 
         let sk1 = PrivateKey::generate(rng);
         let sk2 = PrivateKey::generate(rng);
@@ -253,7 +253,7 @@ mod tests {
         is_composite: bool,
         is_cip22: bool,
     ) {
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
         let num_epochs = 10;
         let num_validators = 7;
 
@@ -331,7 +331,7 @@ mod tests {
         // verify them all in 1 call
         let batch_size = 5;
         let num_keys = 7;
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         // generate some random messages
         let messages = (0..batch_size)
@@ -373,7 +373,7 @@ mod tests {
     fn test_signature_serialization_inner<H: HashToCurve<Output = G1Projective>>(
         try_and_increment: &H,
     ) {
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
 
         for _ in 0..100 {
             let message = b"hello";
@@ -412,7 +412,7 @@ mod tests {
         let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
         assert!(res.is_ok());
 
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
         let wrong_msg_sk = PrivateKey::generate(rng);
         let wrong_msg_pk = wrong_msg_sk.to_public();
         let wrong_msg_sig = wrong_msg_sk

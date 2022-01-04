@@ -205,10 +205,11 @@ mod tests {
         groups::CurveVar,
     };
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
+
     use bls_gadgets::utils::bytes_le_to_bits_le;
 
     fn pubkeys<E: PairingEngine>(num: usize) -> Vec<E::G2Projective> {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         (0..num)
             .map(|_| E::G2Projective::rand(rng))
             .collect::<Vec<_>>()

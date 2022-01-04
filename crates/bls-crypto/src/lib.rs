@@ -17,7 +17,7 @@
 //!     hash_to_curve::{HashToCurve, try_and_increment::DIRECT_HASH_TO_G1}
 //! };
 //!
-//! let rng = &mut rand::thread_rng();
+//! let rng = &mut ark_std::test_rng();
 //! let message = &b"hello"[..];
 //! let extra_data = &[];
 //! let hasher = &*DIRECT_HASH_TO_G1;

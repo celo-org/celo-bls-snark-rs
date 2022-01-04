@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn msg_convert_ok() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         let public_key = G2Projective::rand(rng);
         let public_key = PublicKey::from(public_key);
 

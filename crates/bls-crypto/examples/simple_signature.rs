@@ -4,15 +4,15 @@ use bls_crypto::{
 
 use ark_ff::to_bytes;
 
+use ark_std::test_rng;
 use clap::{App, Arg};
-use rand::thread_rng;
 
 fn main() {
     let matches = App::new("SimpleAggregatedSignature")
         .about("Show an example of a simple signature with a random key")
         .arg(
             Arg::with_name("message")
-                .short("m")
+                .short('m')
                 .value_name("MESSAGE")
                 .help("Sets the message to sign")
                 .required(true),
@@ -23,7 +23,7 @@ fn main() {
 
     println!("matches: {}", message);
 
-    let rng = &mut thread_rng();
+    let rng = &mut test_rng();
 
     println!("rng");
 

@@ -190,7 +190,7 @@ mod test {
     #[tracing::instrument(target = "r1cs")]
     fn test_y_to_bit_g1_inner() {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         for _ in 0..10 {
             let element = G1Projective::rand(rng);
@@ -222,7 +222,7 @@ mod test {
     fn test_y_to_bit_g2_inner() {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         // Check random points.
         for _ in 0..10 {
@@ -258,7 +258,7 @@ mod test {
     fn test_y_to_bit_g2_edge(edge: <<Parameters as Bls12Parameters>::Fp as PrimeField>::BigInt) {
         let half = Fp::from_repr(Fp::modulus_minus_one_div_two()).unwrap();
         let zero = <Parameters as Bls12Parameters>::Fp::zero();
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         for _ in 0..10 {
             let element = G2Projective::rand(rng);

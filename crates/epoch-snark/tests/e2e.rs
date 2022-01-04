@@ -7,7 +7,7 @@ use fixtures::generate_test_data;
 #[test]
 #[ignore] // This test makes CI run out of memory and takes too long. It works though!
 fn prover_verifier_groth16() {
-    let rng = &mut rand::thread_rng();
+    let rng = &mut ark_std::test_rng();
     let num_transitions = 2;
     let faults = 1;
     let num_validators = 3 * faults + 1;
@@ -68,7 +68,7 @@ fn prover_verifier_groth16() {
 #[test]
 #[ignore] // This test makes CI run out of memory and takes too long. It works though!
 fn prover_verifier_groth16_with_dummy() {
-    let rng = &mut rand::thread_rng();
+    let rng = &mut ark_std::test_rng();
     let num_transitions = 2;
     let max_transitions = num_transitions + 10;
     let faults = 1;

@@ -1,5 +1,5 @@
+use ark_std::rand::Rng;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::Rng;
 
 use ark_bls12_377::{G1Projective, G2Projective};
 use ark_ff::Zero;
@@ -15,7 +15,7 @@ fn batch_bls_comparison(c: &mut Criterion) {
     // Generate aggregate signatures on 100-validators across 1000 blocks
     const NUM_BLOCKS: usize = 300;
     const NUM_VALIDATORS: usize = 20;
-    let rng = &mut rand::thread_rng();
+    let rng = &mut ark_std::test_rng();
     let try_and_increment = &*COMPOSITE_HASH_TO_G1_CIP22;
 
     // generate some msgs and extra data

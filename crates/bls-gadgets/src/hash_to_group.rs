@@ -1,8 +1,9 @@
 use crate::utils::{bits_le_to_bytes_le, bytes_le_to_bits_le};
 use crate::YToBitGadget;
 use ark_bls12_377::{Fq as Bls12_377_Fq, Parameters as Bls12_377_Parameters};
+use ark_crypto_primitives::CRHGadget;
 use ark_crypto_primitives::{
-    crh::{bowe_hopwood::constraints::CRHGadget as BHHash, FixedLengthCRHGadget},
+    crh::{bowe_hopwood::constraints::CRHGadget as BHHash},
     prf::{blake2s::constraints::evaluate_blake2s_with_parameters, Blake2sWithParameterBlock},
 };
 use ark_ec::{
@@ -149,21 +150,24 @@ impl HashToGroupGadget<Bls12_377_Parameters, Bls12_377_Fq> {
         input: &[UInt8<Bls12_377_Fq>],
     ) -> Result<Vec<Boolean<Bls12_377_Fq>>, SynthesisError> {
         // We setup by getting the Parameters over the provided CRH
-        let crh_params =
-            <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as FixedLengthCRHGadget<
-                CRH,
-                Bls12_377_Fq,
-            >>::ParametersVar::new_constant(
-                input.cs(),
-                CompositeHasher::<CRH>::setup_crh()
-                    .map_err(|_| SynthesisError::AssignmentMissing)?,
-            )?;
+        let crh_params = <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as CRHGadget<
+            CRH,
+            Bls12_377_Fq,
+        >>::ParametersVar::new_constant(
+            input.cs(),
+            CompositeHasher::<CRH>::setup_crh().map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?;
 
-        let pedersen_hash: AffineVar<EdwardsParameters, FpVar<Bls12_377_Fq>> =
-            <BHHash<EdwardsParameters, FpVar<Bls12_377_Fq>> as FixedLengthCRHGadget<
-                CRH,
-                Bls12_377_Fq,
-            >>::evaluate(&crh_params, input)?;
+        let pedersen_hash: AffineVar<EdwardsParameters, FpVar<Bls12_377_Fq>> = <BHHash<
+            EdwardsParameters,
+            FpVar<Bls12_377_Fq>,
+        > as CRHGadget<
+            CRH,
+            Bls12_377_Fq,
+        >>::evaluate(
+            &crh_params,
+            input,
+        )?;
 
         let mut crh_bits = pedersen_hash.x.to_bits_le()?;
         // The hash must be front-padded to the nearest multiple of 8 for the LE encoding

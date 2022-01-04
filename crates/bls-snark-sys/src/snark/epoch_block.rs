@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn groth_verifying_key_from_pointer() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         let c = TestCircuit::<Bls12_377>(None);
         let params = generate_random_parameters(c, rng).unwrap();
         let vk = params.vk;
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn groth_proof_from_pointer() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         let c = TestCircuit::<Bls12_377>(None);
         let params = generate_random_parameters(c, rng).unwrap();
         let c = TestCircuit::<Bls12_377>(Some(Fr::rand(rng)));
@@ -351,7 +351,7 @@ mod tests {
     }
 
     fn rand_pubkeys(num_keys: usize) -> Vec<PublicKey> {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         let mut points = (0..num_keys)
             .map(|_| G2Projective::rand(rng))
             .collect::<Vec<_>>();
