@@ -1,4 +1,4 @@
-use ark_std::{end_timer, start_timer};
+use bench_utils::{end_timer, start_timer};
 use byteorder::WriteBytesExt;
 use log::trace;
 use std::marker::PhantomData;

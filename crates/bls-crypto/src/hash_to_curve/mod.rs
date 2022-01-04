@@ -281,7 +281,7 @@ mod compat_tests {
     };
     use ark_ff::{Field, FpParameters, FromBytes, PrimeField, SquareRootField, Zero};
     use ark_serialize::CanonicalSerialize;
-    use ark_std::{end_timer, start_timer};
+    use bench_utils::{end_timer, start_timer};
     use byteorder::WriteBytesExt;
     use log::trace;
     use rand::SeedableRng;
