@@ -30,3 +30,48 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+
+### /!\ WARNING: fragile hack! /!\
+### This is using URL mangling to confuse the cargo resolver into resolving a patch to what it thinks is a 
+### different source, when it isn't. See https://github.com/rust-lang/cargo/issues/7497 for details.
+### The intent is to force the versioning of all the transitive dependencies of arkworks-based crates, 
+### despite them only relying on git dependencies. 
+###
+### This will break the moment the cargo resolver stops being confused by tail forward slashes, or the moment git stops 
+### resolving them correctly, whichever comes first. It's also very easy to create cycles in cargo's resolver with this.
+###
+### This is cursed, and a proper vendoring of those crates (or an upgrade of the groth16 circuit) should replace this.
+### 
+[patch."https://github.com/arkworks-rs/algebra"]
+ark-ec = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-ff-asm = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-ff-macros = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-poly = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+ark-serialize-derive = { git = "https://github.com/arkworks-rs/algebra//", rev = "8d76d181de0079b7e5a92f6e1133e7be635efdd3" }
+
+[patch."https://github.com/arkworks-rs/curves"]
+ark-bls12-377 = { git = "https://github.com/arkworks-rs/curves//", rev = "6ed2450b5505de5d451f629bb6642e3977bf66e2" }
+ark-bw6-761 = { git = "https://github.com/arkworks-rs/curves//", rev = "6ed2450b5505de5d451f629bb6642e3977bf66e2" }
+ark-ed-on-bls12-377 = { git = "https://github.com/arkworks-rs/curves//", rev = "6ed2450b5505de5d451f629bb6642e3977bf66e2" }
+ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves//", rev = "6ed2450b5505de5d451f629bb6642e3977bf66e2" }
+ark-ed-on-cp6-782 = { git = "https://github.com/arkworks-rs/curves//", rev = "6ed2450b5505de5d451f629bb6642e3977bf66e2" }
+
+[patch."https://github.com/arkworks-rs/crypto-primitives"]
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives//", rev = "fde39ab764f00e28b2f292af3706a2654ea55edb" }
+
+[patch."https://github.com/arkworks-rs/groth16"]
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16//", rev = "d8acb2b2108023b2ad09974040b347b03bfe70b1" }
+
+[patch."https://github.com/arkworks-rs/r1cs-std"]
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std//", rev = "e5ec2e66d3aead34f7e3fa15909f22e1600bd11d" }
+
+[patch."https://github.com/arkworks-rs/snark"]
+ark-relations = { git = "https://github.com/arkworks-rs/snark//", rev = "8d9055d5397b510716ad2951ce1f18675aebe7c8" }
+
+[patch."https://github.com/arkworks-rs/utils"]
+ark-std = { git = "https://github.com/arkworks-rs/utils//", rev = "b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9" }
+bench-utils = { git = "https://github.com/arkworks-rs/utils//", rev = "b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9" }
+

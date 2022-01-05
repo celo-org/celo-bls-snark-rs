@@ -9,7 +9,9 @@ ark-bls12-377 = { git = "https://github.com/arkworks-rs/curves" }
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
 ark-ff = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
 ark-ec = { git = "https://github.com/arkworks-rs/algebra", features = [ "std", "parallel"] }
-ark-std = { git = "https://github.com/arkworks-rs/std" }
+ark-std-recent = { version = "0.3", package = "ark-std" }
+ark-std = { git = "https://github.com/arkworks-rs/utils" }
+
 ark-ed-on-bw6-761 = { git = "https://github.com/arkworks-rs/curves" }
 ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", branch = "main", features = ["parallel"] }
 

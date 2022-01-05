@@ -19,7 +19,8 @@ ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-featur
 ark-relations = { git = "https://github.com/arkworks-rs/snark", features = [ "std" ] }
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
 ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
-ark-std = { git = "https://github.com/arkworks-rs/std" }
+ark-std-recent = { version = "0.3", package = "ark-std" }
+ark-std = { git = "https://github.com/arkworks-rs/utils" }
 
 rand = "0.7"
 byteorder = "1.4.3"
