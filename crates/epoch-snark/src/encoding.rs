@@ -51,8 +51,7 @@ pub(crate) fn encode_u8(num: u8) -> Result<Vec<bool>, EncodingError> {
     let bytes = vec![num];
     let bits = bytes
         .into_iter()
-        .map(|x| (0..8).map(move |i| (((x as u8) & u8::pow(2, i)) >> i) == 1))
-        .flatten()
+        .flat_map(|x| (0..8).map(move |i| (((x as u8) & u8::pow(2, i)) >> i) == 1))
         .collect::<Vec<_>>();
     Ok(bits)
 }
@@ -63,8 +62,7 @@ pub(crate) fn encode_u16(num: u16) -> Result<Vec<bool>, EncodingError> {
     bytes.write_u16::<LittleEndian>(num)?;
     let bits = bytes
         .into_iter()
-        .map(|x| (0..8).map(move |i| (((x as u16) & u16::pow(2, i)) >> i) == 1))
-        .flatten()
+        .flat_map(|x| (0..8).map(move |i| (((x as u16) & u16::pow(2, i)) >> i) == 1))
         .collect::<Vec<_>>();
     Ok(bits)
 }
@@ -75,8 +73,7 @@ pub(crate) fn encode_u32(num: u32) -> Result<Vec<bool>, EncodingError> {
     bytes.write_u32::<LittleEndian>(num)?;
     let bits = bytes
         .into_iter()
-        .map(|x| (0..8).map(move |i| (((x as u32) & u32::pow(2, i)) >> i) == 1))
-        .flatten()
+        .flat_map(|x| (0..8).map(move |i| (((x as u32) & u32::pow(2, i)) >> i) == 1))
         .collect::<Vec<_>>();
     Ok(bits)
 }

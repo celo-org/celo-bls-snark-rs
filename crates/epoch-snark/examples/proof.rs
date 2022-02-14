@@ -18,7 +18,7 @@ fn main() {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let rng = &mut rand::thread_rng();
+    let rng = &mut ark_std::test_rng();
     let mut args = env::args();
     args.next().unwrap(); // discard the program name
     let num_validators = args

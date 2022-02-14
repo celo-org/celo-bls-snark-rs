@@ -313,7 +313,7 @@ mod verify_one_message {
         // verify them all in 1 call
         let batch_size = 5;
         let num_keys = 7;
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         // generate some random messages
         let messages = (0..batch_size)
@@ -398,7 +398,7 @@ mod verify_one_message {
         );
         print_unsatisfied_constraints(cs.clone());
         assert!(cs.is_satisfied().unwrap());
-        assert_eq!(cs.num_constraints(), 18702);
+        assert_eq!(cs.num_constraints(), 18699);
 
         // random sig fails
         let cs = cs_verify::<Bls12_377, BW6_761Fr, Bls12_377PairingGadget>(

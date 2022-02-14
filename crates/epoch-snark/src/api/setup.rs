@@ -5,7 +5,7 @@ use crate::gadgets::{HashToBits, ValidatorSetUpdate};
 
 use ark_ec::PairingEngine;
 use ark_relations::r1cs::SynthesisError;
-use rand::Rng;
+use ark_std::rand::Rng;
 
 use super::{BLSCurve, BWCurve, BWFrParams};
 
@@ -50,7 +50,7 @@ mod tests {
     use super::*;
     #[test]
     fn runs_setup() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         assert!(trusted_setup(3, 2, 1, rng, false).is_ok())
     }
 }

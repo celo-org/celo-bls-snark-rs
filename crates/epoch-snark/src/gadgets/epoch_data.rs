@@ -316,7 +316,7 @@ mod tests {
 
     #[tracing::instrument(target = "r1cs")]
     fn test_epoch(index: u16) -> EpochData<Bls12_377> {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         let pubkeys = (0..10)
             .map(|_| Some(Bls12_377G2Projective::rand(rng)))
             .collect::<Vec<_>>();

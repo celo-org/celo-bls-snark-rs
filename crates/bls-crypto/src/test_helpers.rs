@@ -2,8 +2,8 @@ use ark_ec::{PairingEngine, ProjectiveCurve};
 use ark_ff::{PrimeField, UniformRand, Zero};
 
 // Same RNG for all tests
-pub fn rng() -> rand::rngs::ThreadRng {
-    rand::thread_rng()
+pub fn rng() -> ark_std::rand::rngs::StdRng {
+    ark_std::test_rng()
 }
 
 /// generate a keypair

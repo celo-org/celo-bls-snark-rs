@@ -115,16 +115,18 @@ mod tests {
     use super::*;
     use ark_ff::UniformRand;
     use ark_serialize::CanonicalSerialize;
+    use ark_std::rand::Rng;
 
-    fn rand_pubkey() -> PublicKey {
-        PublicKey(G2Projective::rand(&mut rand::thread_rng()))
+    fn rand_pubkey<R: Rng + Sized>(rng: &mut R) -> PublicKey {
+        PublicKey(G2Projective::rand(rng))
     }
 
     #[test]
     fn deserializer() {
         let mut cache = PublicKeyCache::new();
 
-        let pubkeys = (0..10).map(|_| rand_pubkey()).collect::<Vec<_>>();
+        let mut rng = ark_std::test_rng();
+        let pubkeys = (0..10).map(|_| rand_pubkey(&mut rng)).collect::<Vec<_>>();
         let serialized = pubkeys
             .iter()
             .map(|p| {
@@ -145,7 +147,8 @@ mod tests {
     fn caches_deserialized_pubkeys() {
         let mut cache = PublicKeyCache::new();
 
-        let pubkey = rand_pubkey();
+        let mut rng = ark_std::test_rng();
+        let pubkey = rand_pubkey(&mut rng);
 
         let mut serialized = vec![];
         pubkey.serialize(&mut serialized).unwrap();
@@ -161,7 +164,8 @@ mod tests {
     fn aggregation() {
         let mut cache = PublicKeyCache::new();
 
-        let pubkeys = (0..10).map(|_| rand_pubkey()).collect::<Vec<_>>();
+        let mut rng = ark_std::test_rng();
+        let pubkeys = (0..10).map(|_| rand_pubkey(&mut rng)).collect::<Vec<_>>();
 
         let apubkey = cache.aggregate(pubkeys.clone());
         assert_eq!(apubkey, PublicKey::aggregate(&pubkeys));

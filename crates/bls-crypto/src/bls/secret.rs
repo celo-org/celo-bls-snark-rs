@@ -4,7 +4,7 @@ use ark_bls12_377::{Fr, G1Projective};
 use ark_ec::group::Group;
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use rand::Rng;
+use ark_std::rand::Rng;
 use std::io::{Read, Write};
 
 /// A Private Key using a pairing friendly curve's Fr point
@@ -84,7 +84,7 @@ mod tests {
     };
     use ark_bls12_377::Parameters;
     use ark_ec::bls12::Bls12Parameters;
-    use rand::{thread_rng, Rng};
+    use ark_std::{rand::Rng, test_rng};
 
     #[test]
     fn test_simple_sig() {
@@ -95,7 +95,7 @@ mod tests {
     }
 
     fn test_simple_sig_with_hasher<X: Hasher<Error = BLSError>>(hasher: X) {
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
         let try_and_increment =
             TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(&hasher);
         for _ in 0..10 {
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_pop() {
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
         let direct_hasher = DirectHasher;
         let try_and_increment =
             TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(

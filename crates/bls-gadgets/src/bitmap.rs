@@ -89,7 +89,7 @@ mod tests {
     #[test]
     // "I know of a bitmap that has at most 2 zeros"
     fn groth16_ok() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
 
         #[derive(Clone)]
         struct BitmapGadget {

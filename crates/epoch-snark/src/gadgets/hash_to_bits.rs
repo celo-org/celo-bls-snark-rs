@@ -81,7 +81,7 @@ mod tests {
     use ark_groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
-    use rand::RngCore;
+    use ark_std::rand::RngCore;
 
     // applies the XOF to the input
     fn hash_to_bits_fn(message: &[bool]) -> Vec<bool> {
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn test_verify_crh_to_xof() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut ark_std::test_rng();
         // generate an empty circuit for 3 epochs
         let num_epochs = 3;
         // Trusted Setup -- USES THE BW6_761FrParameters!

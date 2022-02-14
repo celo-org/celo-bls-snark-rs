@@ -17,7 +17,7 @@ use std::{os::raw::c_int, slice};
 /// out_private_key must initialized to memory that can contain a pointer.
 #[no_mangle]
 pub unsafe extern "C" fn generate_private_key(out_private_key: *mut *mut PrivateKey) -> bool {
-    let mut rng = rand::thread_rng();
+    let mut rng = ark_std::test_rng();
     let key = PrivateKey::generate(&mut rng);
     *out_private_key = Box::into_raw(Box::new(key));
 

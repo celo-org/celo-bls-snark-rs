@@ -36,10 +36,7 @@ pub fn prove(
     let span = span!(Level::TRACE, "prove");
     let _enter = span.enter();
 
-    let mut epochs = transitions
-        .iter()
-        .map(|transition| to_update(transition))
-        .collect::<Vec<_>>();
+    let mut epochs = transitions.iter().map(to_update).collect::<Vec<_>>();
 
     let num_epochs = epochs.len();
     if num_epochs < max_transitions {
@@ -55,11 +52,11 @@ pub fn prove(
 
     // Generate a helping proof if a Proving Key for the HashToBits
     // circuit was provided
-    let hash_helper = if let Some(ref params) = parameters.hash_to_bits {
-        Some(generate_hash_helper(params, transitions)?)
-    } else {
-        None
-    };
+    let hash_helper = parameters
+        .hash_to_bits
+        .as_ref()
+        .map(|params| generate_hash_helper(params, transitions))
+        .transpose()?;
 
     // Generate the BLS proof
     let asig = Signature::aggregate(transitions.iter().map(|epoch| &epoch.aggregate_signature));
