@@ -20,6 +20,8 @@ ark-relations = { git = "https://github.com/arkworks-rs/snark", features = [ "st
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
 ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
 ark-std = { git = "https://github.com/arkworks-rs/std" }
+phase2 = { git = "https://github.com/celo-org/snark-setup", package = "phase2", rev = "5b5143afcb70ed7ef76f3dff97c7b5c65a5fa6f4" }
+setup-utils = { git = "https://github.com/celo-org/snark-setup", package = "setup-utils", rev = "5b5143afcb70ed7ef76f3dff97c7b5c65a5fa6f4" }
 
 rand = "0.7"
 byteorder = "1.3.2"

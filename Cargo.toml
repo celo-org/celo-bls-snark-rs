@@ -30,3 +30,13 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+[patch.'https://github.com/scipr-lab/zexe']
+algebra_core = { git = "https://github.com/celo-org/zexe", package = "algebra-core" }
+algebra = { git = "https://github.com/celo-org/zexe", package = "algebra" }
+crypto-primitives = { git = "https://github.com/celo-org/zexe", package = "crypto-primitives" }
+fft = { git = "https://github.com/celo-org/zexe", package = "ff-fft", default-features = false }
+bench_utils = { git = "https://github.com/celo-org/zexe", package = "bench-utils" }
+r1cs_core = { git = "https://github.com/celo-org/zexe", package = "r1cs-core" }
+r1cs_std = { git = "https://github.com/celo-org/zexe", package = "r1cs-std" }
+groth16 = { git = "https://github.com/celo-org/zexe", package = "groth16" }
