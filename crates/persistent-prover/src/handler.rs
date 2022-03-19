@@ -20,9 +20,8 @@ const EPOCH_DURATION: usize = 17280;
 #[derive(Deserialize)]
 pub struct ProofRequest {
     pub node_url: String,
-    pub start_epoch: u64,
-    pub end_epoch: u64,
-    pub maximum_non_signers: u32,
+    pub start_block: u64,
+    pub end_block: u64,
 }
 
 #[derive(Serialize)]
@@ -32,16 +31,16 @@ pub struct ProofStartResponse {
 
 
 pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Parameters<BWCurve>>) -> Result<impl Reply> {
-    let provider = Arc::new(Provider::<Http>::try_from("http://127.0.0.1:8545").unwrap());
+    let provider = Arc::new(Provider::<Http>::try_from(body.node_url.as_ref()).unwrap());
 
-    let futs = (body.start_epoch as u64..body.end_epoch)
+    let futs = (body.start_block as u64..=body.end_block)
         .step_by(1)
         .enumerate()
-        .map(|(i, epoch_index)| {
+        .map(|(i, num)| {
             let provider = provider.clone();
             async move {
-                let previous_num = (epoch_index-1)*17280;
-                let num = epoch_index*17280;
+                let epoch_index = num as usize/EPOCH_DURATION;
+                let previous_num = num - EPOCH_DURATION as u64;
                 println!("nums: {}, {}", previous_num, num);
 
                 let block = provider.get_block(num).await.expect("could not get block").unwrap();
