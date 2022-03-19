@@ -5,6 +5,7 @@ members = [
     "crates/bls-gadgets",
     "crates/epoch-snark",
     "crates/bls-snark-sys",
+    "crates/persistent-prover",
 ]
 
 [profile.release]

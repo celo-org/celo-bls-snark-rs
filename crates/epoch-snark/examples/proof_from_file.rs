@@ -40,7 +40,7 @@ fn main() {
 
     let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
     println!("Read parameters");
-    let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize(&mut file).unwrap();
+    let epoch_proving_key = Groth16Parameters::<BWCurve>::deserialize_unchecked(&mut file).unwrap();
 
     let params = Parameters {
         epochs: epoch_proving_key,
