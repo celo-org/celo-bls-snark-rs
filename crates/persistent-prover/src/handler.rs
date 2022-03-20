@@ -39,16 +39,16 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
         .map(|(i, epoch_index)| {
             let provider = provider.clone();
             async move {
-                let num = epoch_index*EPOCH_DURATION;
+                let num = epoch_index*EPOCH_DURATION-1;
                 let previous_num = num - EPOCH_DURATION as u64;
                 println!("nums: {}, {}", previous_num, num);
 
                 let block = provider.get_block(num).await.expect("could not get block").unwrap();
                 let parent_block = provider.get_block(num - EPOCH_DURATION as u64).await.expect("could not get parent epoch block").unwrap();
                 //println!("block: {:?}", block);
-                let previous_validators = provider.get_validators_bls_public_keys(previous_num).await.expect("could not get validators");
+                let previous_validators = provider.get_validators_bls_public_keys(previous_num+1).await.expect("could not get validators");
                 let previous_validators_keys = previous_validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().unwrap();
-                let validators = provider.get_validators_bls_public_keys(num).await.expect("could not get validators");
+                let validators = provider.get_validators_bls_public_keys(num+1).await.expect("could not get validators");
                 let validators_keys = validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().unwrap();
                 //println!("valiators keys: {}", validators_keys.len());
                 println!("valiators: {}", previous_validators_keys == validators_keys);
