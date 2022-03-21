@@ -72,7 +72,7 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                 let parent_hash = parent_block.hash.unwrap();
                 let entropy = unsafe { Some(slice::from_raw_parts(block_hash.as_ptr(), EpochBlock::ENTROPY_BYTES).to_vec()) };
                 let parent_entropy = unsafe { Some(slice::from_raw_parts(parent_hash.as_ptr(), EpochBlock::ENTROPY_BYTES).to_vec()) };
-                let num_non_signers = ((validators_keys.len() - 1)/3) as u32;
+                let num_non_signers = MAX_VALIDATORS as u32 - ((2*validators_keys.len()+ 2)/3) as u32;
 
                 let mut new_public_keys = validators_keys.clone();
                 if MAX_VALIDATORS > new_public_keys.len() {
