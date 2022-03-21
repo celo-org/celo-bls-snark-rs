@@ -85,6 +85,7 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                 println!("new pub keys len {}", new_public_keys.len());
 
                 let mut round = 0;
+                let mut found_signature = false;
                 for i in 0..=255u8 {
                     let epoch_block = EpochBlock {
                         index: epoch_index as u16,
@@ -111,9 +112,13 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                         &*COMPOSITE_HASH_TO_G1_CIP22,
                     ).is_ok() {
                         round = i;
+                        found_signature = true;
                         break;
                     }
                 };
+                if !found_signature {
+                    panic!("could not have found signatures for epoch {}: num non signers {}, num keys {}", epoch_index, num_non_signers, validators_keys.len());
+                }
                 println!("epoch {}: num non signers {}, num keys {}", epoch_index, num_non_signers, validators_keys.len());
                 
                 // construct the epoch block transition
