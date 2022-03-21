@@ -39,7 +39,7 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
         .map(|(i, epoch_index)| {
             let provider = provider.clone();
             async move {
-                let num = epoch_index*EPOCH_DURATION-1;
+                let num = epoch_index*EPOCH_DURATION;
                 let previous_num = num - EPOCH_DURATION as u64;
                 println!("nums: {}, {}", previous_num, num);
 
@@ -121,7 +121,7 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                     block: EpochBlock {
                         index: epoch_index as u16,
                         maximum_non_signers: num_non_signers,
-                        new_public_keys: validators_keys.clone(),
+                        new_public_keys: new_public_keys.clone(),
                         epoch_entropy: entropy,
                         parent_entropy,
                         maximum_validators: MAX_VALIDATORS,
