@@ -13,7 +13,7 @@ use ethers::{types::U256, providers::*};
 
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
-const MAX_VALIDATORS: usize = 143;
+const MAX_VALIDATORS: usize = 150;
 const MAX_TRANSITIONS: usize = 143;
 const EPOCH_DURATION: u64 = 17280;
 
