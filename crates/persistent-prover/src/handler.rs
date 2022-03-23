@@ -163,5 +163,8 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
     end_timer!(time);
     assert!(res.is_ok());
 
-    Ok("ok")
+    let mut proof_bytes = vec![];
+    proof.serialize(&mut proof_bytes).unwrap();
+
+    Ok(hex::encode(&proof_bytes))
 }
