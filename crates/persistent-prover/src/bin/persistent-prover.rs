@@ -2,7 +2,7 @@ use ark_ec::PairingEngine;
 use epoch_snark::{prove, verify, Parameters, BWCurve};
 use ark_groth16::{data_structures::ProvingKey as Groth16Parameters, VerifyingKey};
 use ark_serialize::CanonicalDeserialize;
-use ark_std::Zero;
+use ark_ff::Zero;
 use gumdrop::Options;
 use std::{
     convert::TryFrom,
@@ -22,7 +22,7 @@ use tracing::info;
 use ethers::{types::U256, utils::rlp};
 use ethers::providers::*;
 
-use ark_std::{end_timer, start_timer};
+use bench_utils::{end_timer, start_timer};
 use serde::{Deserialize, Serialize};
 use warp::{Filter, Rejection, http::StatusCode, Reply};
 use std::convert::Infallible;

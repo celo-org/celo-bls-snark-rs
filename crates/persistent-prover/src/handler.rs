@@ -5,7 +5,7 @@ use warp::Reply;
 use ark_groth16::data_structures::ProvingKey as Groth16Parameters;
 use serde::{Serialize, Deserialize};
 use epoch_snark::{Parameters, BLSCurve};
-use ark_std::{end_timer, start_timer};
+use bench_utils::{end_timer, start_timer};
 use epoch_snark::{prove, verify, BWCurve, EpochBlock, EpochTransition};
 use std::sync::Arc;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
