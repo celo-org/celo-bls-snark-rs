@@ -56,7 +56,7 @@ pub struct ProofStatusResponse {
 
 lazy_static! {
     static ref PROOFS_IN_PROGRESS: HashMap<String, Mutex<Option<ProofEndResponse>>> =
-        { HashMap::new() };
+        HashMap::new();
 }
 
 pub async fn create_proof_inner(
