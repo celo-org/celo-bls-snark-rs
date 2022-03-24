@@ -68,17 +68,13 @@ async fn main() {
 
     let health_route = warp::path!("health").map(|| StatusCode::OK);
 
-    let proof_route = warp::path!("proof")
-        .and(warp::path!("create"))
-        .and(warp::path::end())
+    let proof_route = warp::path!("proof_create")
         .and(warp::post())
         .and(warp::body::json())
         .and(with_proving_key(epoch_proving_key.clone()))
         .and_then(handler::create_proof_handler);
 
-    let proof_status_route = warp::path!("proof")
-        .and(warp::path!("status"))
-        .and(warp::path::end())
+    let proof_status_route = warp::path!("proof_status")
         .and(warp::post())
         .and(warp::body::json())
         .and_then(handler::create_proof_status_handler);
