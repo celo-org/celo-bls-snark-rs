@@ -70,6 +70,7 @@ async fn main() {
 
     let proof_route = warp::path!("proof")
         .and(warp::path!("create"))
+        .and(warp::path::end())
         .and(warp::post())
         .and(warp::body::json())
         .and(with_proving_key(epoch_proving_key.clone()))
@@ -77,6 +78,7 @@ async fn main() {
 
     let proof_status_route = warp::path!("proof")
         .and(warp::path!("status"))
+        .and(warp::path::end())
         .and(warp::post())
         .and(warp::body::json())
         .and_then(handler::create_proof_status_handler);
