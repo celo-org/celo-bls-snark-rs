@@ -1,4 +1,3 @@
-use ark_ec::PairingEngine;
 use bls_crypto::{PublicKey, Signature, hash_to_curve::try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22};
 use std::slice;
 use warp::Reply;
@@ -10,6 +9,13 @@ use epoch_snark::{prove, verify, BWCurve, EpochBlock, EpochTransition};
 use std::sync::Arc;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ethers::{types::U256, providers::*};
+use uuid::Uuid;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use tokio::task;
+
+use crate::error::Error;
 
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
@@ -24,32 +30,55 @@ pub struct ProofRequest {
     pub end_epoch: u64,
 }
 
+#[derive(Deserialize)]
+pub struct ProofStatusRequest {
+    pub id: String,
+}
+
 #[derive(Serialize)]
 pub struct ProofStartResponse {
     pub id: String,
 }
 
+#[derive(Serialize, Clone)]
+pub struct ProofEndResponse {
+    pub id: String,
+    pub proofs: Vec<String>,
+}
 
-pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Parameters<BWCurve>>) -> Result<impl Reply> {
-    let provider = Arc::new(Provider::<Http>::try_from(body.node_url.as_ref()).unwrap());
+#[derive(Serialize)]
+pub struct ProofStatusResponse {
+    pub id: String,
+    pub response: Option<ProofEndResponse>,
+}
+
+lazy_static! {
+    static ref PROOFS_IN_PROGRESS: HashMap<String, Mutex<Option<ProofEndResponse>>> = {
+        HashMap::new()
+    };
+}
+
+
+pub async fn create_proof_inner(id: String, body: ProofRequest, proving_key: Arc<Groth16Parameters<BWCurve>>) -> std::result::Result<(), Error> {
+    let provider = Arc::new(Provider::<Http>::try_from(body.node_url.as_ref()).map_err(|_| Error::DataFetchError)?);
 
     let futs = (body.start_epoch as u64..=body.end_epoch)
         .step_by(1)
         .enumerate()
-        .map(|(i, epoch_index)| {
+        .map(|(_, epoch_index)| {
             let provider = provider.clone();
             async move {
                 let num = epoch_index*EPOCH_DURATION;
                 let previous_num = num - EPOCH_DURATION as u64;
                 println!("nums: {}, {}", previous_num, num);
 
-                let block = provider.get_block(num).await.expect("could not get block").unwrap();
-                let parent_block = provider.get_block(num - EPOCH_DURATION as u64).await.expect("could not get parent epoch block").unwrap();
+                let block = provider.get_block(num).await.map_err(|_| Error::DataFetchError)?.expect("could not get parent epoch block");
+                let parent_block = provider.get_block(num - EPOCH_DURATION as u64).await.map_err(|_| Error::DataFetchError)?.expect("could not get parent epoch block");
                 //println!("block: {:?}", block);
-                let previous_validators = provider.get_validators_bls_public_keys(previous_num+1).await.expect("could not get validators");
-                let previous_validators_keys = previous_validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().unwrap();
-                let validators = provider.get_validators_bls_public_keys(num+1).await.expect("could not get validators");
-                let validators_keys = validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().unwrap();
+                let previous_validators = provider.get_validators_bls_public_keys(previous_num+1).await.map_err(|_| Error::DataFetchError)?;
+                let previous_validators_keys = previous_validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().map_err(|_| Error::DataFetchError)?;
+                let validators = provider.get_validators_bls_public_keys(num+1).await.map_err(|_| Error::DataFetchError)?;
+                let validators_keys = validators.into_iter().map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice())).collect::<std::result::Result<Vec<_>, _>>().map_err(|_| Error::DataFetchError)?;
                 //println!("valiators keys: {}", validators_keys.len());
                 println!("valiators: {}", previous_validators_keys == validators_keys);
 
@@ -96,8 +125,8 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                         maximum_validators: MAX_VALIDATORS,
                         round: i,
                     };
-                    let (mut encoded_inner, mut encoded_extra_data) =
-                    epoch_block.encode_inner_to_bytes_cip22().unwrap();
+                    let (encoded_inner, encoded_extra_data) =
+                    epoch_block.encode_inner_to_bytes_cip22().map_err(|_| Error::DataGenerationError)?;
                     let mut participating_keys = vec![];
                     for (j, b) in bitmap.iter().enumerate() {
                         if *b {
@@ -117,12 +146,12 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                     }
                 };
                 if !found_signature {
-                    panic!("could not have found signatures for epoch {}: num non signers {}, num keys {}", epoch_index, num_non_signers, validators_keys.len());
+                    return Err(Error::CouldNotFindSignatureError);
                 }
                 println!("epoch {}: num non signers {}, num keys {}", epoch_index, num_non_signers, validators_keys.len());
                 
                 // construct the epoch block transition
-                EpochTransition {
+                Ok(EpochTransition {
                     block: EpochBlock {
                         index: epoch_index as u16,
                         maximum_non_signers: num_non_signers,
@@ -134,37 +163,64 @@ pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Pa
                     },
                     aggregate_signature,
                     bitmap,
-                }
+                })
             }
         })
         .collect::<Vec<_>>();
-    let mut transitions = futures_util::future::join_all(futs).await;
-    let first_epoch = transitions.remove(0).block;
 
     let params = Parameters::<BWCurve, BLSCurve> {
         epochs: (*proving_key).clone(),
         hash_to_bits: None,
     };
 
-    // Prover generates the proof given the params
-    let time = start_timer!(|| "Generate proof");
-    let proof = prove(
-        &params,
-        MAX_VALIDATORS as u32,
-        &first_epoch,
-        &transitions,
-        MAX_TRANSITIONS,
-    ).unwrap();
-    end_timer!(time);
+    let mut transitions = futures_util::future::join_all(futs).await.into_iter().collect::<std::result::Result<Vec<_>, Error>>()?;
+    let mut first_epoch = transitions.remove(0).block;
+    let mut proofs = vec![];
+    for transitions_chunk in transitions.chunks(MAX_TRANSITIONS) {
+        let time = start_timer!(|| "Generate proof");
 
-    // Verifier checks the proof
-    let time = start_timer!(|| "Verify proof");
-    let res = verify(&params.epochs.vk, &first_epoch, &transitions.last().unwrap().block, &proof);
-    end_timer!(time);
-    assert!(res.is_ok());
+        let proof = prove(
+            &params,
+            MAX_VALIDATORS as u32,
+            &first_epoch,
+            &transitions_chunk,
+            MAX_TRANSITIONS,
+        ).map_err(|_| Error::ProofGenerationError)?;
+        end_timer!(time);
 
-    let mut proof_bytes = vec![];
-    proof.serialize(&mut proof_bytes).unwrap();
+        // Verifier checks the proof
+        let time = start_timer!(|| "Verify proof");
+        verify(&params.epochs.vk, &first_epoch, &transitions.last().unwrap().block, &proof).map_err(|_| Error::ProofVerificationError)?;
+        end_timer!(time);
 
-    Ok(hex::encode(&proof_bytes))
+        let mut proof_bytes = vec![];
+        proof.serialize(&mut proof_bytes).unwrap();
+        proofs.push(proof_bytes);
+
+        first_epoch = transitions_chunk.last().unwrap().block.clone();
+    }
+
+    *(PROOFS_IN_PROGRESS[&id].lock().map_err(|_| Error::CouldNotLockMutexError)?) = Some(ProofEndResponse{ 
+       id: id.clone(),
+       proofs: proofs.into_iter().map(|proof| hex::encode(&proof)).collect::<Vec<_>>(),
+    });
+
+    Ok(())
+}
+
+pub async fn create_proof_handler(body: ProofRequest, proving_key: Arc<Groth16Parameters<BWCurve>>) -> Result<impl Reply> {
+    let id = Uuid::new_v4().to_string();
+    task::spawn(create_proof_inner(id.clone(), body, proving_key));
+    *(PROOFS_IN_PROGRESS[&id].lock().map_err(|_| Error::CouldNotLockMutexError)?) = None;
+    Ok(warp::reply::json(&ProofStartResponse {
+        id,
+    }))
+}
+
+pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
+    let progress = PROOFS_IN_PROGRESS[&body.id].lock().map_err(|_| Error::CouldNotLockMutexError)?;
+    Ok(warp::reply::json(&ProofStatusResponse {
+        id: body.id.clone(),
+        response: (*progress).clone(),
+    }))
 }
