@@ -52,18 +52,45 @@ pub struct ProofEndResponse {
 pub struct ProofStatusResponse {
     pub id: String,
     pub response: Option<ProofEndResponse>,
+    pub error: Option<Error>,
 }
 
 lazy_static! {
-    static ref PROOFS_IN_PROGRESS: Mutex<HashMap<String, Option<ProofEndResponse>>> =
+    static ref PROOFS_IN_PROGRESS: Mutex<HashMap<String, Option<std::result::Result<ProofEndResponse, Error>>>> =
         Mutex::new(HashMap::new());
 }
 
-pub async fn create_proof_inner(
+pub async fn create_proof_inner_and_catch_errors(
     id: String,
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
-) -> std::result::Result<(), Error> {
+) {
+    let result = create_proof_inner(body, proving_key).await;
+    let mut key = PROOFS_IN_PROGRESS
+        .lock()
+        .map_err(|_| Error::CouldNotLockMutexError)
+        .unwrap();
+
+    match result {
+        Ok(proofs) => {
+            *(key.get_mut(&id).unwrap()) = Some(Ok(ProofEndResponse {
+                id: id.clone(),
+                proofs: proofs
+                    .into_iter()
+                    .map(|proof| hex::encode(&proof))
+                    .collect::<Vec<_>>(),
+            }));
+        }
+        Err(e) => {
+            *(key.get_mut(&id).unwrap()) = Some(Err(e));
+        }
+    }
+}
+
+pub async fn create_proof_inner(
+    body: ProofRequest,
+    proving_key: Arc<Groth16Parameters<BWCurve>>,
+) -> std::result::Result<Vec<Vec<u8>>, Error> {
     let provider = Arc::new(
         Provider::<Http>::try_from(body.node_url.as_ref()).map_err(|_| Error::DataFetchError)?,
     );
@@ -258,18 +285,7 @@ pub async fn create_proof_inner(
         first_epoch = transitions_chunk.last().unwrap().block.clone();
     }
 
-    let mut key = PROOFS_IN_PROGRESS
-        .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?;
-    *(key.get_mut(&id).unwrap()) = Some(ProofEndResponse {
-        id: id.clone(),
-        proofs: proofs
-            .into_iter()
-            .map(|proof| hex::encode(&proof))
-            .collect::<Vec<_>>(),
-    });
-
-    Ok(())
+    Ok(proofs)
 }
 
 pub async fn create_proof_handler(
@@ -277,7 +293,11 @@ pub async fn create_proof_handler(
     proving_key: Arc<Groth16Parameters<BWCurve>>,
 ) -> Result<impl Reply> {
     let id = Uuid::new_v4().to_string();
-    task::spawn(create_proof_inner(id.clone(), body, proving_key));
+    task::spawn(create_proof_inner_and_catch_errors(
+        id.clone(),
+        body,
+        proving_key,
+    ));
     PROOFS_IN_PROGRESS
         .lock()
         .map_err(|_| Error::CouldNotLockMutexError)?
@@ -290,8 +310,16 @@ pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<imp
         .lock()
         .map_err(|_| Error::CouldNotLockMutexError)?[&body.id]
         .clone();
+    let (response, error) = match progress {
+        None => (None, None),
+        Some(r) => match r {
+            Ok(proof_response) => (Some(proof_response), None),
+            Err(e) => (None, Some(e)),
+        },
+    };
     Ok(warp::reply::json(&ProofStatusResponse {
         id: body.id.clone(),
-        response: progress,
+        response,
+        error,
     }))
 }
