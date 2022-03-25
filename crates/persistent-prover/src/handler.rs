@@ -66,7 +66,7 @@ pub async fn create_proof_inner_and_catch_errors(
 ) {
     let result = create_proof_inner(body, proving_key).await;
     let mut key = PROOFS_IN_PROGRESS
-        .try_lock()
+        .lock()
         .map_err(|_| Error::CouldNotLockMutexError)
         .unwrap();
 
@@ -292,17 +292,17 @@ pub async fn create_proof_handler(
     sender: std::sync::mpsc::SyncSender<(String, ProofRequest)>,
 ) -> Result<impl Reply> {
     let id = Uuid::new_v4().to_string();
-    sender.send((id.clone(), body)).unwrap();
     PROOFS_IN_PROGRESS
-        .try_lock()
+        .lock()
         .map_err(|_| Error::CouldNotLockMutexError)?
         .insert(id.clone(), None);
+    sender.send((id.clone(), body)).unwrap();
     Ok(warp::reply::json(&ProofStartResponse { id }))
 }
 
 pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
     let progress = PROOFS_IN_PROGRESS
-        .try_lock()
+        .lock()
         .map_err(|_| Error::CouldNotLockMutexError)?[&body.id]
         .clone();
     let (response, error) = match progress {
