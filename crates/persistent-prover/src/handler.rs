@@ -271,7 +271,7 @@ pub async fn create_proof_inner(
         verify(
             &params.epochs.vk,
             &first_epoch,
-            &transitions.last().unwrap().block,
+            &transitions_chunk.last().unwrap().block,
             &proof,
         )
         .map_err(|_| Error::ProofVerificationError)?;
