@@ -1,9 +1,8 @@
-use epoch_snark::{prove, verify, Parameters, BWCurve};
-use std::io::BufReader;
-use std::fs::File;
 use ark_groth16::data_structures::ProvingKey as Groth16Parameters;
 use ark_serialize::CanonicalDeserialize;
-
+use epoch_snark::{prove, verify, BWCurve, Parameters};
+use std::fs::File;
+use std::io::BufReader;
 
 use std::env;
 

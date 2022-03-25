@@ -46,7 +46,12 @@ pub fn prove(
         epochs = [
             &epochs[..num_epochs - 1],
             &(0..max_transitions - num_epochs)
-                .map(|_| to_dummy_update(num_validators, epochs[num_epochs - 2].epoch_data.maximum_non_signers))
+                .map(|_| {
+                    to_dummy_update(
+                        num_validators,
+                        epochs[num_epochs - 2].epoch_data.maximum_non_signers,
+                    )
+                })
                 .collect::<Vec<_>>(),
             &[epochs[num_epochs - 1].clone()],
         ]
@@ -158,6 +163,14 @@ fn to_dummy_update(num_validators: u32, max_non_signers: u32) -> SingleUpdate<BL
                 .map(|_| Some(BLSCurveG2::prime_subgroup_generator()))
                 .collect::<Vec<_>>(),
         },
-        signed_bitmap: (0..num_validators).map(|i| if i < (num_validators - max_non_signers) { Some(true) } else { Some(false) }).collect::<Vec<_>>(),
+        signed_bitmap: (0..num_validators)
+            .map(|i| {
+                if i < (num_validators - max_non_signers) {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            })
+            .collect::<Vec<_>>(),
     }
 }

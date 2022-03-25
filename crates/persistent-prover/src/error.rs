@@ -17,3 +17,13 @@ pub enum Error {
 }
 
 impl warp::reject::Reject for Error {}
+
+impl warp::reply::Reply for Error {
+    fn into_response(self) -> warp::reply::Response {
+        warp::reply::with_status(
+            self.to_string(),
+            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+        )
+        .into_response()
+    }
+}
