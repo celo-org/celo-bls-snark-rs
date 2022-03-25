@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::slice;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tokio::task;
 use uuid::Uuid;
 use warp::Reply;
 
@@ -290,14 +289,10 @@ pub async fn create_proof_inner(
 
 pub async fn create_proof_handler(
     body: ProofRequest,
-    proving_key: Arc<Groth16Parameters<BWCurve>>,
+    sender: std::sync::mpsc::SyncSender<(String, ProofRequest)>,
 ) -> Result<impl Reply> {
     let id = Uuid::new_v4().to_string();
-    task::spawn(create_proof_inner_and_catch_errors(
-        id.clone(),
-        body,
-        proving_key,
-    ));
+    sender.send((id.clone(), body)).unwrap();
     PROOFS_IN_PROGRESS
         .try_lock()
         .map_err(|_| Error::CouldNotLockMutexError)?

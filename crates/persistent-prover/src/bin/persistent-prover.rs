@@ -5,8 +5,10 @@ use ark_relations::r1cs::*;
 use ark_serialize::CanonicalDeserialize;
 use epoch_snark::BWCurve;
 use gumdrop::Options;
-use persistent_prover::handler;
+use persistent_prover::handler::{self, ProofRequest};
 use std::convert::Infallible;
+use std::sync::mpsc::sync_channel;
+use std::thread;
 use std::{fs::File, io::BufReader, sync::Arc};
 use tracing_subscriber::{
     fmt::{fmt, time::ChronoUtc},
@@ -15,10 +17,11 @@ use tracing_subscriber::{
 };
 use warp::{http::StatusCode, Filter};
 
-fn with_proving_key<E: PairingEngine>(
-    proving_key: Arc<Groth16Parameters<E>>,
-) -> impl Filter<Extract = (Arc<Groth16Parameters<E>>,), Error = Infallible> + Clone {
-    warp::any().map(move || proving_key.clone())
+fn with_sender(
+    sender: std::sync::mpsc::SyncSender<(String, ProofRequest)>,
+) -> impl Filter<Extract = (std::sync::mpsc::SyncSender<(String, ProofRequest)>,), Error = Infallible>
+       + Clone {
+    warp::any().map(move || sender.clone())
 }
 
 #[derive(Debug, Options)]
@@ -66,12 +69,30 @@ async fn main() {
     let epoch_proving_key = Arc::new(epoch_proving_key);
     println!("Done read parameters");
 
+    let (sender, receiver) = sync_channel(1000);
+
+    thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        loop {
+            let (id, body) = receiver.recv().unwrap();
+            rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
+                id,
+                body,
+                epoch_proving_key.clone(),
+            ));
+        }
+    });
+
     let health_route = warp::path!("health").map(|| StatusCode::OK);
 
     let proof_route = warp::path!("proof_create")
         .and(warp::post())
         .and(warp::body::json())
-        .and(with_proving_key(epoch_proving_key.clone()))
+        .and(with_sender(sender.clone()))
         .and_then(handler::create_proof_handler);
 
     let proof_status_route = warp::path!("proof_status")
