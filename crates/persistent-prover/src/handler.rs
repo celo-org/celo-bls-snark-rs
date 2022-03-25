@@ -55,8 +55,8 @@ pub struct ProofStatusResponse {
 }
 
 lazy_static! {
-    static ref PROOFS_IN_PROGRESS: HashMap<String, Mutex<Option<ProofEndResponse>>> =
-        HashMap::new();
+    static ref PROOFS_IN_PROGRESS: Mutex<HashMap<String, Option<ProofEndResponse>>> =
+        Mutex::new(HashMap::new());
 }
 
 pub async fn create_proof_inner(
@@ -258,9 +258,10 @@ pub async fn create_proof_inner(
         first_epoch = transitions_chunk.last().unwrap().block.clone();
     }
 
-    *(PROOFS_IN_PROGRESS[&id]
+    let mut key = PROOFS_IN_PROGRESS
         .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?) = Some(ProofEndResponse {
+        .map_err(|_| Error::CouldNotLockMutexError)?;
+    *(key.get_mut(&id).unwrap()) = Some(ProofEndResponse {
         id: id.clone(),
         proofs: proofs
             .into_iter()
@@ -277,18 +278,20 @@ pub async fn create_proof_handler(
 ) -> Result<impl Reply> {
     let id = Uuid::new_v4().to_string();
     task::spawn(create_proof_inner(id.clone(), body, proving_key));
-    *(PROOFS_IN_PROGRESS[&id]
+    PROOFS_IN_PROGRESS
         .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?) = None;
+        .map_err(|_| Error::CouldNotLockMutexError)?
+        .insert(id.clone(), None);
     Ok(warp::reply::json(&ProofStartResponse { id }))
 }
 
 pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
-    let progress = PROOFS_IN_PROGRESS[&body.id]
+    let progress = PROOFS_IN_PROGRESS
         .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?;
+        .map_err(|_| Error::CouldNotLockMutexError)?[&body.id]
+        .clone();
     Ok(warp::reply::json(&ProofStatusResponse {
         id: body.id.clone(),
-        response: (*progress).clone(),
+        response: progress,
     }))
 }
