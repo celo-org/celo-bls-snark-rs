@@ -67,7 +67,7 @@ pub async fn create_proof_inner_and_catch_errors(
 ) {
     let result = create_proof_inner(body, proving_key).await;
     let mut key = PROOFS_IN_PROGRESS
-        .lock()
+        .try_lock()
         .map_err(|_| Error::CouldNotLockMutexError)
         .unwrap();
 
@@ -299,7 +299,7 @@ pub async fn create_proof_handler(
         proving_key,
     ));
     PROOFS_IN_PROGRESS
-        .lock()
+        .try_lock()
         .map_err(|_| Error::CouldNotLockMutexError)?
         .insert(id.clone(), None);
     Ok(warp::reply::json(&ProofStartResponse { id }))
@@ -307,7 +307,7 @@ pub async fn create_proof_handler(
 
 pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
     let progress = PROOFS_IN_PROGRESS
-        .lock()
+        .try_lock()
         .map_err(|_| Error::CouldNotLockMutexError)?[&body.id]
         .clone();
     let (response, error) = match progress {
