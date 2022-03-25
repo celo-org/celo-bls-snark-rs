@@ -1,12 +1,14 @@
 use super::encoding::{encode_public_key, encode_u16, encode_u32, encode_u8, EncodingError};
 use ark_bls12_377::{G1Projective, G2Projective};
 use ark_ec::ProjectiveCurve;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use blake2s_simd::Params;
 use bls_crypto::{
     hash_to_curve::{try_and_increment_cip22::COMPOSITE_HASH_TO_G1_CIP22, HashToCurve},
     PublicKey, Signature, OUT_DOMAIN, SIG_DOMAIN,
 };
 use bls_gadgets::utils::{bits_be_to_bytes_le, bytes_le_to_bits_le};
+use std::io::{Read, Write};
 
 #[derive(Debug, Clone, Copy)]
 pub enum EpochType {
@@ -30,7 +32,7 @@ pub struct EpochTransition {
 }
 
 /// Metadata about the next epoch
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct EpochBlock {
     /// The block number
     pub index: u16,

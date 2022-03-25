@@ -45,6 +45,7 @@ pub struct ProofStartResponse {
 pub struct ProofEndResponse {
     pub id: String,
     pub proofs: Vec<String>,
+    pub epochs: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -71,12 +72,20 @@ pub async fn create_proof_inner_and_catch_errors(
         .unwrap();
 
     match result {
-        Ok(proofs) => {
+        Ok((proofs, epochs)) => {
             *(key.get_mut(&id).unwrap()) = Some(Ok(ProofEndResponse {
                 id: id.clone(),
                 proofs: proofs
                     .into_iter()
                     .map(|proof| hex::encode(&proof))
+                    .collect::<Vec<_>>(),
+                epochs: epochs
+                    .into_iter()
+                    .map(|block| {
+                        let mut block_bytes = vec![];
+                        block.serialize(&mut block_bytes).unwrap();
+                        hex::encode(&block_bytes)
+                    })
                     .collect::<Vec<_>>(),
             }));
         }
@@ -89,7 +98,7 @@ pub async fn create_proof_inner_and_catch_errors(
 pub async fn create_proof_inner(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
-) -> std::result::Result<Vec<Vec<u8>>, Error> {
+) -> std::result::Result<(Vec<Vec<u8>>, Vec<EpochBlock>), Error> {
     let provider = Arc::new(
         Provider::<Http>::try_from(body.node_url.as_ref()).map_err(|_| Error::DataFetchError)?,
     );
@@ -253,6 +262,8 @@ pub async fn create_proof_inner(
         .collect::<std::result::Result<Vec<_>, Error>>()?;
     let mut first_epoch = transitions.remove(0).block;
     let mut proofs = vec![];
+    let mut epochs = vec![];
+    epochs.push(first_epoch.clone());
     for transitions_chunk in transitions.chunks(MAX_TRANSITIONS) {
         let time = start_timer!(|| "Generate proof");
 
@@ -282,9 +293,10 @@ pub async fn create_proof_inner(
         proofs.push(proof_bytes);
 
         first_epoch = transitions_chunk.last().unwrap().block.clone();
+        epochs.push(first_epoch.clone());
     }
 
-    Ok(proofs)
+    Ok((proofs, epochs))
 }
 
 pub async fn create_proof_handler(
