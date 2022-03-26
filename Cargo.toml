@@ -6,6 +6,7 @@ members = [
     "crates/epoch-snark",
     "crates/bls-snark-sys",
     "crates/persistent-prover",
+    "crates/plumo-wasm-verifier",
 ]
 
 [profile.release]

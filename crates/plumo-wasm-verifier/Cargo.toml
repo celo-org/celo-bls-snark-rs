@@ -1,0 +1,23 @@
+[package]
+name = "plumo-wasm-verifier"
+version = "0.2.0"
+authors = ["Kobi Gurkan <kobigurk@gmail.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+epoch-snark = { path = "../epoch-snark", default-features = false }
+bls-crypto = { path = "../bls-crypto", default-features = false }
+wasm-bindgen = { version = "0.2.79", features = ["serde-serialize"] }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra", features = [ "derive" ] }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", features = [ "std", "parallel", "r1cs" ] }
+serde = { version = "1.0", features = ["derive"] }
+hex = "0.4.2"
+console_error_panic_hook = "0.1"
+num-bigint = "0.4"
+
+[features]
+default = ["compat"]
+compat = ["epoch-snark/compat"]
