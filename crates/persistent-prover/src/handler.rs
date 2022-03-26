@@ -292,7 +292,7 @@ pub async fn create_proof_inner(
         proof.serialize(&mut proof_bytes).unwrap();
         proofs.push(proof_bytes);
 
-        first_epoch = &transitions_chunk.last().unwrap().block.clone();
+        first_epoch = transitions_chunk.last().unwrap().block.clone();
         epochs.push(first_epoch.clone());
     }
 
