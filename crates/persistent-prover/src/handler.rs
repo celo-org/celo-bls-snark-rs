@@ -60,7 +60,7 @@ pub async fn create_proof_inner_and_catch_errors(
     let aligned_start_epoch_index =
         MAX_TRANSITIONS as u64 * body.start_epoch / MAX_TRANSITIONS as u64;
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
-        let end_epoch = start_epoch + MAX_TRANSITIONS as u64;
+        let end_epoch = std::cmp::min(start_epoch + MAX_TRANSITIONS as u64, body.end_epoch);
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
         let existing_proof =
             get_existing_proof(aligned_start_epoch_index as i32, body.end_epoch as i32)?;
