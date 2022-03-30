@@ -46,7 +46,7 @@ async fn main() {
     .unwrap();
 
     let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
-    println!("Read parameters");
+    info!("Read parameters");
     let epoch_proving_key = if !opts.fake_proving_key {
         Groth16Parameters::<BWCurve>::deserialize_unchecked(&mut file).unwrap()
     } else {
@@ -68,7 +68,7 @@ async fn main() {
         }
     };
     let epoch_proving_key = Arc::new(epoch_proving_key);
-    println!("Done read parameters");
+    info!("Done read parameters");
 
     let (sender, receiver) = sync_channel(1000);
 
@@ -112,6 +112,6 @@ async fn main() {
         .or(proof_status_route)
         .with(warp::cors().allow_any_origin());
 
-    println!("Serving");
+    info!("Serving");
     warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
 }

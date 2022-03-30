@@ -10,6 +10,7 @@ use ethers::{providers::*, types::U256};
 use serde::{Deserialize, Serialize};
 use std::slice;
 use std::sync::Arc;
+use tracing::info;
 use uuid::Uuid;
 use warp::Reply;
 
@@ -58,7 +59,8 @@ pub async fn create_proof_inner_and_catch_errors(
 ) -> eyre::Result<()> {
     let aligned_start_epoch_index = body.start_epoch / EPOCH_DURATION;
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
-        let end_epoch = start_epoch + EPOCH_DURATION;
+        let end_epoch = start_epoch + MAX_TRANSITIONS as u64;
+        info!("Processing epochs {} to {}", start_epoch, end_epoch);
         let existing_proof =
             get_existing_proof(aligned_start_epoch_index as i32, body.end_epoch as i32)?;
         if let Some(_) = existing_proof {
