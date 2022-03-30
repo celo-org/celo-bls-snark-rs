@@ -57,7 +57,8 @@ pub async fn create_proof_inner_and_catch_errors(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
 ) -> eyre::Result<()> {
-    let aligned_start_epoch_index = body.start_epoch / EPOCH_DURATION;
+    let aligned_start_epoch_index =
+        MAX_TRANSITIONS as u64 * body.start_epoch / MAX_TRANSITIONS as u64;
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
         let end_epoch = start_epoch + MAX_TRANSITIONS as u64;
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
