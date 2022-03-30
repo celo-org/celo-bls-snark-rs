@@ -111,7 +111,7 @@ pub async fn create_proof_inner(
             async move {
                 let num = epoch_index * EPOCH_DURATION;
                 let previous_num = num - EPOCH_DURATION as u64;
-                println!("nums: {}, {}", previous_num, num);
+                info!("nums: {}, {}", previous_num, num);
 
                 let block = provider
                     .get_block(num)
@@ -123,7 +123,6 @@ pub async fn create_proof_inner(
                     .await
                     .map_err(|_| Error::DataFetchError)?
                     .expect("could not get parent epoch block");
-                //println!("block: {:?}", block);
                 let previous_validators = provider
                     .get_validators_bls_public_keys(previous_num + 1)
                     .await
@@ -142,8 +141,6 @@ pub async fn create_proof_inner(
                     .map(|s| PublicKey::deserialize(&mut hex::decode(&s[2..]).unwrap().as_slice()))
                     .collect::<std::result::Result<Vec<_>, _>>()
                     .map_err(|_| Error::DataFetchError)?;
-                //println!("valiators keys: {}", validators_keys.len());
-                println!("valiators: {}", previous_validators_keys == validators_keys);
 
                 let epoch_snark_data = block.epoch_snark_data.unwrap();
                 // Get the bitmap / signature
@@ -155,7 +152,6 @@ pub async fn create_proof_inner(
                     }
                     bitmap
                 };
-                //println!("bitmap: {:?}", bitmap);
 
                 let signature = epoch_snark_data.signature;
                 let aggregate_signature = Signature::deserialize(&mut &signature.0[..])
@@ -185,7 +181,6 @@ pub async fn create_proof_inner(
                         new_public_keys.push(generator.clone());
                     }
                 }
-                println!("new pub keys len {}", new_public_keys.len());
 
                 let mut round = 0;
                 let mut found_signature = false;
@@ -226,7 +221,7 @@ pub async fn create_proof_inner(
                 if !found_signature {
                     return Err(Error::CouldNotFindSignatureError);
                 }
-                println!(
+                info!(
                     "epoch {}: num non signers {}, num keys {}",
                     epoch_index,
                     num_non_signers,
