@@ -1,0 +1,6 @@
+CREATE TABLE proofs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    first_epoch BLOB NOT NULL,
+    last_epoch BLOB NOT NULL,
+    proof BLOB NOT NULL
+)

@@ -7,16 +7,14 @@ use bls_crypto::{
 use epoch_snark::{prove, verify, BWCurve, EpochBlock, EpochTransition};
 use epoch_snark::{BLSCurve, Parameters};
 use ethers::{providers::*, types::U256};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::slice;
 use std::sync::Arc;
-use std::sync::Mutex;
 use uuid::Uuid;
 use warp::Reply;
 
 use crate::error::Error;
+use crate::{create_proof, get_existing_proof};
 
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
@@ -33,7 +31,8 @@ pub struct ProofRequest {
 
 #[derive(Deserialize)]
 pub struct ProofStatusRequest {
-    pub id: String,
+    pub start_epoch: u64,
+    pub end_epoch: u64,
 }
 
 #[derive(Serialize)]
@@ -43,62 +42,60 @@ pub struct ProofStartResponse {
 
 #[derive(Serialize, Clone)]
 pub struct ProofEndResponse {
-    pub id: String,
-    pub proofs: Vec<String>,
-    pub epochs: Vec<String>,
+    pub proof: String,
+    pub first_epoch: String,
+    pub last_epoch: String,
 }
 
 #[derive(Serialize)]
 pub struct ProofStatusResponse {
-    pub id: String,
     pub response: Option<ProofEndResponse>,
-    pub error: Option<Error>,
-}
-
-lazy_static! {
-    static ref PROOFS_IN_PROGRESS: Mutex<HashMap<String, Option<std::result::Result<ProofEndResponse, Error>>>> =
-        Mutex::new(HashMap::new());
 }
 
 pub async fn create_proof_inner_and_catch_errors(
-    id: String,
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
-) {
-    let result = create_proof_inner(body, proving_key).await;
-    let mut key = PROOFS_IN_PROGRESS
-        .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)
-        .unwrap();
+) -> eyre::Result<()> {
+    let aligned_start_epoch_index = body.start_epoch / EPOCH_DURATION;
+    for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
+        let end_epoch = start_epoch + EPOCH_DURATION;
+        let existing_proof =
+            get_existing_proof(aligned_start_epoch_index as i32, body.end_epoch as i32)?;
+        if let Some(_) = existing_proof {
+            continue;
+        }
+        let partial_request = ProofRequest {
+            node_url: body.node_url.clone(),
+            start_epoch,
+            end_epoch,
+        };
+        let (proof_bytes, first_epoch_block, last_epoch_block) =
+            create_proof_inner(partial_request, proving_key.clone()).await?;
+        let mut first_epoch_block_bytes = vec![];
+        first_epoch_block
+            .serialize(&mut first_epoch_block_bytes)
+            .unwrap();
+        let mut last_epoch_block_bytes = vec![];
+        last_epoch_block
+            .serialize(&mut last_epoch_block_bytes)
+            .unwrap();
 
-    match result {
-        Ok((proofs, epochs)) => {
-            *(key.get_mut(&id).unwrap()) = Some(Ok(ProofEndResponse {
-                id: id.clone(),
-                proofs: proofs
-                    .into_iter()
-                    .map(|proof| hex::encode(&proof))
-                    .collect::<Vec<_>>(),
-                epochs: epochs
-                    .into_iter()
-                    .map(|block| {
-                        let mut block_bytes = vec![];
-                        block.serialize(&mut block_bytes).unwrap();
-                        hex::encode(&block_bytes)
-                    })
-                    .collect::<Vec<_>>(),
-            }));
-        }
-        Err(e) => {
-            *(key.get_mut(&id).unwrap()) = Some(Err(e));
-        }
+        create_proof(
+            first_epoch_block.index as i32,
+            &first_epoch_block_bytes,
+            last_epoch_block.index as i32,
+            &last_epoch_block_bytes,
+            &proof_bytes,
+        )?;
     }
+
+    Ok(())
 }
 
 pub async fn create_proof_inner(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
-) -> std::result::Result<(Vec<Vec<u8>>, Vec<EpochBlock>), Error> {
+) -> std::result::Result<(Vec<u8>, EpochBlock, EpochBlock), Error> {
     let provider = Arc::new(
         Provider::<Http>::try_from(body.node_url.as_ref()).map_err(|_| Error::DataFetchError)?,
     );
@@ -260,73 +257,54 @@ pub async fn create_proof_inner(
         .await
         .into_iter()
         .collect::<std::result::Result<Vec<_>, Error>>()?;
-    let mut first_epoch = transitions.remove(0).block;
-    let mut proofs = vec![];
-    let mut epochs = vec![];
-    epochs.push(first_epoch.clone());
-    for transitions_chunk in transitions.chunks(MAX_TRANSITIONS) {
-        let time = start_timer!(|| "Generate proof");
+    let first_epoch_block = transitions.remove(0).block;
+    let time = start_timer!(|| "Generate proof");
 
-        let proof = prove(
-            &params,
-            MAX_VALIDATORS as u32,
-            &first_epoch,
-            &transitions_chunk,
-            MAX_TRANSITIONS,
-        )
-        .map_err(|_| Error::ProofGenerationError)?;
-        end_timer!(time);
+    let proof_plumo = prove(
+        &params,
+        MAX_VALIDATORS as u32,
+        &first_epoch_block,
+        &transitions,
+        MAX_TRANSITIONS,
+    )
+    .map_err(|_| Error::ProofGenerationError)?;
+    end_timer!(time);
 
-        // Verifier checks the proof
-        let time = start_timer!(|| "Verify proof");
-        verify(
-            &params.epochs.vk,
-            &first_epoch,
-            &transitions_chunk.last().unwrap().block,
-            &proof,
-        )
-        .map_err(|_| Error::ProofVerificationError)?;
-        end_timer!(time);
+    let last_epoch_block = transitions.last().unwrap().block.clone();
+    // Verifier checks the proof
+    let time = start_timer!(|| "Verify proof");
+    verify(
+        &params.epochs.vk,
+        &first_epoch_block,
+        &last_epoch_block,
+        &proof_plumo,
+    )
+    .map_err(|_| Error::ProofVerificationError)?;
+    end_timer!(time);
 
-        let mut proof_bytes = vec![];
-        proof.serialize(&mut proof_bytes).unwrap();
-        proofs.push(proof_bytes);
+    let mut proof_bytes = vec![];
+    proof_plumo.serialize(&mut proof_bytes).unwrap();
 
-        first_epoch = transitions_chunk.last().unwrap().block.clone();
-        epochs.push(first_epoch.clone());
-    }
-
-    Ok((proofs, epochs))
+    Ok((proof_bytes, first_epoch_block, last_epoch_block))
 }
 
 pub async fn create_proof_handler(
     body: ProofRequest,
     sender: std::sync::mpsc::SyncSender<(String, ProofRequest)>,
 ) -> Result<impl Reply> {
-    let id = Uuid::new_v4().to_string();
-    PROOFS_IN_PROGRESS
-        .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?
-        .insert(id.clone(), None);
-    sender.send((id.clone(), body)).unwrap();
-    Ok(warp::reply::json(&ProofStartResponse { id }))
+    let proof_id = Uuid::new_v4().to_string();
+    sender.send((proof_id.clone(), body)).unwrap();
+    Ok(warp::reply::json(&ProofStartResponse { id: proof_id }))
 }
 
 pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
-    let progress = PROOFS_IN_PROGRESS
-        .lock()
-        .map_err(|_| Error::CouldNotLockMutexError)?[&body.id]
-        .clone();
-    let (response, error) = match progress {
-        None => (None, None),
-        Some(r) => match r {
-            Ok(proof_response) => (Some(proof_response), None),
-            Err(e) => (None, Some(e)),
-        },
-    };
+    let possible_proof = get_existing_proof(body.start_epoch as i32, body.end_epoch as i32)
+        .map_err(|_| Error::CouldNotCheckProofStatusError)?;
     Ok(warp::reply::json(&ProofStatusResponse {
-        id: body.id.clone(),
-        response,
-        error,
+        response: possible_proof.map(|p| ProofEndResponse {
+            proof: hex::encode(&p.proof),
+            first_epoch: hex::encode(&p.first_epoch),
+            last_epoch: hex::encode(&p.last_epoch),
+        }),
     }))
 }

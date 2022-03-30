@@ -15,6 +15,8 @@ pub enum Error {
     CouldNotFindSignatureError,
     #[error("could not lock mutex")]
     CouldNotLockMutexError,
+    #[error("could not check proof status")]
+    CouldNotCheckProofStatusError,
 }
 
 impl warp::reject::Reject for Error {}

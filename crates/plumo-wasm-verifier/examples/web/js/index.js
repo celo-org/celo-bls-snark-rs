@@ -115,6 +115,8 @@ import('../../../pkg/index.js').catch(console.error)
         let stateRoot = resp.header[2];
         let stateRootFromProof = VerifyProof.getRootFromProof(resp.accountProof);
         if(!stateRoot.equals(stateRootFromProof)) throw new Error('StateRoot mismatch');
+        console.log('accoutn proof: ', encode(resp.accountProof).length);
+        length += encode(resp.accountProof).length;
         const tx = await VerifyProof.getAccountFromProofAt(resp.accountProof, untrustedAccount);
         console.log('tx: ', tx, encode(tx).length);
         length += encode(tx).length;

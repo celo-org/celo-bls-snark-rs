@@ -10,6 +10,7 @@ use std::convert::Infallible;
 use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::{fs::File, io::BufReader, sync::Arc};
+use tracing::{error, info};
 use tracing_subscriber::{
     fmt::{fmt, time::ChronoUtc},
     layer::SubscriberExt,
@@ -78,12 +79,18 @@ async fn main() {
             .unwrap();
 
         loop {
-            let (id, body) = receiver.recv().unwrap();
-            rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
-                id,
+            let (id, body): (String, ProofRequest) = receiver.recv().unwrap();
+            match rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
                 body,
                 epoch_proving_key.clone(),
-            ));
+            )) {
+                Err(e) => {
+                    error!("Failed generating proof for id {}: {}", id, e.to_string());
+                }
+                Ok(()) => {
+                    info!("Finished generating proof for id {}", id);
+                }
+            };
         }
     });
 
