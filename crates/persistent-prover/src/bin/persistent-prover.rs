@@ -1,7 +1,6 @@
 use ark_ec::PairingEngine;
 use ark_ff::Zero;
 use ark_groth16::{data_structures::ProvingKey as Groth16Parameters, VerifyingKey};
-use ark_relations::r1cs::*;
 use ark_serialize::CanonicalDeserialize;
 use epoch_snark::BWCurve;
 use gumdrop::Options;
@@ -11,11 +10,6 @@ use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::{fs::File, io::BufReader, sync::Arc};
 use tracing::{error, info};
-use tracing_subscriber::{
-    fmt::{fmt, time::ChronoUtc},
-    layer::SubscriberExt,
-    EnvFilter,
-};
 use warp::{http::StatusCode, Filter};
 
 fn with_sender(
@@ -34,16 +28,7 @@ struct ProverOptions {
 #[tokio::main]
 async fn main() {
     let opts = ProverOptions::parse_args_default_or_exit();
-    let layer = ConstraintLayer::new(ark_relations::r1cs::TracingMode::OnlyConstraints);
-
-    tracing::subscriber::set_global_default(
-        fmt()
-            .with_timer(ChronoUtc::rfc3339())
-            .with_env_filter(EnvFilter::from_default_env())
-            .finish()
-            .with(layer),
-    )
-    .unwrap();
+    tracing_subscriber::fmt::init();
 
     let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
     info!("Read parameters");
