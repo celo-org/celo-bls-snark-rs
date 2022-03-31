@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@celo/contractkit": "^1.5.2",
-    "eth-proof": "^2.1.6",
+    "eth-proof": "github:kobigurk/celo-proof#d79c3cf39a05f4832426adce1fb30e2fa938776c",
     "rlp": "^3.0.0",
     "web3": "^1.3.6"
   }
