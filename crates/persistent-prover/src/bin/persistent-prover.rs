@@ -3,13 +3,22 @@ use ark_ff::Zero;
 use ark_groth16::{data_structures::ProvingKey as Groth16Parameters, VerifyingKey};
 use ark_serialize::CanonicalDeserialize;
 use epoch_snark::BWCurve;
+use ethers::prelude::BlockNumber;
+use ethers::providers::*;
 use gumdrop::Options;
-use persistent_prover::handler::{self, ProofRequest};
+use persistent_prover::{
+    error::Error,
+    get_aligned_epoch_index, get_epoch_index, get_existing_proof,
+    handler::{self, ProofRequest},
+};
 use std::convert::Infallible;
 use std::sync::mpsc::sync_channel;
 use std::thread;
+use std::thread::sleep;
+use std::time::Duration;
 use std::{fs::File, io::BufReader, sync::Arc};
 use tracing::{error, info};
+use uuid::Uuid;
 use warp::{http::StatusCode, Filter};
 
 fn with_sender(
@@ -23,6 +32,8 @@ fn with_sender(
 struct ProverOptions {
     #[options(help = "use fake proving key for debug purposes")]
     fake_proving_key: bool,
+    #[options(help = "node URL")]
+    node_url: String,
 }
 
 #[tokio::main]
@@ -56,6 +67,7 @@ async fn main() {
     info!("Done read parameters");
 
     let (sender, receiver) = sync_channel(1000);
+    let node_url_for_thread = opts.node_url.clone();
 
     thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -68,6 +80,7 @@ async fn main() {
             match rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
                 body.clone(),
                 epoch_proving_key.clone(),
+                node_url_for_thread.clone(),
             )) {
                 Err(e) => {
                     error!(
@@ -85,6 +98,47 @@ async fn main() {
                     );
                 }
             };
+        }
+    });
+
+    let sender_for_thread = sender.clone();
+    thread::spawn(move || {
+        let sender = sender_for_thread;
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        loop {
+            let check_for_new_epoch = || -> eyre::Result<()> {
+                let provider = Arc::new(Provider::<Http>::try_from(opts.node_url.as_ref())?);
+                let latest_block = rt
+                    .block_on(provider.get_block(BlockNumber::Latest))
+                    .map_err(|_| Error::DataFetchError)?;
+                if let Some(block) = latest_block {
+                    let epoch_index =
+                        get_epoch_index(block.number.ok_or(Error::DataFetchError)?.as_u64());
+                    let aligned_start_epoch_index = get_aligned_epoch_index(epoch_index);
+                    let existing_proof =
+                        get_existing_proof(aligned_start_epoch_index as i32, epoch_index as i32)?;
+                    if existing_proof.is_none() {
+                        info!("Found new epoch {}, starting proof generation", epoch_index);
+                        let proof_id = Uuid::new_v4().to_string();
+                        sender.send((
+                            proof_id.clone(),
+                            ProofRequest {
+                                start_epoch: aligned_start_epoch_index,
+                                end_epoch: epoch_index,
+                            },
+                        ))?;
+                    }
+                }
+                Ok(())
+            };
+
+            if let Err(e) = check_for_new_epoch() {
+                error!("Could not check for new epoch: {}", e.to_string());
+            }
+            sleep(Duration::from_secs(60));
         }
     });
 

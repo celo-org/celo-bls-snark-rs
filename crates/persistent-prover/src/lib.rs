@@ -16,6 +16,11 @@ use std::env;
 use models::{NewProof, Proof};
 use schema::proofs;
 
+const MIN_CIP22_EPOCH: u64 = 393;
+const MAX_VALIDATORS: usize = 150;
+const MAX_TRANSITIONS: usize = 143;
+const EPOCH_DURATION: u64 = 17280;
+
 pub fn establish_connection() -> Result<SqliteConnection> {
     dotenv().ok();
 
@@ -81,4 +86,13 @@ pub fn get_all_proofs() -> Result<Option<Vec<Proof>>> {
     };
 
     Ok(all_proofs)
+}
+
+pub fn get_aligned_epoch_index(epoch_index: u64) -> u64 {
+    MIN_CIP22_EPOCH
+        + MAX_TRANSITIONS as u64 * ((epoch_index - MIN_CIP22_EPOCH) / MAX_TRANSITIONS as u64)
+}
+
+pub fn get_epoch_index(block_number: u64) -> u64 {
+    block_number / EPOCH_DURATION
 }

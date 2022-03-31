@@ -14,19 +14,16 @@ use tracing::{debug, info};
 use uuid::Uuid;
 use warp::Reply;
 
-use crate::error::Error;
-use crate::{create_proof, get_all_proofs, get_existing_proof};
+use crate::get_aligned_epoch_index;
+use crate::{
+    create_proof, error::Error, get_all_proofs, get_existing_proof, EPOCH_DURATION,
+    MAX_TRANSITIONS, MAX_VALIDATORS, MIN_CIP22_EPOCH,
+};
 
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
-const MAX_VALIDATORS: usize = 150;
-const MAX_TRANSITIONS: usize = 143;
-const EPOCH_DURATION: u64 = 17280;
-const MIN_CIP22_EPOCH: u64 = 393;
-
 #[derive(Deserialize, Clone)]
 pub struct ProofRequest {
-    pub node_url: String,
     pub start_epoch: u64,
     pub end_epoch: u64,
 }
@@ -45,7 +42,9 @@ pub struct ProofStartResponse {
 #[derive(Serialize, Clone)]
 pub struct ProofEndResponse {
     pub proof: String,
+    pub first_epoch_index: i32,
     pub first_epoch: String,
+    pub last_epoch_index: i32,
     pub last_epoch: String,
 }
 
@@ -62,12 +61,12 @@ pub struct ProofListResponse {
 pub async fn create_proof_inner_and_catch_errors(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
+    node_url: String,
 ) -> eyre::Result<()> {
     if body.start_epoch < MIN_CIP22_EPOCH {
         return Err(Error::EpochTooSmallError.into());
     }
-    let aligned_start_epoch_index = MIN_CIP22_EPOCH
-        + MAX_TRANSITIONS as u64 * ((body.start_epoch - MIN_CIP22_EPOCH) / MAX_TRANSITIONS as u64);
+    let aligned_start_epoch_index = get_aligned_epoch_index(body.start_epoch);
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
         let end_epoch = std::cmp::min(start_epoch + MAX_TRANSITIONS as u64, body.end_epoch);
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
@@ -77,12 +76,11 @@ pub async fn create_proof_inner_and_catch_errors(
             continue;
         }
         let partial_request = ProofRequest {
-            node_url: body.node_url.clone(),
             start_epoch,
             end_epoch,
         };
         let (proof_bytes, first_epoch_block, last_epoch_block) =
-            create_proof_inner(partial_request, proving_key.clone()).await?;
+            create_proof_inner(partial_request, proving_key.clone(), node_url.clone()).await?;
         let mut first_epoch_block_bytes = vec![];
         first_epoch_block
             .serialize(&mut first_epoch_block_bytes)
@@ -108,10 +106,10 @@ pub async fn create_proof_inner_and_catch_errors(
 pub async fn create_proof_inner(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
+    node_url: String,
 ) -> std::result::Result<(Vec<u8>, EpochBlock, EpochBlock), Error> {
-    let provider = Arc::new(
-        Provider::<Http>::try_from(body.node_url.as_ref()).map_err(|_| Error::DataFetchError)?,
-    );
+    let provider =
+        Arc::new(Provider::<Http>::try_from(node_url.as_ref()).map_err(|_| Error::DataFetchError)?);
 
     let futs = (body.start_epoch as u64..=body.end_epoch)
         .step_by(1)
@@ -311,7 +309,9 @@ pub async fn create_proof_get_handler(body: ProofGetRequest) -> Result<impl Repl
     Ok(warp::reply::json(&ProofGetResponse {
         response: possible_proof.map(|p| ProofEndResponse {
             proof: hex::encode(&p.proof),
+            first_epoch_index: p.first_epoch_index as i32,
             first_epoch: hex::encode(&p.first_epoch),
+            last_epoch_index: p.last_epoch_index as i32,
             last_epoch: hex::encode(&p.last_epoch),
         }),
     }))
@@ -324,7 +324,9 @@ pub async fn create_proof_list_handler() -> Result<impl Reply> {
             p.into_iter()
                 .map(|pr| ProofEndResponse {
                     proof: hex::encode(&pr.proof),
+                    first_epoch_index: pr.first_epoch_index as i32,
                     first_epoch: hex::encode(&pr.first_epoch),
+                    last_epoch_index: pr.last_epoch_index as i32,
                     last_epoch: hex::encode(&pr.last_epoch),
                 })
                 .collect::<Vec<_>>()
