@@ -17,6 +17,8 @@ pub enum Error {
     CouldNotLockMutexError,
     #[error("could not check proof status")]
     CouldNotCheckProofStatusError,
+    #[error("epoch too small")]
+    EpochTooSmallError,
 }
 
 impl warp::reject::Reject for Error {}

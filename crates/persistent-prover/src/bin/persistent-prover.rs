@@ -66,14 +66,23 @@ async fn main() {
         loop {
             let (id, body): (String, ProofRequest) = receiver.recv().unwrap();
             match rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
-                body,
+                body.clone(),
                 epoch_proving_key.clone(),
             )) {
                 Err(e) => {
-                    error!("Failed generating proof for id {}: {}", id, e.to_string());
+                    error!(
+                        "Failed generating proof for id {}, epochs {}-{}: {}",
+                        id,
+                        body.start_epoch,
+                        body.end_epoch,
+                        e.to_string()
+                    );
                 }
                 Ok(()) => {
-                    info!("Finished generating proof for id {}", id);
+                    info!(
+                        "Finished generating proof for id {}, epochs {}-{}",
+                        id, body.start_epoch, body.end_epoch
+                    );
                 }
             };
         }
@@ -87,14 +96,19 @@ async fn main() {
         .and(with_sender(sender.clone()))
         .and_then(handler::create_proof_handler);
 
-    let proof_status_route = warp::path!("proof_status")
+    let proof_status_route = warp::path!("proof_get")
         .and(warp::post())
         .and(warp::body::json())
-        .and_then(handler::create_proof_status_handler);
+        .and_then(handler::create_proof_get_handler);
+
+    let proof_list_route = warp::path!("proof_list")
+        .and(warp::get())
+        .and_then(handler::create_proof_list_handler);
 
     let routes = health_route
         .or(proof_route)
         .or(proof_status_route)
+        .or(proof_list_route)
         .with(warp::cors().allow_any_origin());
 
     info!("Serving");

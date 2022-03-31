@@ -10,20 +10,21 @@ use ethers::{providers::*, types::U256};
 use serde::{Deserialize, Serialize};
 use std::slice;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use warp::Reply;
 
 use crate::error::Error;
-use crate::{create_proof, get_existing_proof};
+use crate::{create_proof, get_all_proofs, get_existing_proof};
 
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
 const MAX_VALIDATORS: usize = 150;
 const MAX_TRANSITIONS: usize = 143;
 const EPOCH_DURATION: u64 = 17280;
+const MIN_CIP22_EPOCH: u64 = 393;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ProofRequest {
     pub node_url: String,
     pub start_epoch: u64,
@@ -31,7 +32,7 @@ pub struct ProofRequest {
 }
 
 #[derive(Deserialize)]
-pub struct ProofStatusRequest {
+pub struct ProofGetRequest {
     pub start_epoch: u64,
     pub end_epoch: u64,
 }
@@ -49,16 +50,24 @@ pub struct ProofEndResponse {
 }
 
 #[derive(Serialize)]
-pub struct ProofStatusResponse {
+pub struct ProofGetResponse {
     pub response: Option<ProofEndResponse>,
+}
+
+#[derive(Serialize)]
+pub struct ProofListResponse {
+    pub response: Option<Vec<ProofEndResponse>>,
 }
 
 pub async fn create_proof_inner_and_catch_errors(
     body: ProofRequest,
     proving_key: Arc<Groth16Parameters<BWCurve>>,
 ) -> eyre::Result<()> {
-    let aligned_start_epoch_index =
-        MAX_TRANSITIONS as u64 * body.start_epoch / MAX_TRANSITIONS as u64;
+    if body.start_epoch < MIN_CIP22_EPOCH {
+        return Err(Error::EpochTooSmallError.into());
+    }
+    let aligned_start_epoch_index = MIN_CIP22_EPOCH
+        + MAX_TRANSITIONS as u64 * (body.start_epoch - MIN_CIP22_EPOCH) / MAX_TRANSITIONS as u64;
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
         let end_epoch = std::cmp::min(start_epoch + MAX_TRANSITIONS as u64, body.end_epoch);
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
@@ -90,6 +99,7 @@ pub async fn create_proof_inner_and_catch_errors(
             &last_epoch_block_bytes,
             &proof_bytes,
         )?;
+        info!("Done processing epochs {} to {}", start_epoch, end_epoch);
     }
 
     Ok(())
@@ -111,7 +121,7 @@ pub async fn create_proof_inner(
             async move {
                 let num = epoch_index * EPOCH_DURATION;
                 let previous_num = num - EPOCH_DURATION as u64;
-                info!("nums: {}, {}", previous_num, num);
+                debug!("nums: {}, {}", previous_num, num);
 
                 let block = provider
                     .get_block(num)
@@ -221,7 +231,7 @@ pub async fn create_proof_inner(
                 if !found_signature {
                     return Err(Error::CouldNotFindSignatureError);
                 }
-                info!(
+                debug!(
                     "epoch {}: num non signers {}, num keys {}",
                     epoch_index,
                     num_non_signers,
@@ -295,14 +305,29 @@ pub async fn create_proof_handler(
     Ok(warp::reply::json(&ProofStartResponse { id: proof_id }))
 }
 
-pub async fn create_proof_status_handler(body: ProofStatusRequest) -> Result<impl Reply> {
+pub async fn create_proof_get_handler(body: ProofGetRequest) -> Result<impl Reply> {
     let possible_proof = get_existing_proof(body.start_epoch as i32, body.end_epoch as i32)
         .map_err(|_| Error::CouldNotCheckProofStatusError)?;
-    Ok(warp::reply::json(&ProofStatusResponse {
+    Ok(warp::reply::json(&ProofGetResponse {
         response: possible_proof.map(|p| ProofEndResponse {
             proof: hex::encode(&p.proof),
             first_epoch: hex::encode(&p.first_epoch),
             last_epoch: hex::encode(&p.last_epoch),
+        }),
+    }))
+}
+
+pub async fn create_proof_list_handler() -> Result<impl Reply> {
+    let possible_proofs = get_all_proofs().map_err(|_| Error::CouldNotCheckProofStatusError)?;
+    Ok(warp::reply::json(&ProofListResponse {
+        response: possible_proofs.map(|p| {
+            p.into_iter()
+                .map(|pr| ProofEndResponse {
+                    proof: hex::encode(&pr.proof),
+                    first_epoch: hex::encode(&pr.first_epoch),
+                    last_epoch: hex::encode(&pr.last_epoch),
+                })
+                .collect::<Vec<_>>()
         }),
     }))
 }

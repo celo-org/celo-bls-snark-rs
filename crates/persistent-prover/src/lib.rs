@@ -67,3 +67,18 @@ pub fn get_existing_proof(start_epoch: i32, end_epoch: i32) -> Result<Option<Pro
 
     Ok(existing_proof)
 }
+
+pub fn get_all_proofs() -> Result<Option<Vec<Proof>>> {
+    use crate::proofs::dsl::*;
+
+    let connection = establish_connection()?;
+    let all_proofs = match proofs.load::<Proof>(&connection) {
+        Ok(p) => Some(p),
+        Err(NotFound) => None,
+        Err(e) => {
+            return Err(e.into());
+        }
+    };
+
+    Ok(all_proofs)
+}
