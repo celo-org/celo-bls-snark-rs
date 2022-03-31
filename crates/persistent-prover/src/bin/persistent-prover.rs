@@ -11,12 +11,17 @@ use persistent_prover::{
     get_aligned_epoch_index, get_epoch_index, get_existing_proof,
     handler::{self, ProofRequest},
 };
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{
+    fs::File,
+    io::BufReader,
+    sync::{Arc, Mutex},
+};
 use tracing::{error, info};
 use uuid::Uuid;
 use warp::{http::StatusCode, Filter};
@@ -69,7 +74,12 @@ async fn main() {
     let (sender, receiver) = sync_channel(1000);
     let node_url_for_thread = opts.node_url.clone();
 
+    let proofs_in_progress: Arc<Mutex<HashMap<(u64, u64), bool>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    let proofs_in_progress_for_processing = proofs_in_progress.clone();
     thread::spawn(move || {
+        let proofs_in_progress = proofs_in_progress_for_processing;
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -77,6 +87,21 @@ async fn main() {
 
         loop {
             let (id, body): (String, ProofRequest) = receiver.recv().unwrap();
+            if proofs_in_progress
+                .lock()
+                .expect("should have locked mutex")
+                .contains_key(&(body.start_epoch, body.end_epoch))
+            {
+                error!(
+                    "Already generating proof for epochs {}-{}",
+                    body.start_epoch, body.end_epoch,
+                );
+                continue;
+            }
+            proofs_in_progress
+                .lock()
+                .expect("should have locked mutex")
+                .insert((body.start_epoch, body.end_epoch), true);
             match rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
                 body.clone(),
                 epoch_proving_key.clone(),
@@ -101,8 +126,10 @@ async fn main() {
         }
     });
 
+    let proofs_in_progress_for_checking = proofs_in_progress.clone();
     let sender_for_thread = sender.clone();
     thread::spawn(move || {
+        let proofs_in_progress = proofs_in_progress_for_checking;
         let sender = sender_for_thread;
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -120,7 +147,13 @@ async fn main() {
                     let aligned_start_epoch_index = get_aligned_epoch_index(epoch_index);
                     let existing_proof =
                         get_existing_proof(aligned_start_epoch_index as i32, epoch_index as i32)?;
-                    if existing_proof.is_none() {
+
+                    if existing_proof.is_none()
+                        && !proofs_in_progress
+                            .lock()
+                            .expect("should have locked mutex")
+                            .contains_key(&(aligned_start_epoch_index, epoch_index))
+                    {
                         info!("Found new epoch {}, starting proof generation", epoch_index);
                         let proof_id = Uuid::new_v4().to_string();
                         sender.send((

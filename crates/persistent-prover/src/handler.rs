@@ -72,7 +72,7 @@ pub async fn create_proof_inner_and_catch_errors(
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
         let existing_proof =
             get_existing_proof(aligned_start_epoch_index as i32, body.end_epoch as i32)?;
-        if let Some(_) = existing_proof {
+        if existing_proof.is_some() {
             continue;
         }
         let partial_request = ProofRequest {
