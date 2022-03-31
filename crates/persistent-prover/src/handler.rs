@@ -67,7 +67,7 @@ pub async fn create_proof_inner_and_catch_errors(
         return Err(Error::EpochTooSmallError.into());
     }
     let aligned_start_epoch_index = MIN_CIP22_EPOCH
-        + MAX_TRANSITIONS as u64 * (body.start_epoch - MIN_CIP22_EPOCH) / MAX_TRANSITIONS as u64;
+        + MAX_TRANSITIONS as u64 * ((body.start_epoch - MIN_CIP22_EPOCH) / MAX_TRANSITIONS as u64);
     for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
         let end_epoch = std::cmp::min(start_epoch + MAX_TRANSITIONS as u64, body.end_epoch);
         info!("Processing epochs {} to {}", start_epoch, end_epoch);
