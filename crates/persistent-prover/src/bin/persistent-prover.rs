@@ -123,6 +123,10 @@ async fn main() {
                     );
                 }
             };
+            proofs_in_progress
+                .lock()
+                .expect("should have locked mutex")
+                .remove(&(body.start_epoch, body.end_epoch));
         }
     });
 
