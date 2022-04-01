@@ -191,7 +191,10 @@ async fn main() {
                                 end_epoch,
                             )
                         {
-                            info!("Found new epoch {}, starting proof generation", epoch_index);
+                            info!(
+                                "Found missing epoch range {}-{}, starting proof generation",
+                                start_epoch, end_epoch
+                            );
                             let proof_id = Uuid::new_v4().to_string();
 
                             insert_task_if_not_exists(
