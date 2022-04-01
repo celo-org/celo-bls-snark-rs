@@ -14,7 +14,6 @@ use tracing::{debug, info};
 use uuid::Uuid;
 use warp::Reply;
 
-use crate::get_aligned_epoch_index;
 use crate::{
     create_proof, error::Error, get_all_proofs, get_existing_proof, EPOCH_DURATION,
     MAX_TRANSITIONS, MAX_VALIDATORS, MIN_CIP22_EPOCH,
@@ -63,43 +62,39 @@ pub async fn create_proof_inner_and_catch_errors(
     proving_key: Arc<Groth16Parameters<BWCurve>>,
     node_url: String,
 ) -> eyre::Result<()> {
-    if body.start_epoch < MIN_CIP22_EPOCH {
+    let start_epoch = body.start_epoch;
+    let end_epoch = body.end_epoch;
+    if start_epoch < MIN_CIP22_EPOCH {
         return Err(Error::EpochTooSmallError.into());
     }
-    let aligned_start_epoch_index = get_aligned_epoch_index(body.start_epoch);
-    for start_epoch in (aligned_start_epoch_index..=body.end_epoch).step_by(MAX_TRANSITIONS) {
-        let end_epoch = std::cmp::min(start_epoch + MAX_TRANSITIONS as u64, body.end_epoch);
-        info!("Processing epochs {} to {}", start_epoch, end_epoch);
-        let existing_proof =
-            get_existing_proof(aligned_start_epoch_index as i32, body.end_epoch as i32)?;
-        if existing_proof.is_some() {
-            continue;
-        }
-        let partial_request = ProofRequest {
-            start_epoch,
-            end_epoch,
-        };
-        let (proof_bytes, first_epoch_block, last_epoch_block) =
-            create_proof_inner(partial_request, proving_key.clone(), node_url.clone()).await?;
-        let mut first_epoch_block_bytes = vec![];
-        first_epoch_block
-            .serialize(&mut first_epoch_block_bytes)
-            .unwrap();
-        let mut last_epoch_block_bytes = vec![];
-        last_epoch_block
-            .serialize(&mut last_epoch_block_bytes)
-            .unwrap();
-
-        create_proof(
-            first_epoch_block.index as i32,
-            &first_epoch_block_bytes,
-            last_epoch_block.index as i32,
-            &last_epoch_block_bytes,
-            &proof_bytes,
-        )?;
-        info!("Done processing epochs {} to {}", start_epoch, end_epoch);
+    info!("Processing epochs {} to {}", start_epoch, end_epoch);
+    let existing_proof = get_existing_proof(start_epoch as i32, end_epoch as i32)?;
+    if existing_proof.is_some() {
+        return Ok(());
     }
+    let partial_request = ProofRequest {
+        start_epoch,
+        end_epoch,
+    };
+    let (proof_bytes, first_epoch_block, last_epoch_block) =
+        create_proof_inner(partial_request, proving_key.clone(), node_url.clone()).await?;
+    let mut first_epoch_block_bytes = vec![];
+    first_epoch_block
+        .serialize(&mut first_epoch_block_bytes)
+        .unwrap();
+    let mut last_epoch_block_bytes = vec![];
+    last_epoch_block
+        .serialize(&mut last_epoch_block_bytes)
+        .unwrap();
 
+    create_proof(
+        first_epoch_block.index as i32,
+        &first_epoch_block_bytes,
+        last_epoch_block.index as i32,
+        &last_epoch_block_bytes,
+        &proof_bytes,
+    )?;
+    info!("Done processing epochs {} to {}", start_epoch, end_epoch);
     Ok(())
 }
 
