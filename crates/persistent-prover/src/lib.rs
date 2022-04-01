@@ -16,10 +16,10 @@ use std::env;
 use models::{NewProof, Proof};
 use schema::proofs;
 
-const MIN_CIP22_EPOCH: u64 = 393;
-const MAX_VALIDATORS: usize = 150;
-const MAX_TRANSITIONS: usize = 143;
-const EPOCH_DURATION: u64 = 17280;
+pub const MIN_CIP22_EPOCH: u64 = 393;
+pub const MAX_VALIDATORS: usize = 150;
+pub const MAX_TRANSITIONS: usize = 143;
+pub const EPOCH_DURATION: u64 = 17280;
 
 pub fn establish_connection() -> Result<SqliteConnection> {
     dotenv().ok();

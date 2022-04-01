@@ -10,6 +10,7 @@ use persistent_prover::{
     error::Error,
     get_aligned_epoch_index, get_epoch_index, get_existing_proof,
     handler::{self, ProofRequest},
+    MAX_TRANSITIONS, MIN_CIP22_EPOCH,
 };
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -37,8 +38,53 @@ fn with_sender(
 struct ProverOptions {
     #[options(help = "use fake proving key for debug purposes")]
     fake_proving_key: bool,
-    #[options(help = "node URL")]
+    #[options(help = "node URL", default = "http://localhost:8545")]
     node_url: String,
+    #[options(help = "proving key location", default = "prover_key")]
+    proving_key_path: String,
+}
+
+fn insert_task_if_not_exists(
+    proofs_in_progress: Arc<Mutex<HashMap<(u64, u64), bool>>>,
+    start_epoch: u64,
+    end_epoch: u64,
+) {
+    if proofs_in_progress
+        .lock()
+        .expect("should have locked mutex")
+        .contains_key(&(start_epoch, end_epoch))
+    {
+        error!(
+            "Already generating proof for epochs {}-{}",
+            start_epoch, end_epoch,
+        );
+    }
+    proofs_in_progress
+        .lock()
+        .expect("should have locked mutex")
+        .insert((start_epoch, end_epoch), true);
+}
+
+fn remove_task(
+    proofs_in_progress: Arc<Mutex<HashMap<(u64, u64), bool>>>,
+    start_epoch: u64,
+    end_epoch: u64,
+) {
+    proofs_in_progress
+        .lock()
+        .expect("should have locked mutex")
+        .remove(&(start_epoch, end_epoch));
+}
+
+fn check_task_in_progress(
+    proofs_in_progress: Arc<Mutex<HashMap<(u64, u64), bool>>>,
+    start_epoch: u64,
+    end_epoch: u64,
+) -> bool {
+    proofs_in_progress
+        .lock()
+        .expect("should have locked mutex")
+        .contains_key(&(start_epoch, end_epoch))
 }
 
 #[tokio::main]
@@ -46,7 +92,8 @@ async fn main() {
     let opts = ProverOptions::parse_args_default_or_exit();
     tracing_subscriber::fmt::init();
 
-    let mut file = BufReader::new(File::open("prover_key").expect("Cannot open prover key file"));
+    let mut file =
+        BufReader::new(File::open(opts.proving_key_path).expect("Cannot open prover key file"));
     info!("Read parameters");
     let epoch_proving_key = if !opts.fake_proving_key {
         Groth16Parameters::<BWCurve>::deserialize_unchecked(&mut file).unwrap()
@@ -87,21 +134,7 @@ async fn main() {
 
         loop {
             let (id, body): (String, ProofRequest) = receiver.recv().unwrap();
-            if proofs_in_progress
-                .lock()
-                .expect("should have locked mutex")
-                .contains_key(&(body.start_epoch, body.end_epoch))
-            {
-                error!(
-                    "Already generating proof for epochs {}-{}",
-                    body.start_epoch, body.end_epoch,
-                );
-                continue;
-            }
-            proofs_in_progress
-                .lock()
-                .expect("should have locked mutex")
-                .insert((body.start_epoch, body.end_epoch), true);
+
             match rt.block_on(crate::handler::create_proof_inner_and_catch_errors(
                 body.clone(),
                 epoch_proving_key.clone(),
@@ -123,10 +156,7 @@ async fn main() {
                     );
                 }
             };
-            proofs_in_progress
-                .lock()
-                .expect("should have locked mutex")
-                .remove(&(body.start_epoch, body.end_epoch));
+            remove_task(proofs_in_progress.clone(), body.start_epoch, body.end_epoch);
         }
     });
 
@@ -149,25 +179,47 @@ async fn main() {
                     let epoch_index =
                         get_epoch_index(block.number.ok_or(Error::DataFetchError)?.as_u64());
                     let aligned_start_epoch_index = get_aligned_epoch_index(epoch_index);
-                    let existing_proof =
-                        get_existing_proof(aligned_start_epoch_index as i32, epoch_index as i32)?;
 
-                    if existing_proof.is_none()
-                        && !proofs_in_progress
-                            .lock()
-                            .expect("should have locked mutex")
-                            .contains_key(&(aligned_start_epoch_index, epoch_index))
+                    let send_if_needed = |start_epoch, end_epoch| -> eyre::Result<()> {
+                        let existing_proof =
+                            get_existing_proof(start_epoch as i32, end_epoch as i32)?;
+
+                        if existing_proof.is_none()
+                            && !check_task_in_progress(
+                                proofs_in_progress.clone(),
+                                start_epoch,
+                                end_epoch,
+                            )
+                        {
+                            info!("Found new epoch {}, starting proof generation", epoch_index);
+                            let proof_id = Uuid::new_v4().to_string();
+
+                            insert_task_if_not_exists(
+                                proofs_in_progress.clone(),
+                                start_epoch,
+                                end_epoch,
+                            );
+
+                            sender.send((
+                                proof_id.clone(),
+                                ProofRequest {
+                                    start_epoch,
+                                    end_epoch,
+                                },
+                            ))?;
+                        }
+
+                        Ok(())
+                    };
+                    for older_epoch_index in
+                        (MIN_CIP22_EPOCH..aligned_start_epoch_index).step_by(MAX_TRANSITIONS)
                     {
-                        info!("Found new epoch {}, starting proof generation", epoch_index);
-                        let proof_id = Uuid::new_v4().to_string();
-                        sender.send((
-                            proof_id.clone(),
-                            ProofRequest {
-                                start_epoch: aligned_start_epoch_index,
-                                end_epoch: epoch_index,
-                            },
-                        ))?;
+                        send_if_needed(
+                            older_epoch_index,
+                            older_epoch_index + MAX_TRANSITIONS as u64,
+                        )?;
                     }
+                    send_if_needed(aligned_start_epoch_index, epoch_index)?;
                 }
                 Ok(())
             };
