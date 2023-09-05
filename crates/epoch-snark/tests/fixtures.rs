@@ -13,7 +13,7 @@ pub fn generate_test_data(
     num_epochs: usize,
 ) -> (EpochBlock, Vec<EpochTransition>, EpochBlock) {
     let bitmaps = generate_bitmaps(num_epochs, num_validators, faults);
-    let initial_validator_set = keygen_mul::<Bls12_377>(num_validators as usize);
+    let initial_validator_set = keygen_mul::<Bls12_377>(num_validators);
     // Generate the initial epoch. This was proven to be correct either via
     // the previous epoch proof, or it's the genesis block
     let initial_pubkeys = initial_validator_set
@@ -32,7 +32,7 @@ pub fn generate_test_data(
     );
 
     // Generate keys for the validators of each epoch
-    let validators = keygen_batch::<Bls12_377>(num_epochs, num_validators as usize);
+    let validators = keygen_batch::<Bls12_377>(num_epochs, num_validators);
     // generate the block for i+1th epoch
     let pubkeys = validators
         .1

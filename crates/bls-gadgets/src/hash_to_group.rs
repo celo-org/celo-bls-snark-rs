@@ -222,8 +222,7 @@ pub fn hash_to_bits<F: PrimeField>(
             // convert hash result to LE bits
             let xof_bits_i = xof_result
                 .into_iter()
-                .map(|n| n.to_bits_le())
-                .flatten()
+                .flat_map(|n| n.to_bits_le())
                 .collect::<Vec<Boolean<F>>>();
             xof_bits.extend_from_slice(&xof_bits_i);
         }

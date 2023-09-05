@@ -225,7 +225,7 @@ pub unsafe extern "C" fn destroy_private_key(private_key: *mut PrivateKey) -> bo
     if private_key.is_null() {
         return false;
     }
-    Box::from_raw(private_key);
+    let _ = Box::from_raw(private_key);
     true
 }
 
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn destroy_public_key(public_key: *mut PublicKey) -> bool 
     if public_key.is_null() {
         return false;
     }
-    Box::from_raw(public_key);
+    let _ = Box::from_raw(public_key);
     true
 }
 
@@ -261,6 +261,6 @@ pub unsafe extern "C" fn destroy_signature(signature: *mut Signature) -> bool {
     if signature.is_null() {
         return false;
     }
-    Box::from_raw(signature);
+    let _ = Box::from_raw(signature);
     true
 }

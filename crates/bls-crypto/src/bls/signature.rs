@@ -221,7 +221,7 @@ mod tests {
         apk3.verify(&message[..], &[], &sigs[0], try_and_increment)
             .unwrap_err();
 
-        let apk4 = PublicKey::aggregate(&[sk1.to_public(), sk2.to_public()]);
+        let apk4 = PublicKey::aggregate([sk1.to_public(), sk2.to_public()]);
         apk4.verify(&message[..], &[], &asig, try_and_increment)
             .unwrap();
         apk4.verify(&message[..], &[], &sigs[0], try_and_increment)
@@ -422,6 +422,6 @@ mod tests {
         batch.add(wrong_msg_pk, wrong_msg_sig);
 
         let res = batch.verify(&*COMPOSITE_HASH_TO_G1_CIP22);
-        assert!(!res.is_ok());
+        assert!(res.is_err());
     }
 }

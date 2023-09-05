@@ -33,19 +33,19 @@ pub extern "C" fn encode_epoch_block_to_bytes_cip22(
             slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
         };
         let added_public_keys = added_public_keys_ptrs
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
         let epoch_entropy = unsafe { read_epoch_entropy(in_epoch_entropy) };
         let parent_entropy = unsafe { read_epoch_entropy(in_parent_entropy) };
         let epoch_block = EpochBlock::new(
-            in_epoch_index as u16,
-            in_round_number as u8,
+            in_epoch_index,
+            in_round_number,
             epoch_entropy,
             parent_entropy,
-            in_maximum_non_signers as u32,
+            in_maximum_non_signers,
             in_maximum_validators as usize,
             added_public_keys,
         );
@@ -79,17 +79,17 @@ pub extern "C" fn encode_epoch_block_to_bytes(
             slice::from_raw_parts(in_added_public_keys, in_added_public_keys_len as usize)
         };
         let added_public_keys = added_public_keys_ptrs
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
         let epoch_block = EpochBlock::new(
-            in_epoch_index as u16,
+            in_epoch_index,
             0u8,  // The round number is not used prior to CIP22
             None, // The epoch entropy is not used prior to CIP22
             None, // The parent entropy is not used prior to CIP22
-            in_maximum_non_signers as u32,
+            in_maximum_non_signers,
             added_public_keys.len(),
             added_public_keys,
         );
@@ -130,7 +130,7 @@ impl TryFrom<&EpochBlockFFI> for EpochBlock {
     type Error = EncodingError;
 
     fn try_from(src: &EpochBlockFFI) -> Result<EpochBlock, Self::Error> {
-        let pubkeys = unsafe { read_pubkeys(src.pubkeys, src.pubkeys_num as usize)? };
+        let pubkeys = unsafe { read_pubkeys(src.pubkeys, src.pubkeys_num)? };
         let epoch_entropy = unsafe { read_epoch_entropy(src.epoch_entropy) };
         let parent_entropy = unsafe { read_epoch_entropy(src.parent_entropy) };
         Ok(EpochBlock {

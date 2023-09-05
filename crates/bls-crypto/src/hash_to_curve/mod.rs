@@ -423,7 +423,7 @@ mod compat_tests {
             "1c529f631ddaffde7cbe62bbb8d48cc8dbe59b8548dc69b156d0568c7aae898d8051a3ef31ad17c60a85ad82203a9b81",
             "de54da7a8813a30c267d662d428e28520a159b51a9e226ceb663d460d9065b66a9586cb8b3a9ba0ef0e27c626f20dc80",
             "b68e1db4b648801676a79ac199eaf003757bf2a96cdbb804bfefe0484afdc0cc299d50d660221d1de374e92c44291280",
-        ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
+        ].into_iter().map(|x| hex::decode(x).unwrap()).collect::<Vec<_>>();
 
         let hasher = TryAndIncrement::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(
             &*COMPOSITE_HASHER,
@@ -446,7 +446,7 @@ mod compat_tests {
             "ab7a89228341fce8deb3d86ff0bb9611b1baf2a1d9d0b64710f42cfe6a7c4f789a36308c3fb70e41630396a2c7aa2601",
             "161e32f9621de279b2e3572d5e07c17c33f5e9bf7a532a382e16c2a323a624799f2b187212d12d8eb5fb3032695f0480",
             "acbb3071d0899488ba69ce1592f49c20dada7598690f8393cca80d4abeca0dc6dec112c70228328d68f8f34d3795d100",
-        ].into_iter().map(|x| hex::decode(&x).unwrap()).collect::<Vec<_>>();
+        ].into_iter().map(|x| hex::decode(x).unwrap()).collect::<Vec<_>>();
 
         let hasher = TryAndIncrementCIP22::<_, <Parameters as Bls12Parameters>::G1Parameters>::new(
             &*COMPOSITE_HASHER,

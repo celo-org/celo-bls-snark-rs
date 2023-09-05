@@ -96,7 +96,7 @@ where
 
         let mut counter = [0; 1];
         for c in 0..NUM_TRIES {
-            (&mut counter[..]).write_u8(c as u8)?;
+            (&mut counter[..]).write_u8(c)?;
             let candidate_hash = self.hasher.hash(
                 domain,
                 &[&counter, extra_data, message].concat(),
