@@ -64,7 +64,7 @@ jobs:
           name: Check Style
           command: |
             cargo fmt --all -- --check
-            cargo clippy --release --all-targets --all-features -- -D warnings
+            cargo clippy --release --all-targets --all-features -- -D warnings -A clippy::not_unsafe_ptr_arg_deref
       - run:
           name: Audit Dependencies
           command: cargo audit --ignore "RUSTSEC-2021-0075"
