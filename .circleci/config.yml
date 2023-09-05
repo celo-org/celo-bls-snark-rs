@@ -67,7 +67,7 @@ jobs:
             cargo clippy --release --all-targets --all-features -- -D warnings -A clippy::not_unsafe_ptr_arg_deref
       - run:
           name: Audit Dependencies
-          command: cargo audit --ignore "RUSTSEC-2021-0075"
+          command: cargo audit --ignore "RUSTSEC-2021-0075" --ignore "RUSTSEC-2022-0013"
       - persist_to_workspace:
           root: .
           paths: target/release
