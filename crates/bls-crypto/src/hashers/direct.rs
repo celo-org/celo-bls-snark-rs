@@ -11,7 +11,7 @@ fn xof_digest_length_to_node_offset(
 ) -> Result<u64, BLSError> {
     let mut xof_digest_length_bytes: [u8; 2] = [0; 2];
     (&mut xof_digest_length_bytes[..]).write_u16::<LittleEndian>(xof_digest_length as u16)?;
-    let offset = node_offset as u64
+    let offset = node_offset
         | ((xof_digest_length_bytes[0] as u64) << 32)
         | ((xof_digest_length_bytes[1] as u64) << 40);
     Ok(offset)

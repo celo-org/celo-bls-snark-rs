@@ -360,14 +360,14 @@ pub extern "C" fn batch_verify_strict(
             let extra_data = <&[u8]>::from(&batch.extra);
 
             let public_keys =
-                unsafe { slice::from_raw_parts(batch.public_keys, batch.public_keys_len as usize) };
+                unsafe { slice::from_raw_parts(batch.public_keys, batch.public_keys_len) };
             let public_keys = public_keys
                 .iter()
                 .map(|ptr| unsafe { (**ptr).clone() })
                 .collect::<Vec<_>>();
 
             let signatures =
-                unsafe { slice::from_raw_parts(batch.signatures, batch.signatures_len as usize) };
+                unsafe { slice::from_raw_parts(batch.signatures, batch.signatures_len) };
             let signatures = signatures
                 .iter()
                 .map(|ptr| unsafe { (**ptr).clone() })
@@ -434,8 +434,8 @@ pub extern "C" fn aggregate_public_keys(
         let public_keys_ptrs =
             unsafe { slice::from_raw_parts(in_public_keys, in_public_keys_len as usize) };
         let public_keys = public_keys_ptrs
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
@@ -462,8 +462,8 @@ pub extern "C" fn aggregate_public_keys_subtract(
         let public_keys_ptrs =
             unsafe { slice::from_raw_parts(in_public_keys, in_public_keys_len as usize) };
         let public_keys = public_keys_ptrs
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .map(|pk| unsafe { &*pk }.clone())
             .collect::<Vec<PublicKey>>();
 
@@ -491,8 +491,8 @@ pub extern "C" fn aggregate_signatures(
         let signatures_ptrs =
             unsafe { slice::from_raw_parts(in_signatures, in_signatures_len as usize) };
         let signatures = signatures_ptrs
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .map(|sig| unsafe { &*sig }.clone())
             .collect::<Vec<Signature>>();
         let aggregated_signature = Signature::aggregate(&signatures[..]);

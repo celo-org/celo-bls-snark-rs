@@ -36,10 +36,7 @@ pub fn prove(
     let span = span!(Level::TRACE, "prove");
     let _enter = span.enter();
 
-    let mut epochs = transitions
-        .iter()
-        .map(|transition| to_update(transition))
-        .collect::<Vec<_>>();
+    let mut epochs = transitions.iter().map(to_update).collect::<Vec<_>>();
 
     let num_epochs = epochs.len();
     if num_epochs < max_transitions {

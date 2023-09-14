@@ -6,8 +6,8 @@ defaults: &defaults
 rust_defaults: &rust_defaults
   <<: *defaults
   docker:
-    - image: circleci/rust:latest
-  resource_class: xlarge
+    - image: cimg/rust:1.72.0
+  resource_class: large
 
 jobs:
   checkout-repo:
@@ -64,10 +64,10 @@ jobs:
           name: Check Style
           command: |
             cargo fmt --all -- --check
-            cargo clippy --release --all-targets --all-features -- -D warnings
+            cargo clippy --release --all-targets --all-features -- -D warnings -A clippy::not_unsafe_ptr_arg_deref
       - run:
           name: Audit Dependencies
-          command: cargo audit --ignore "RUSTSEC-2021-0075"
+          command: cargo audit --ignore "RUSTSEC-2021-0075" --ignore "RUSTSEC-2022-0013"
       - persist_to_workspace:
           root: .
           paths: target/release

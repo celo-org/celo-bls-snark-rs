@@ -90,7 +90,7 @@ where
         let inner_hash = self.hasher.crh(domain, message, hash_bytes)?;
         let mut counter = [0; 1];
         for c in 0..NUM_TRIES {
-            (&mut counter[..]).write_u8(c as u8)?;
+            (&mut counter[..]).write_u8(c)?;
 
             // concatenate the message with the counter
             let msg = &[&counter, extra_data, &inner_hash].concat();
