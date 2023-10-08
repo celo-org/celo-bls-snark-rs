@@ -68,8 +68,7 @@ pub trait HashToCurve {
 ///      2. given 96 = 768 bits, it will return 96 bytes (no rounding needed since 768 is already a
 ///         multiple of 256)
 pub fn hash_length(n: usize) -> usize {
-    let bits = (n * 8) as f64 / 256.0;
-    let rounded_bits = bits.ceil() * 256.0;
+    let rounded_bits = (((n * 8) -1 + 256) / 256) * 256;
     rounded_bits as usize / 8
 }
 
