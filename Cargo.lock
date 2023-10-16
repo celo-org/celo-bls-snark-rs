@@ -49,7 +49,7 @@ dependencies = [
 [[package]]
 name = "ark-bls12-377"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/curves#6ed2450b5505de5d451f629bb6642e3977bf66e2"
+source = "git+https://github.com//arkworks-rs/curves?rev=6ed2450#6ed2450b5505de5d451f629bb6642e3977bf66e2"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -60,7 +60,7 @@ dependencies = [
 [[package]]
 name = "ark-bw6-761"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/curves#6ed2450b5505de5d451f629bb6642e3977bf66e2"
+source = "git+https://github.com//arkworks-rs/curves?rev=6ed2450#6ed2450b5505de5d451f629bb6642e3977bf66e2"
 dependencies = [
  "ark-bls12-377",
  "ark-ec",
@@ -71,7 +71,7 @@ dependencies = [
 [[package]]
 name = "ark-crypto-primitives"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/crypto-primitives?branch=main#fde39ab764f00e28b2f292af3706a2654ea55edb"
+source = "git+https://github.com//arkworks-rs/crypto-primitives?rev=fde39ab#fde39ab764f00e28b2f292af3706a2654ea55edb"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -92,7 +92,7 @@ dependencies = [
 [[package]]
 name = "ark-ec"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "ark-ff",
  "ark-serialize",
@@ -107,7 +107,7 @@ dependencies = [
 [[package]]
 name = "ark-ed-on-bls12-377"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/curves#6ed2450b5505de5d451f629bb6642e3977bf66e2"
+source = "git+https://github.com//arkworks-rs/curves?rev=6ed2450#6ed2450b5505de5d451f629bb6642e3977bf66e2"
 dependencies = [
  "ark-bls12-377",
  "ark-ec",
@@ -118,7 +118,7 @@ dependencies = [
 [[package]]
 name = "ark-ed-on-bw6-761"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/curves#6ed2450b5505de5d451f629bb6642e3977bf66e2"
+source = "git+https://github.com//arkworks-rs/curves?rev=6ed2450#6ed2450b5505de5d451f629bb6642e3977bf66e2"
 dependencies = [
  "ark-ed-on-cp6-782",
 ]
@@ -126,7 +126,7 @@ dependencies = [
 [[package]]
 name = "ark-ed-on-cp6-782"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/curves#6ed2450b5505de5d451f629bb6642e3977bf66e2"
+source = "git+https://github.com//arkworks-rs/curves?rev=6ed2450#6ed2450b5505de5d451f629bb6642e3977bf66e2"
 dependencies = [
  "ark-bls12-377",
  "ark-ec",
@@ -137,7 +137,7 @@ dependencies = [
 [[package]]
 name = "ark-ff"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "ark-ff-asm",
  "ark-ff-macros",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-asm"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "quote",
  "syn 1.0.58",
@@ -163,7 +163,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-macros"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -174,7 +174,7 @@ dependencies = [
 [[package]]
 name = "ark-groth16"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/groth16#d8acb2b2108023b2ad09974040b347b03bfe70b1"
+source = "git+https://github.com//arkworks-rs/groth16?rev=d8acb2b#d8acb2b2108023b2ad09974040b347b03bfe70b1"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
@@ -212,7 +212,7 @@ dependencies = [
 [[package]]
 name = "ark-poly"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "ark-ff",
  "ark-serialize",
@@ -226,7 +226,7 @@ dependencies = [
 [[package]]
 name = "ark-r1cs-std"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/r1cs-std#e5ec2e66d3aead34f7e3fa15909f22e1600bd11d"
+source = "git+https://github.com//arkworks-rs/r1cs-std?rev=e5ec2e6#e5ec2e66d3aead34f7e3fa15909f22e1600bd11d"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "ark-relations"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/snark#8d9055d5397b510716ad2951ce1f18675aebe7c8"
+source = "git+https://github.com//arkworks-rs/snark?rev=8d9055d#8d9055d5397b510716ad2951ce1f18675aebe7c8"
 dependencies = [
  "ark-ff",
  "ark-std 0.1.0",
@@ -250,7 +250,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "ark-serialize-derive",
  "ark-std 0.1.0",
@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize-derive"
 version = "0.1.1-alpha.0"
-source = "git+https://github.com/arkworks-rs/algebra#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
+source = "git+https://github.com//arkworks-rs/algebra?rev=8d76d18#8d76d181de0079b7e5a92f6e1133e7be635efdd3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -269,7 +269,7 @@ dependencies = [
 [[package]]
 name = "ark-snark"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/snark#8d9055d5397b510716ad2951ce1f18675aebe7c8"
+source = "git+https://github.com//arkworks-rs/snark?rev=8d9055d#8d9055d5397b510716ad2951ce1f18675aebe7c8"
 dependencies = [
  "ark-ff",
  "ark-relations",
@@ -289,7 +289,7 @@ dependencies = [
 [[package]]
 name = "ark-std"
 version = "0.3.0"
-source = "git+https://github.com/arkworks-rs/std#d0be44c030b35f369db6f9431903a283c077a1b9"
+source = "git+https://github.com//arkworks-rs/std?rev=d0be44c#d0be44c030b35f369db6f9431903a283c077a1b9"
 dependencies = [
  "colored",
  "num-traits",
@@ -328,7 +328,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "bench-utils"
 version = "0.1.0"
-source = "git+https://github.com/arkworks-rs/utils#b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9"
+source = "git+https://github.com/arkworks-rs/std?rev=b37f1c8#b37f1c8f73c94c5648b6dd310d02c3a81c8a37e9"
 
 [[package]]
 name = "bitflags"

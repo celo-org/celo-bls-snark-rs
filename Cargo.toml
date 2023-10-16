@@ -30,3 +30,35 @@ opt-level = 3
 incremental = true
 debug-assertions = true
 debug = true
+
+
+[patch."https://github.com/arkworks-rs/crypto-primitives"]
+ark-crypto-primitives = { git = "https://github.com//arkworks-rs/crypto-primitives", rev = "fde39ab" }
+
+[patch."https://github.com/arkworks-rs/curves"]
+ark-bls12-377 = { git = "https://github.com//arkworks-rs/curves", rev = "6ed2450" }
+ark-bw6-761 = { git = "https://github.com//arkworks-rs/curves", rev = "6ed2450" }
+ark-ed-on-bw6-761 = { git = "https://github.com//arkworks-rs/curves", rev = "6ed2450" }
+ark-ed-on-bls12-377 = { git = "https://github.com//arkworks-rs/curves", rev = "6ed2450" }
+
+[patch."https://github.com/arkworks-rs/algebra"]
+ark-ff = { git = "https://github.com//arkworks-rs/algebra", rev = "8d76d18" }
+ark-ec = { git = "https://github.com//arkworks-rs/algebra", rev = "8d76d18" }
+ark-serialize = { git = "https://github.com//arkworks-rs/algebra", rev = "8d76d18" }
+ark-poly = { git = "https://github.com//arkworks-rs/algebra", rev = "8d76d18" }
+
+[patch."https://github.com/arkworks-rs/groth16"]
+ark-groth16 = { git = "https://github.com//arkworks-rs/groth16", rev = "d8acb2b" }
+
+[patch."https://github.com/arkworks-rs/snark"]
+ark-relations = { git = "https://github.com//arkworks-rs/snark", rev = "8d9055d" }
+ark-snark = { git = "https://github.com//arkworks-rs/snark", rev = "8d9055d"}
+
+[patch."https://github.com/arkworks-rs/r1cs-std"]
+ark-r1cs-std = { git = "https://github.com//arkworks-rs/r1cs-std", rev = "e5ec2e6" }
+
+[patch."https://github.com/arkworks-rs/std"]
+ark-std = { git = "https://github.com//arkworks-rs/std", rev = "d0be44c" }
+
+[patch."https://github.com/arkworks-rs/utils"]
+bench-utils = { git = "https://github.com/arkworks-rs/std", rev = "b37f1c8" }
